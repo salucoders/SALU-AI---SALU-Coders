@@ -1,0 +1,8 @@
+{
+  "name": "SALU Coders AI",
+  "description": "A next-generation intelligent assistant for students, developers, creators, and the SALU community.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}
