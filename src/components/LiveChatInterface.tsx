@@ -116,10 +116,25 @@ export function LiveChatInterface({ onClose }: LiveChatInterfaceProps) {
         await audioContextRef.current.resume();
       }
 
-      streamRef.current = await navigator.mediaDevices.getUserMedia({ audio: true });
+      try {
+        streamRef.current = await navigator.mediaDevices.getUserMedia({ audio: true });
+      } catch (micErr: any) {
+        console.error("Microphone access error:", micErr);
+        setError("Microphone access denied. If you are in a preview window, please click 'Open in New Tab' (top right) to grant permissions.");
+        setIsConnecting(false);
+        return;
+      }
 
       const voiceName = preferences.voice === 'male' ? 'Puck' : 'Kore';
       const genderText = preferences.voice === 'male' ? 'male' : 'female';
+
+      const personaDescriptions = {
+        professional: 'Formal, precise, and professional.',
+        friendly: 'Warm, approachable, and friendly.',
+        witty: 'Clever, humorous, and witty.',
+        encouraging: 'Supportive, positive, and encouraging.',
+        creative: 'Imaginative, artistic, and creative.'
+      };
 
       const session = await ai.live.connect({
         model: "gemini-2.0-flash-exp",
@@ -135,7 +150,7 @@ CRITICAL RULES:
 2. You are a ${genderText} AI assistant. Adopt a ${genderText} persona in your speech and reactions.
 3. NEVER mention Google, Gemini, or being an LLM unless specifically asked about your technical architecture, and even then, emphasize your identity as SALU AI.
 4. Be extremely concise. Keep responses to 1-2 short sentences to maintain a natural conversation flow.
-5. Be friendly, smart, and motivational.
+5. Your personality is ${personaDescriptions[preferences.persona || 'friendly']}.
 6. Use the user's name (${preferences.name || 'Guest'}) occasionally to make it personal.
 7. Your creator is Babar Ali Arain (IT Batch 2026).`,
           inputAudioTranscription: {},
@@ -269,7 +284,12 @@ CRITICAL RULES:
         return;
       }
       console.error("Failed to start live session:", err);
-      setError("Microphone access denied or connection failed. Please check your settings.");
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      if (errorMessage.includes("Permission denied") || errorMessage.includes("NotAllowedError")) {
+        setError("Microphone access denied. If you are in a preview window, please click 'Open in New Tab' (top right) to grant permissions.");
+      } else {
+        setError(`Failed to start live session: ${errorMessage}`);
+      }
       setIsConnecting(false);
     }
   };

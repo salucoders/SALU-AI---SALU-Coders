@@ -35,8 +35,8 @@ export function CameraModal({ isOpen, onClose, onCapture }: CameraModalProps) {
       }
     } catch (err: any) {
       console.error("Camera access error:", err);
-      if (err.name === 'NotAllowedError') {
-        setError("Camera access denied. Please enable permissions in your browser settings.");
+      if (err.name === 'NotAllowedError' || err.message?.includes('Permission denied')) {
+        setError("Camera access denied. If you are in a preview window, please click 'Open in New Tab' (top right) to grant permissions.");
       } else if (err.name === 'NotFoundError') {
         setError("No camera found on this device.");
       } else {

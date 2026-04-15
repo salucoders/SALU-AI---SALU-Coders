@@ -1,9 +1,9 @@
 import { Message, Mode, UserPreferences, Persona } from "../types";
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { GoogleGenAI } from "@google/genai";
 
 export async function getActiveApiKey(): Promise<string> {
   // Use environment variable if provided (e.g., in Netlify), otherwise use the hardcoded key
-  return import.meta.env.VITE_GEMINI_API_KEY || "AIzaSyAnHn18NhxNAb8MRb-bSAgOIWJf3WncMZ8";
+  return (process.env.GEMINI_API_KEY as string) || "AIzaSyAnHn18NhxNAb8MRb-bSAgOIWJf3WncMZ8";
 }
 
 function getSystemInstruction(mode: Mode, preferences: UserPreferences, persona: Persona) {
@@ -73,7 +73,11 @@ export async function sendMessage(
         const [header, base64] = data.split(',');
         if (base64) {
           const mimeTypeMatch = header.match(/:(.*?);/);
-          const mimeType = mimeTypeMatch ? mimeTypeMatch[1] : 'image/jpeg';
+          let mimeType = mimeTypeMatch ? mimeTypeMatch[1] : 'image/jpeg';
+          // Clean MIME type (remove ;name=...)
+          if (mimeType.includes(';')) {
+            mimeType = mimeType.split(';')[0];
+          }
           parts.push({ inlineData: { data: base64, mimeType } });
         }
       });
@@ -87,7 +91,11 @@ export async function sendMessage(
       const [header, base64] = data.split(',');
       if (base64) {
         const mimeTypeMatch = header.match(/:(.*?);/);
-        const mimeType = mimeTypeMatch ? mimeTypeMatch[1] : 'image/jpeg';
+        let mimeType = mimeTypeMatch ? mimeTypeMatch[1] : 'image/jpeg';
+        // Clean MIME type (remove ;name=...)
+        if (mimeType.includes(';')) {
+          mimeType = mimeType.split(';')[0];
+        }
         currentParts.push({ inlineData: { data: base64, mimeType } });
       }
     });
@@ -105,18 +113,16 @@ export async function sendMessage(
       throw new Error("Gemini API key is missing");
     }
 
-    const genAI = new GoogleGenerativeAI(currentApiKey);
-    const model = genAI.getGenerativeModel({ 
-      model: "gemini-1.5-flash",
-      systemInstruction: systemInstruction
-    });
-    
-    const result = await model.generateContent({
-      contents
+    const ai = new GoogleGenAI({ apiKey: currentApiKey });
+    const response = await ai.models.generateContent({
+      model: "gemini-2.0-flash",
+      contents,
+      config: {
+        systemInstruction: systemInstruction
+      }
     });
 
-    const response = await result.response;
-    const text = response.text();
+    const text = response.text;
     
     if (!text) {
       throw new Error("Empty response from AI");

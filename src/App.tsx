@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { Sidebar } from './components/Sidebar';
-import { Header } from './components/Header';
 import { ChatInterface } from './components/ChatInterface';
 import { SettingsModal } from './components/SettingsModal';
 import { LoginPage } from './components/LoginPage';
 import { Mode, Message, ChatSession, Persona } from './types';
 import { sendMessage } from './services/gemini';
-import { Menu, Settings, Loader2, Sparkles } from 'lucide-react';
+import { Menu, Settings, Loader2, Sparkles, Plus, ChevronDown, User } from 'lucide-react';
+import { cn } from './lib/utils';
 import { useUserProfile } from './context/UserProfileContext';
 import { useNotification } from './context/NotificationContext';
 import { useAuth } from './context/AuthContext';
@@ -194,6 +194,13 @@ export default function App() {
     }
   }, [user, profileLoading, preferences.name]);
 
+  // Auto-create session if none exists
+  useEffect(() => {
+    if (user && !sessionsLoading && sessions.length === 0 && !currentSessionId) {
+      createSession('student').catch(e => console.error("Auto-create session failed:", e));
+    }
+  }, [user, sessionsLoading, sessions.length, currentSessionId, createSession]);
+
   const handleSendMessage = async (content: string, attachments?: string[]) => {
     const currentSession = sessions.find(s => s.id === currentSessionId);
     if (!currentSession) return;
@@ -285,7 +292,10 @@ export default function App() {
   const currentSession = sessions.find(s => s.id === currentSessionId);
 
   return (
-    <div className="flex h-screen bg-slate-50 font-sans overflow-hidden relative">
+    <div className={cn(
+      "flex h-screen font-sans overflow-hidden relative",
+      preferences.theme === 'dark' ? "dark bg-slate-950" : "bg-slate-50"
+    )}>
       <Sidebar 
         sessions={sessions}
         currentSessionId={currentSessionId}
@@ -351,51 +361,68 @@ export default function App() {
         onClose={() => setIsSettingsOpen(false)}
       />
       
-      <main className="flex-1 flex flex-col min-w-0 h-full relative bg-slate-50 overflow-hidden">
-        <div className="absolute inset-0 pointer-events-none opacity-[0.03] z-0">
-          <div className="absolute inset-0" style={{ backgroundImage: 'radial-gradient(#000 1px, transparent 1px)', backgroundSize: '40px 40px' }} />
-        </div>
-        
+      <main className="flex-1 flex flex-col min-w-0 h-full relative bg-white overflow-hidden">
         <div className="flex-1 flex flex-col h-full overflow-hidden relative z-10">
-          <div className="lg:hidden">
-            <Header 
-              onNewChat={async () => {
-                try {
-                  await createSession('student');
-                } catch (e) {
-                  console.error("Failed to create session:", e);
-                }
-              }}
-              onOpenSidebar={() => setIsSidebarOpen(true)}
-              onOpenSettings={() => setIsSettingsOpen(true)}
-              isSidebarOpen={isSidebarOpen}
-              battery={battery}
-            />
+          {/* Floating Top Bar (ChatGPT style) */}
+          <div className="absolute top-0 left-0 right-0 z-40 p-3 flex items-center justify-between pointer-events-none">
+            <div className="flex items-center gap-2 pointer-events-auto">
+              {!isSidebarOpen && (
+                <button
+                  onClick={() => setIsSidebarOpen(true)}
+                  className="p-2 text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+                  title="Open sidebar"
+                >
+                  <Menu className="w-5 h-5" />
+                </button>
+              )}
+              <button className="flex items-center gap-1 px-2 py-1 hover:bg-slate-100 rounded-lg transition-colors text-slate-800 font-medium text-lg">
+                SALU AI <ChevronDown className="w-4 h-4 text-slate-500" />
+              </button>
+            </div>
+            
+            <div className="flex items-center gap-2 pointer-events-auto">
+              <button
+                onClick={() => setIsSettingsOpen(true)}
+                className="p-2 text-slate-600 hover:bg-slate-100 rounded-full transition-colors"
+                title="Settings"
+              >
+                <Settings className="w-5 h-5" />
+              </button>
+              <button className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center overflow-hidden border border-slate-200">
+                {preferences.profilePicture ? (
+                  <img src={preferences.profilePicture} alt="Profile" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                ) : (
+                  <User className="w-5 h-5 text-slate-500" />
+                )}
+              </button>
+            </div>
           </div>
           
-          <div className="flex-1 flex flex-col h-full overflow-hidden">
+          <div className="flex-1 flex flex-col h-full overflow-hidden pt-14">
             <div className="flex-1 overflow-hidden">
               {!currentSession ? (
-                <div className="h-full flex flex-col items-center justify-center p-8 text-center space-y-6">
-                  <div className="w-20 h-20 bg-slate-100 rounded-[2.5rem] flex items-center justify-center">
-                    <Sparkles className="w-10 h-10 text-slate-300" />
-                  </div>
-                  <div className="space-y-2">
-                    <h2 className="text-2xl font-black text-slate-900 tracking-tight">Ready to start?</h2>
-                    <p className="text-slate-500 max-w-xs mx-auto font-medium">Create your first chat session to begin exploring with SALU AI.</p>
-                  </div>
-                  <button
-                    onClick={async () => {
-                      try {
-                        await createSession('student');
-                      } catch (e) {
-                        console.error("Failed to create session:", e);
-                      }
-                    }}
-                    className="px-8 py-4 bg-slate-900 text-white rounded-2xl font-black uppercase tracking-widest text-[10px] hover:bg-black transition-all active:scale-95 shadow-xl shadow-slate-900/20"
+                <div className="h-full flex flex-col items-center justify-center p-8 text-center relative overflow-hidden bg-white">
+                  <motion.div 
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="relative z-10 space-y-8"
                   >
-                    Start New Conversation
-                  </button>
+                    <h1 className="text-3xl md:text-4xl font-medium text-slate-800 tracking-tight">
+                      What can I help with?
+                    </h1>
+                    <button
+                      onClick={async () => {
+                        try {
+                          await createSession('student');
+                        } catch (e) {
+                          console.error("Failed to create session:", e);
+                        }
+                      }}
+                      className="px-6 py-3 bg-brand-500 text-white rounded-full font-medium text-sm hover:bg-brand-600 transition-all active:scale-95 shadow-sm mx-auto"
+                    >
+                      Start New Conversation
+                    </button>
+                  </motion.div>
                 </div>
               ) : currentSession.mode === 'live' ? (
                 <LiveChatInterface 

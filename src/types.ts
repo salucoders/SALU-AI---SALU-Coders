@@ -16,6 +16,7 @@ export interface UserPreferences {
   language: 'English' | 'Urdu' | 'Sindhi' | 'Spanish' | 'French' | 'German';
   profilePicture?: string; // base64
   accentColor: string; // hex or tailwind color name
+  theme: 'light' | 'dark' | 'system';
   persona: Persona;
   voice: 'male' | 'female';
   likes?: string;

@@ -15,6 +15,7 @@ const defaultPreferences: UserPreferences = {
   name: 'Guest User',
   language: 'English',
   accentColor: '#0ea5e9',
+  theme: 'light',
   persona: 'friendly',
   voice: 'female',
   likes: '',
@@ -43,7 +44,10 @@ export const UserProfileProvider: React.FC<{ children: React.ReactNode }> = ({ c
     
     const unsubscribe = onSnapshot(userDocRef, (docSnap) => {
       if (docSnap.exists()) {
-        setPreferences(docSnap.data() as UserPreferences);
+        setPreferences({
+          ...defaultPreferences,
+          ...docSnap.data()
+        } as UserPreferences);
       }
       setLoading(false);
     }, (error) => {
