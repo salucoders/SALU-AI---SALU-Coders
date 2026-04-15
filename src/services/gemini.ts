@@ -2,8 +2,13 @@ import { Message, Mode, UserPreferences, Persona } from "../types";
 import { GoogleGenAI } from "@google/genai";
 
 export async function getActiveApiKey(): Promise<string> {
-  // Use environment variable if provided (e.g., in Netlify), otherwise use the hardcoded key
-  return (process.env.GEMINI_API_KEY as string) || "AIzaSyAnHn18NhxNAb8MRb-bSAgOIWJf3WncMZ8";
+  // Use VITE_ prefixed environment variable if provided (standard for Vite/Netlify)
+  if (import.meta.env && import.meta.env.VITE_GEMINI_API_KEY) {
+    return import.meta.env.VITE_GEMINI_API_KEY;
+  }
+  
+  // Fallback to process.env (for AI Studio / custom define)
+  return (process.env.GEMINI_API_KEY as string) || "AIzaSyA9THzKfpE5aCX2j7GTIMYvQkKuHmGHFLk";
 }
 
 function getSystemInstruction(mode: Mode, preferences: UserPreferences, persona: Persona) {
@@ -145,6 +150,22 @@ export async function sendMessage(
     if (error.message?.includes("404") || error.message?.includes("not found")) {
       return "System Error: The requested AI model was not found. Please try again later.";
     }
+    if (error.message?.includes("429") || error.message?.includes("RESOURCE_EXHAUSTED") || error.message?.includes("quota")) {
+      return "System Error: You have exceeded your Gemini API rate limit or quota. Please wait a minute and try again, or check your billing details in Google AI Studio.";
+    }
+    
+    // Try to parse JSON errors if they are returned as a string
+    try {
+      if (error.message && error.message.startsWith('{')) {
+        const parsed = JSON.parse(error.message);
+        if (parsed.error && parsed.error.message) {
+          return `System Error: ${parsed.error.message}`;
+        }
+      }
+    } catch (e) {
+      // Ignore parsing errors
+    }
+
     return `System Error: ${error.message || "I encountered an unexpected issue. Please try again."}`;
   }
 }
