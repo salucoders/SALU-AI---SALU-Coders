@@ -7,8 +7,13 @@ export async function getActiveApiKey(): Promise<string> {
     return import.meta.env.VITE_GEMINI_API_KEY;
   }
   
-  // Fallback to process.env (for AI Studio / custom define)
-  return (process.env.GEMINI_API_KEY as string) || "AIzaSyA9THzKfpE5aCX2j7GTIMYvQkKuHmGHFLk";
+  // Safe check for process.env to prevent crashes in browser environments
+  if (typeof process !== 'undefined' && process.env && process.env.GEMINI_API_KEY) {
+    return process.env.GEMINI_API_KEY;
+  }
+  
+  // Fallback
+  return "AIzaSyA9THzKfpE5aCX2j7GTIMYvQkKuHmGHFLk";
 }
 
 function getSystemInstruction(mode: Mode, preferences: UserPreferences, persona: Persona) {
