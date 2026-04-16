@@ -2,29 +2,30 @@ import { Message, Mode, UserPreferences, Persona } from "../types";
 import { GoogleGenAI } from "@google/genai";
 
 export async function getSystemConfig(): Promise<{ apiKey: string, defaultModel: string }> {
+  let apiKey = "";
+  let defaultModel = "gemini-2.0-flash";
+
   try {
     const res = await fetch('/api/config');
     if (res.ok) {
       const data = await res.json();
-      if (data.geminiApiKey) {
-        return { apiKey: data.geminiApiKey, defaultModel: data.defaultModel || "gemini-2.0-flash" };
-      }
+      if (data.geminiApiKey) apiKey = data.geminiApiKey;
+      if (data.defaultModel) defaultModel = data.defaultModel;
     }
   } catch (e) {
     console.error("Failed to fetch config from backend:", e);
   }
 
   // Use VITE_ prefixed environment variable if provided (standard for Vite/Netlify)
-  let apiKey = "";
-  if (import.meta.env && import.meta.env.VITE_GEMINI_API_KEY) {
-    apiKey = import.meta.env.VITE_GEMINI_API_KEY;
-  } else if (typeof process !== 'undefined' && process.env && process.env.GEMINI_API_KEY) {
-    apiKey = process.env.GEMINI_API_KEY;
-  } else {
-    apiKey = "AIzaSyA9THzKfpE5aCX2j7GTIMYvQkKuHmGHFLk";
+  if (!apiKey) {
+    if (import.meta.env && import.meta.env.VITE_GEMINI_API_KEY) {
+      apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+    } else if (typeof process !== 'undefined' && process.env && process.env.GEMINI_API_KEY) {
+      apiKey = process.env.GEMINI_API_KEY;
+    }
   }
 
-  return { apiKey, defaultModel: "gemini-2.0-flash" };
+  return { apiKey, defaultModel };
 }
 
 function getSystemInstruction(mode: Mode, preferences: UserPreferences, persona: Persona) {

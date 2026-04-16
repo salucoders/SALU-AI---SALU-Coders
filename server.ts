@@ -24,6 +24,8 @@ function getSystemConfig() {
   try {
     if (fs.existsSync(CONFIG_FILE)) {
       const fileConfig = JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf-8'));
+      // Don't overwrite with empty string if we have a default from env
+      if (!fileConfig.geminiApiKey) delete fileConfig.geminiApiKey;
       return { ...defaults, ...fileConfig };
     }
   } catch (e) {
