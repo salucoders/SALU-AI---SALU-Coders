@@ -1,0 +1,96 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile information",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "name": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "profilePicture": { "type": "string" },
+        "language": { "type": "string" },
+        "accentColor": { "type": "string" },
+        "persona": { "type": "string" },
+        "voice": { "type": "string" },
+        "role": { "type": "string", "enum": ["admin", "user"] },
+        "updatedAt": { "type": "timestamp" },
+        "likes": { "type": "string" },
+        "dislikes": { "type": "string" },
+        "department": { "type": "string" },
+        "class": { "type": "string" },
+        "theme": { "type": "string" }
+      },
+      "required": ["uid", "name", "email", "role"]
+    },
+    "Session": {
+      "title": "Session",
+      "description": "A chat session",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "title": { "type": "string" },
+        "mode": { "type": "string" },
+        "isArchived": { "type": "boolean" },
+        "createdAt": { "type": "timestamp" },
+        "updatedAt": { "type": "timestamp" }
+      },
+      "required": ["id", "userId", "title", "mode", "isArchived"]
+    },
+    "Message": {
+      "title": "Message",
+      "description": "A message within a chat session",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "role": { "type": "string", "enum": ["user", "model"] },
+        "content": { "type": "string" },
+        "attachments": { "type": "array", "items": { "type": "string" } },
+        "timestamp": { "type": "timestamp" }
+      },
+      "required": ["id", "role", "content"]
+    },
+    "SystemConfig": {
+      "title": "SystemConfig",
+      "description": "Global system configuration",
+      "type": "object",
+      "properties": {
+        "publicRegistration": { "type": "boolean" },
+        "liveAiMode": { "type": "boolean" },
+        "maintenanceMode": { "type": "boolean" }
+      }
+    },
+    "SystemBroadcast": {
+      "title": "SystemBroadcast",
+      "description": "Global system broadcast message",
+      "type": "object",
+      "properties": {
+        "active": { "type": "boolean" },
+        "message": { "type": "string" }
+      }
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/User" },
+      "description": "User profiles"
+    },
+    "/sessions/{sessionId}": {
+      "schema": { "$ref": "#/entities/Session" },
+      "description": "Chat sessions"
+    },
+    "/sessions/{sessionId}/messages/{messageId}": {
+      "schema": { "$ref": "#/entities/Message" },
+      "description": "Messages within a chat session"
+    },
+    "/system/config": {
+      "schema": { "$ref": "#/entities/SystemConfig" },
+      "description": "System configuration"
+    },
+    "/system/broadcast": {
+      "schema": { "$ref": "#/entities/SystemBroadcast" },
+      "description": "System broadcast"
+    }
+  }
+}

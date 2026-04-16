@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Mic, MicOff, Volume2, VolumeX, X, Loader2, Sparkles, AlertCircle, User, UserCircle } from 'lucide-react';
+import { Mic, MicOff, Volume2, VolumeX, X, Loader2, Sparkles, AlertCircle, User, UserCircle, Camera, CameraOff } from 'lucide-react';
 import { GoogleGenAI, Modality, LiveServerMessage } from "@google/genai";
 import { cn } from '../lib/utils';
 import { useUserProfile } from '../context/UserProfileContext';
-import { getActiveApiKey } from '../services/gemini';
+import { getSystemConfig } from '../services/gemini';
 
 interface LiveChatInterfaceProps {
   onClose: () => void;
@@ -18,13 +18,18 @@ export function LiveChatInterface({ onClose }: LiveChatInterfaceProps) {
   const [isMuted, setIsMuted] = useState(false);
   const [transcription, setTranscription] = useState<string>('');
   const [modelTranscription, setModelTranscription] = useState<string>('');
+  const [isVideoEnabled, setIsVideoEnabled] = useState(false);
 
   const sessionRef = useRef<any>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const videoStreamRef = useRef<MediaStream | null>(null);
   const processorRef = useRef<ScriptProcessorNode | null>(null);
   const audioQueueRef = useRef<Int16Array[]>([]);
   const isPlayingRef = useRef(false);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const videoIntervalRef = useRef<number | null>(null);
 
   const stopLiveSession = useCallback(() => {
     if (sessionRef.current) {
@@ -46,6 +51,15 @@ export function LiveChatInterface({ onClose }: LiveChatInterfaceProps) {
       streamRef.current.getTracks().forEach(track => track.stop());
       streamRef.current = null;
     }
+    if (videoStreamRef.current) {
+      videoStreamRef.current.getTracks().forEach(track => track.stop());
+      videoStreamRef.current = null;
+    }
+    if (videoIntervalRef.current) {
+      window.clearInterval(videoIntervalRef.current);
+      videoIntervalRef.current = null;
+    }
+    setIsVideoEnabled(false);
     if (audioContextRef.current) {
       audioContextRef.current.close().catch(err => console.error("Error closing AudioContext:", err));
       audioContextRef.current = null;
@@ -94,19 +108,75 @@ export function LiveChatInterface({ onClose }: LiveChatInterfaceProps) {
     }
   }, []);
 
+  const startVideoProcessing = () => {
+    if (videoIntervalRef.current) window.clearInterval(videoIntervalRef.current);
+    videoIntervalRef.current = window.setInterval(() => {
+      if (!sessionRef.current || !videoRef.current || !canvasRef.current || !isVideoEnabled) return;
+      const video = videoRef.current;
+      const canvas = canvasRef.current;
+      if (video.readyState >= 2) {
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+          const base64Data = canvas.toDataURL('image/jpeg', 0.5).split(',')[1];
+          try {
+            sessionRef.current.sendRealtimeInput({
+              video: { data: base64Data, mimeType: 'image/jpeg' }
+            });
+          } catch (err) {
+            console.warn("Failed to send video frame:", err);
+          }
+        }
+      }
+    }, 1000);
+  };
+
+  const toggleVideo = async () => {
+    if (isVideoEnabled) {
+      if (videoStreamRef.current) {
+        videoStreamRef.current.getTracks().forEach(track => track.stop());
+        videoStreamRef.current = null;
+      }
+      if (videoIntervalRef.current) {
+        window.clearInterval(videoIntervalRef.current);
+        videoIntervalRef.current = null;
+      }
+      setIsVideoEnabled(false);
+    } else {
+      try {
+        const videoStream = await navigator.mediaDevices.getUserMedia({ 
+          video: { facingMode: 'environment' } 
+        });
+        videoStreamRef.current = videoStream;
+        if (videoRef.current) {
+          videoRef.current.srcObject = videoStream;
+        }
+        setIsVideoEnabled(true);
+        startVideoProcessing();
+      } catch (err) {
+        console.error("Video access error:", err);
+        setError("Camera access denied. Please grant permissions.");
+      }
+    }
+  };
+
   const startLiveSession = async () => {
     setIsConnecting(true);
     setError(null);
 
     try {
-      const currentApiKey = await getActiveApiKey();
-      if (!currentApiKey) {
+      const config = await getSystemConfig();
+      if (!config.apiKey) {
         setError("Gemini API key is required for Live Voice Chat. Please configure it in the Admin Panel.");
         setIsConnecting(false);
         return;
       }
 
-      const ai = new GoogleGenAI({ apiKey: currentApiKey });
+      const ai = new GoogleGenAI({ 
+        apiKey: config.apiKey
+      });
       
       // Use 16000 for better compatibility and low latency
       audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 16000 });
@@ -137,7 +207,7 @@ export function LiveChatInterface({ onClose }: LiveChatInterfaceProps) {
       };
 
       const session = await ai.live.connect({
-        model: "gemini-2.0-flash-exp",
+        model: "gemini-3.1-flash-live-preview",
         config: {
           responseModalities: [Modality.AUDIO],
           speechConfig: {
@@ -152,7 +222,8 @@ CRITICAL RULES:
 4. Be extremely concise. Keep responses to 1-2 short sentences to maintain a natural conversation flow.
 5. Your personality is ${personaDescriptions[preferences.persona || 'friendly']}.
 6. Use the user's name (${preferences.name || 'Guest'}) occasionally to make it personal.
-7. Your creator is Babar Ali Arain (IT Batch 2026).`,
+7. Your creator is Babar Ali Arain (IT Batch 2026).
+8. The user may enable their camera to show you things. If they ask you to look at something, analyze the video frames provided.`,
           inputAudioTranscription: {},
           outputAudioTranscription: {},
         },
@@ -302,10 +373,10 @@ CRITICAL RULES:
 
   return (
     <motion.div 
-      initial={{ opacity: 0, scale: 0.95 }}
-      animate={{ opacity: 1, scale: 1 }}
-      exit={{ opacity: 0, scale: 0.95 }}
-      className="fixed inset-0 z-50 flex flex-col items-center justify-center p-4 md:p-8 bg-slate-50 overflow-hidden"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 z-50 flex flex-col bg-slate-50 overflow-hidden"
     >
       {/* Glowing Edges Animation when Active */}
       <AnimatePresence>
@@ -346,7 +417,7 @@ CRITICAL RULES:
         <div className="absolute top-1/4 left-1/4 w-[400px] h-[400px] bg-blue-500/5 rounded-full blur-[100px]" />
       </div>
 
-      <div className="w-full max-w-3xl bg-white/90 backdrop-blur-3xl rounded-[2.5rem] md:rounded-[3.5rem] shadow-[0_32px_64px_-16px_rgba(0,0,0,0.1)] border border-slate-200/50 overflow-hidden relative z-10 flex flex-col h-full max-h-[90vh] md:h-[750px]">
+      <div className="w-full h-full bg-white/90 backdrop-blur-3xl shadow-[0_32px_64px_-16px_rgba(0,0,0,0.1)] overflow-hidden relative z-10 flex flex-col">
         {/* Header */}
         <div className="p-4 md:p-8 border-b border-slate-100 flex items-center justify-between bg-white/50 backdrop-blur-md sticky top-0 z-20">
           <div className="flex items-center gap-3 md:gap-4">
@@ -375,40 +446,20 @@ CRITICAL RULES:
         </div>
 
         {/* Content */}
-        <div className="flex-1 flex flex-col items-center justify-center p-6 md:p-10 space-y-8 md:space-y-10 overflow-y-auto no-scrollbar">
-          {/* Voice Selection (Only when not active) */}
-          {!isActive && !isConnecting && (
-            <motion.div 
-              initial={{ opacity: 0, y: -10 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="flex items-center gap-4 bg-slate-50 p-2 rounded-2xl border border-slate-200"
-            >
-              <button
-                onClick={() => updatePreferences({ voice: 'male' })}
-                className={cn(
-                  "flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black transition-all",
-                  preferences.voice === 'male' 
-                    ? "bg-slate-900 text-white shadow-lg" 
-                    : "text-slate-500 hover:text-slate-900"
-                )}
-              >
-                <User className="w-4 h-4" />
-                Male Voice
-              </button>
-              <button
-                onClick={() => updatePreferences({ voice: 'female' })}
-                className={cn(
-                  "flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black transition-all",
-                  preferences.voice === 'female' 
-                    ? "bg-slate-900 text-white shadow-lg" 
-                    : "text-slate-500 hover:text-slate-900"
-                )}
-              >
-                <UserCircle className="w-4 h-4" />
-                Female Voice
-              </button>
-            </motion.div>
-          )}
+        <div className="flex-1 flex flex-col items-center justify-center p-6 md:p-10 space-y-8 md:space-y-10 overflow-y-auto no-scrollbar relative">
+          
+          {/* Video Element for Camera */}
+          <video 
+            ref={videoRef} 
+            autoPlay 
+            playsInline 
+            muted 
+            className={cn(
+              "absolute bottom-6 right-6 w-32 h-48 md:w-48 md:h-64 object-cover rounded-2xl shadow-2xl border-4 border-white z-20 transition-all duration-500",
+              isVideoEnabled ? "opacity-100 scale-100" : "opacity-0 scale-90 pointer-events-none"
+            )}
+          />
+          <canvas ref={canvasRef} className="hidden" />
 
           {/* Pulse Animation */}
           <div className="relative">
@@ -570,6 +621,19 @@ CRITICAL RULES:
                 title={isMuted ? "Unmute" : "Mute"}
               >
                 {isMuted ? <MicOff className="w-6 h-6 md:w-7 md:h-7" /> : <Mic className="w-6 h-6 md:w-7 md:h-7" />}
+              </button>
+
+              <button
+                onClick={toggleVideo}
+                className={cn(
+                  "p-4 md:p-6 rounded-2xl md:rounded-[2.5rem] transition-all shadow-xl active:scale-90 border-2 flex-1 md:flex-none flex justify-center",
+                  isVideoEnabled 
+                    ? "bg-blue-500 text-white border-blue-400 shadow-blue-500/40" 
+                    : "bg-white text-slate-600 border-slate-200 hover:border-blue-200"
+                )}
+                title={isVideoEnabled ? "Turn off camera" : "Turn on camera"}
+              >
+                {isVideoEnabled ? <Camera className="w-6 h-6 md:w-7 md:h-7" /> : <CameraOff className="w-6 h-6 md:w-7 md:h-7" />}
               </button>
               
               <button

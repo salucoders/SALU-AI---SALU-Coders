@@ -5,7 +5,7 @@ import { SettingsModal } from './components/SettingsModal';
 import { LoginPage } from './components/LoginPage';
 import { Mode, Message, ChatSession, Persona } from './types';
 import { sendMessage } from './services/gemini';
-import { Menu, Settings, Loader2, Sparkles, Plus, ChevronDown, User } from 'lucide-react';
+import { Menu, Settings, Loader2, Sparkles, Plus, ChevronDown, User, Shield } from 'lucide-react';
 import { cn } from './lib/utils';
 import { useUserProfile } from './context/UserProfileContext';
 import { useNotification } from './context/NotificationContext';
@@ -17,6 +17,7 @@ import { db } from './lib/firebase';
 
 import { Onboarding } from './components/Onboarding';
 import { LiveChatInterface } from './components/LiveChatInterface';
+import { AdminPanel } from './components/AdminPanel';
 
 export default function App() {
   const { preferences, loading: profileLoading, isAdmin } = useUserProfile();
@@ -39,7 +40,9 @@ export default function App() {
   const [systemConfig, setSystemConfig] = useState({
     publicRegistration: true,
     liveAiMode: true,
-    maintenanceMode: false
+    maintenanceMode: false,
+    appName: 'SALU AI',
+    welcomeMessage: 'What can I help with?'
   });
 
   // Broadcast & Config Listener
@@ -81,6 +84,7 @@ export default function App() {
   const [isLoading, setIsLoading] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isAdminPanelOpen, setIsAdminPanelOpen] = useState(false);
   const [battery, setBattery] = useState<{ level: number; charging: boolean } | null>(null);
   const [showOnboarding, setShowOnboarding] = useState(false);
 
@@ -376,11 +380,20 @@ export default function App() {
                 </button>
               )}
               <button className="flex items-center gap-1 px-2 py-1 hover:bg-slate-100 rounded-lg transition-colors text-slate-800 font-medium text-lg">
-                SALU AI <ChevronDown className="w-4 h-4 text-slate-500" />
+                {systemConfig.appName} <ChevronDown className="w-4 h-4 text-slate-500" />
               </button>
             </div>
             
             <div className="flex items-center gap-2 pointer-events-auto">
+              {isAdmin && (
+                <button
+                  onClick={() => setIsAdminPanelOpen(true)}
+                  className="p-2 text-rose-600 hover:bg-rose-50 rounded-full transition-colors"
+                  title="Admin Panel"
+                >
+                  <Shield className="w-5 h-5" />
+                </button>
+              )}
               <button
                 onClick={() => setIsSettingsOpen(true)}
                 className="p-2 text-slate-600 hover:bg-slate-100 rounded-full transition-colors"
@@ -408,7 +421,7 @@ export default function App() {
                     className="relative z-10 space-y-8"
                   >
                     <h1 className="text-3xl md:text-4xl font-medium text-slate-800 tracking-tight">
-                      What can I help with?
+                      {systemConfig.welcomeMessage}
                     </h1>
                     <button
                       onClick={async () => {
@@ -446,6 +459,12 @@ export default function App() {
           </div>
         </div>
       </main>
+
+      <AnimatePresence>
+        {isAdminPanelOpen && (
+          <AdminPanel onClose={() => setIsAdminPanelOpen(false)} />
+        )}
+      </AnimatePresence>
     </div>
   );
 }
