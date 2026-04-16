@@ -65,11 +65,14 @@ export default function App() {
     const unsubscribeConfig = onSnapshot(doc(db, 'system', 'config'), (snapshot) => {
       if (snapshot.exists()) {
         const data = snapshot.data();
-        setSystemConfig({
-          publicRegistration: data.publicRegistration ?? true,
-          liveAiMode: data.liveAiMode ?? true,
-          maintenanceMode: data.maintenanceMode ?? false
-        });
+        setSystemConfig(prev => ({
+          ...prev,
+          publicRegistration: data.publicRegistration ?? prev.publicRegistration,
+          liveAiMode: data.liveAiMode ?? prev.liveAiMode,
+          maintenanceMode: data.maintenanceMode ?? prev.maintenanceMode,
+          appName: data.appName ?? prev.appName,
+          welcomeMessage: data.welcomeMessage ?? prev.welcomeMessage
+        }));
       }
     }, (error) => {
       console.error("Error listening to config:", error);
