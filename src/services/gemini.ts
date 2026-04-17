@@ -34,7 +34,7 @@ export async function getSystemConfig(): Promise<{ apiKey: string, defaultModel:
           apiKey = data.geminiApiKey;
           keySource = "Backend API";
         }
-        if (data.defaultModel && data.defaultModel !== "gemini-2.0-flash") defaultModel = data.defaultModel;
+        if (data.defaultModel) defaultModel = data.defaultModel;
       }
     } catch (e) {
       console.warn("Failed to fetch config from backend:", e);
@@ -210,8 +210,14 @@ export async function sendMessage(
     if (error.message?.includes("PERMISSION_DENIED")) {
       return `System Error: Access denied. Your API key might be blocked or restricted. (Loaded from: ${keySource}).`;
     }
+    let fallbackModelName = "Unknown";
+    try {
+       const c = await getSystemConfig();
+       fallbackModelName = c.defaultModel;
+    } catch(e) {}
+    
     if (error.message?.includes("404") || error.message?.includes("not found")) {
-      return "System Error: The requested AI model was not found. Please try again later.";
+      return `System Error: The requested AI model '${fallbackModelName}' was not found. Please try switching to Gemini 1.5 Flash in the Admin Panel.`;
     }
     if (error.message?.includes("429") || error.message?.includes("RESOURCE_EXHAUSTED") || error.message?.includes("quota")) {
       return `System Error: Google's API returned "Quota Exceeded/Rate Limited" for this key. 

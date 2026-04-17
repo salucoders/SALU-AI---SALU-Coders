@@ -614,22 +614,11 @@ export function AdminPanel({ onClose }: AdminPanelProps) {
                             <option value="gemini-2.0-flash">Gemini 2.0 Flash (Fastest / Recommended)</option>
                             <option value="gemini-1.5-flash">Gemini 1.5 Flash (Use if you hit Quota errors!)</option>
                             <option value="gemini-1.5-pro">Gemini 1.5 Pro (Powerful but slower)</option>
+                            <option value="gemini-1.5-flash-8b">Gemini 1.5 Flash-8B (High rate limits)</option>
                           </select>
                           <p className="mt-2 text-xs text-slate-500">
-                            If you get <b>Quota Exceeded</b> errors on a free key, switch to <b>Gemini 1.5 Flash</b>.
+                            If you get <b>Quota Exceeded</b> errors on a free key, switch to <b>Gemini 1.5 Flash</b> or <b>Gemini 1.5 Flash-8B</b>.
                           </p>
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium text-slate-700 mb-1">Default AI Model</label>
-                          <select 
-                            value={systemConfig.defaultModel}
-                            onChange={(e) => setSystemConfig({...systemConfig, defaultModel: e.target.value})}
-                            className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 transition-all bg-white"
-                          >
-                            <option value="gemini-2.0-flash">Gemini 2.0 Flash (Recommended)</option>
-                            <option value="gemini-1.5-pro">Gemini 1.5 Pro</option>
-                            <option value="gemini-1.5-flash">Gemini 1.5 Flash</option>
-                          </select>
                         </div>
                       </div>
                     </div>
