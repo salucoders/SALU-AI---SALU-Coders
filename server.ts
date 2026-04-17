@@ -14,8 +14,9 @@ const __dirname = path.dirname(__filename);
 const CONFIG_FILE = path.join(__dirname, 'system-config.json');
 
 function getSystemConfig() {
+  const envKey = process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY || "";
   const defaults = {
-    geminiApiKey: process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY || "",
+    geminiApiKey: envKey,
     defaultModel: "gemini-2.0-flash",
     appName: "SALU AI",
     welcomeMessage: "What can I help with?"
@@ -26,10 +27,11 @@ function getSystemConfig() {
       const fileConfig = JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf-8'));
       
       // If server has an explicitly set environment variable, ALWAYS prefer it over the saved file
-      if (process.env.GEMINI_API_KEY) {
-        fileConfig.geminiApiKey = process.env.GEMINI_API_KEY;
-      } else if (!fileConfig.geminiApiKey) {
-        delete fileConfig.geminiApiKey; // Don't overwrite with empty string
+      if (envKey) {
+        fileConfig.geminiApiKey = envKey;
+      } else if (!fileConfig.geminiApiKey || fileConfig.geminiApiKey.includes('AIzaSyA9TH')) {
+        // Also strip out the known bad key just in case it got stuck in the json file
+        delete fileConfig.geminiApiKey; 
       }
       
       return { ...defaults, ...fileConfig };
