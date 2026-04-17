@@ -153,9 +153,9 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
       
       batch.update(sessionRef, sessionUpdate);
       await batch.commit();
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error adding message:", error);
-      notify?.('Failed to save message', 'error', 3000);
+      notify?.(`Failed to save message: ${error.message || String(error)}`, 'error', 5000);
       throw error;
     }
   };

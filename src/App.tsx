@@ -229,9 +229,9 @@ export default function App() {
 
       // Add model response to Firestore
       await addMessage(currentSession.id, 'model', aiResponse);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to send message:", error);
-      notify('Failed to send message. Please try again.', 'error', 3000);
+      notify(`Failed to send message: ${error.message || String(error)}`, 'error', 5000);
     } finally {
       setIsLoading(false);
     }
