@@ -241,3 +241,148 @@ To fix this: Go to console.cloud.google.com, ensure your project has an active B
     return `System Error: ${error.message || "I encountered an unexpected issue."} [Key: ${apiKeyForDebug.substring(0, 10)}] [Source: ${keySource}]`;
   }
 }
+
+export async function sendMessageStream(
+  mode: Mode,
+  history: Message[],
+  message: string,
+  preferences?: UserPreferences,
+  persona: Persona = 'friendly',
+  attachments?: string[],
+  onChunk?: (text: string) => void
+): Promise<string> {
+  const currentTime = new Date().toLocaleString('en-US', { 
+    weekday: 'long', 
+    year: 'numeric', 
+    month: 'long', 
+    day: 'numeric', 
+    hour: '2-digit', 
+    minute: '2-digit', 
+    second: '2-digit', 
+    timeZoneName: 'short' 
+  });
+
+  const personalization = `
+    User Profile:
+    - Name: ${preferences?.name || 'Guest'}
+    - Language: ${preferences?.language || 'English'}
+    - Department: ${preferences?.department || 'Not specified'}
+    - Class/Year: ${preferences?.class || 'Not specified'}
+    - Likes: ${preferences?.likes || 'Not specified'}
+    - Dislikes: ${preferences?.dislikes || 'Not specified'}
+  `.trim();
+
+  const userContext = `Current time: ${currentTime}. ${personalization}. 
+    Tailor your responses based on the user's department, class, and preferences. 
+    If they like certain topics, use them in examples. If they dislike something, avoid it. 
+    If the preferred language is Urdu or Sindhi, respond primarily in that language but keep technical terms in English.`;
+
+  const systemInstruction = `You are SALU Coders AI. ${getSystemInstruction(mode, preferences, persona)} ${userContext} Be friendly, to the point, smart, and motivational. Avoid unnecessary repetition. Use clear, structured formatting with headings and bullet points.`;
+
+  const recentHistory = history.slice(-10);
+  const contents: any[] = recentHistory.map((msg: any) => {
+    const parts: any[] = [{ text: msg.content || " " }];
+    if (msg.attachments && msg.attachments.length > 0) {
+      msg.attachments.forEach((data: string) => {
+        const [header, base64] = data.split(',');
+        if (base64) {
+          const mimeTypeMatch = header.match(/:(.*?);/);
+          let mimeType = mimeTypeMatch ? mimeTypeMatch[1] : 'image/jpeg';
+          if (mimeType.includes(';')) {
+            mimeType = mimeType.split(';')[0];
+          }
+          parts.push({ inlineData: { data: base64, mimeType } });
+        }
+      });
+    }
+    return { role: msg.role === 'user' ? 'user' : 'model', parts };
+  });
+
+  const currentParts: any[] = [];
+  if (attachments && attachments.length > 0) {
+    attachments.forEach((data: string) => {
+      const [header, base64] = data.split(',');
+      if (base64) {
+        const mimeTypeMatch = header.match(/:(.*?);/);
+        let mimeType = mimeTypeMatch ? mimeTypeMatch[1] : 'image/jpeg';
+        if (mimeType.includes(';')) {
+          mimeType = mimeType.split(';')[0];
+        }
+        currentParts.push({ inlineData: { data: base64, mimeType } });
+      }
+    });
+  }
+
+  if (message.trim() || currentParts.length === 0) {
+    currentParts.push({ text: message || "Analyze this attachment" });
+  }
+
+  contents.push({ role: 'user', parts: currentParts });
+
+  let apiKeyForDebug = "";
+  try {
+    const config = await getSystemConfig();
+    apiKeyForDebug = config.apiKey || "";
+    
+    if (!config.apiKey) {
+      throw new Error("Gemini API key is missing");
+    }
+
+    const ai = new GoogleGenAI({ apiKey: config.apiKey });
+    const responseStream = await ai.models.generateContentStream({
+      model: config.defaultModel,
+      contents,
+      config: {
+        systemInstruction: systemInstruction
+      }
+    });
+
+    let fullText = "";
+    for await (const chunk of responseStream) {
+      if (chunk.text) {
+        fullText += chunk.text;
+        if (onChunk) {
+          onChunk(fullText);
+        }
+      }
+    }
+    
+    if (!fullText) {
+      throw new Error("Empty response from AI");
+    }
+
+    return fullText;
+  } catch (error: any) {
+    console.error("AI Service Error Details:", {
+      message: error.message,
+      stack: error.stack,
+      error: error
+    });
+    
+    const keySource = (window as any)._geminiKeySource || "Unknown";
+    let errorMessage = "";
+    
+    if (error.message?.includes("API key not valid")) {
+      errorMessage = `System Error: The API key provided is invalid. (Loaded from: ${keySource}). Please check your API key in Google AI Studio.`;
+    } else if (error.message?.includes("PERMISSION_DENIED")) {
+      errorMessage = `System Error: Access denied. Your API key might be blocked or restricted. (Loaded from: ${keySource}).`;
+    } else {
+      let fallbackModelName = "Unknown";
+      try {
+         const c = await getSystemConfig();
+         fallbackModelName = c.defaultModel;
+      } catch(e) {}
+      
+      if (error.message?.includes("404") || error.message?.includes("not found")) {
+        errorMessage = `System Error: The requested AI model '${fallbackModelName}' was deprecated or not found. Please try switching to Gemini 3.1 Flash Lite in the Admin Panel.`;
+      } else if (error.message?.includes("429") || error.message?.includes("RESOURCE_EXHAUSTED") || error.message?.includes("quota")) {
+        errorMessage = `System Error: Google's API returned "Quota Exceeded/Rate Limited" for this key. \nIf this is a completely new key, Google may have restricted the free-tier quota for your Google Cloud project or region (this is a common Google security measure). \nTo fix this: Go to console.cloud.google.com, ensure your project has an active Billing Account linked, or wait a few hours if you've simply hit the free requests limit. \n[Key: ${apiKeyForDebug.substring(0, 10)}...] [Source: ${keySource}]`;
+      } else {
+        errorMessage = `System Error: ${error.message || "I encountered an unexpected issue."} [Key: ${apiKeyForDebug.substring(0, 10)}] [Source: ${keySource}]`;
+      }
+    }
+    
+    if (onChunk) onChunk(errorMessage);
+    return errorMessage;
+  }
+}

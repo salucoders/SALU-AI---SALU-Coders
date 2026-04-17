@@ -40,6 +40,8 @@ interface ChatInterfaceProps {
   onSendMessage: (content: string, attachments?: string[]) => void;
   isLoading: boolean;
   mode: Mode;
+  isStreaming?: boolean;
+  streamedText?: string;
 }
 
 const MODE_QUICK_ACTIONS: Record<Mode, { label: string; prompt: string; icon: React.ReactNode }[]> = {
@@ -260,7 +262,7 @@ const SpeakButton = ({ content, voicePreference }: { content: string, voicePrefe
   );
 };
 
-export const ChatInterface = React.memo(({ messages, onSendMessage, isLoading, mode }: ChatInterfaceProps) => {
+export const ChatInterface = React.memo(({ messages, onSendMessage, isLoading, mode, isStreaming, streamedText }: ChatInterfaceProps) => {
   const { notify } = useNotification();
   const { preferences } = useUserProfile();
   const [input, setInput] = useState('');
@@ -742,9 +744,35 @@ export const ChatInterface = React.memo(({ messages, onSendMessage, isLoading, m
                 referrerPolicy="no-referrer"
               />
             </div>
-            <div className="flex items-center bg-white border border-slate-100 px-4 py-3 rounded-2xl shadow-sm">
-              <TypingIndicator />
-            </div>
+            {isStreaming && streamedText ? (
+              <div className="flex flex-col gap-2 max-w-[85%] md:max-w-[75%] items-start">
+                <div className="relative px-5 py-4 md:px-7 md:py-6 rounded-[2.5rem] transition-all duration-500 rounded-tl-sm bg-white border border-slate-100 text-slate-700 shadow-sm">
+                  <div className="prose prose-slate max-w-none text-[15px] leading-relaxed">
+                    <Markdown
+                      remarkPlugins={[remarkGfm]}
+                      components={{
+                        code({node, inline, className, children, ...props}: any) {
+                          const match = /language-(\w+)/.exec(className || '');
+                          return !inline ? (
+                            <CodeBlock language={match?.[1]} value={String(children).replace(/\n$/, '')} />
+                          ) : (
+                            <code className="bg-emerald-50 text-emerald-600 px-1.5 py-0.5 rounded-md text-sm font-mono border border-emerald-100" {...props}>
+                              {children}
+                            </code>
+                          )
+                        }
+                      }}
+                    >
+                      {streamedText}
+                    </Markdown>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-center bg-white border border-slate-100 px-4 py-3 rounded-2xl shadow-sm">
+                <TypingIndicator />
+              </div>
+            )}
           </motion.div>
         )}
       </div>

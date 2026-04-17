@@ -4,7 +4,7 @@ import { ChatInterface } from './components/ChatInterface';
 import { SettingsModal } from './components/SettingsModal';
 import { LoginPage } from './components/LoginPage';
 import { Mode, Message, ChatSession, Persona } from './types';
-import { sendMessage } from './services/gemini';
+import { sendMessage, sendMessageStream } from './services/gemini';
 import { Menu, Settings, Loader2, Sparkles, Plus, ChevronDown, User, Shield } from 'lucide-react';
 import { cn } from './lib/utils';
 import { useUserProfile } from './context/UserProfileContext';
@@ -90,6 +90,9 @@ export default function App() {
   const [isAdminPanelOpen, setIsAdminPanelOpen] = useState(false);
   const [battery, setBattery] = useState<{ level: number; charging: boolean } | null>(null);
   const [showOnboarding, setShowOnboarding] = useState(false);
+  
+  const [isStreaming, setIsStreaming] = useState(false);
+  const [streamedText, setStreamedText] = useState("");
 
   useEffect(() => {
     // Global error handlers
@@ -218,27 +221,35 @@ export default function App() {
     if (!currentSession) return;
 
     setIsLoading(true);
+    setIsStreaming(true);
+    setStreamedText("");
+    
     try {
       // Add user message to Firestore
       await addMessage(currentSession.id, 'user', content, attachments);
 
-      // Get AI response
-      const aiResponse = await sendMessage(
+      // Get AI response via Stream
+      const aiResponse = await sendMessageStream(
         currentSession.mode,
         messages,
         content,
         preferences,
-        'friendly', // Default persona for now
-        attachments
+        'friendly', 
+        attachments,
+        (chunkText) => {
+          setStreamedText(chunkText);
+        }
       );
 
-      // Add model response to Firestore
+      // Add finalized model response to Firestore
       await addMessage(currentSession.id, 'model', aiResponse);
     } catch (error: any) {
       console.error("Failed to send message:", error);
       notify(`Failed to send message: ${error.message || String(error)}`, 'error', 5000);
     } finally {
       setIsLoading(false);
+      setIsStreaming(false);
+      setStreamedText("");
     }
   };
 
@@ -461,6 +472,8 @@ export default function App() {
                   onSendMessage={handleSendMessage}
                   isLoading={isLoading}
                   mode={currentSession.mode}
+                  isStreaming={isStreaming}
+                  streamedText={streamedText}
                 />
               )}
             </div>
