@@ -5,7 +5,7 @@ import { db } from "../lib/firebase";
 
 export async function getSystemConfig(): Promise<{ apiKey: string, defaultModel: string }> {
   let apiKey = "";
-  let defaultModel = "gemini-2.0-flash";
+  let defaultModel = "gemini-3-flash-preview";
   let keySource = "";
 
   // 1. Try fetching from Firestore (Most reliable for Admin Panel saves on Static Sites)
@@ -217,7 +217,7 @@ export async function sendMessage(
     } catch(e) {}
     
     if (error.message?.includes("404") || error.message?.includes("not found")) {
-      return `System Error: The requested AI model '${fallbackModelName}' was not found. Please try switching to Gemini 1.5 Flash in the Admin Panel.`;
+      return `System Error: The requested AI model '${fallbackModelName}' was deprecated or not found. Please try switching to Gemini 3.1 Flash Lite in the Admin Panel.`;
     }
     if (error.message?.includes("429") || error.message?.includes("RESOURCE_EXHAUSTED") || error.message?.includes("quota")) {
       return `System Error: Google's API returned "Quota Exceeded/Rate Limited" for this key. 

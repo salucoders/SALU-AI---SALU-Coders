@@ -23,7 +23,7 @@ export function AdminPanel({ onClose }: AdminPanelProps) {
     publicRegistration: true,
     liveAiMode: true,
     geminiApiKey: '',
-    defaultModel: 'gemini-2.0-flash',
+    defaultModel: 'gemini-3-flash-preview',
     appName: 'SALU AI',
     welcomeMessage: 'What can I help with?'
   });
@@ -611,13 +611,12 @@ export function AdminPanel({ onClose }: AdminPanelProps) {
                             onChange={(e) => setSystemConfig({...systemConfig, defaultModel: e.target.value})}
                             className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 transition-all"
                           >
-                            <option value="gemini-2.0-flash">Gemini 2.0 Flash (Fastest / Recommended)</option>
-                            <option value="gemini-1.5-flash">Gemini 1.5 Flash (Use if you hit Quota errors!)</option>
-                            <option value="gemini-1.5-pro">Gemini 1.5 Pro (Powerful but slower)</option>
-                            <option value="gemini-1.5-flash-8b">Gemini 1.5 Flash-8B (High rate limits)</option>
+                            <option value="gemini-3-flash-preview">Gemini 3 Flash Preview (Fastest / Recommended)</option>
+                            <option value="gemini-3.1-flash-lite-preview">Gemini 3.1 Flash Lite (Use if you hit Quota errors!)</option>
+                            <option value="gemini-3.1-pro-preview">Gemini 3.1 Pro Preview (Powerful but slower)</option>
                           </select>
                           <p className="mt-2 text-xs text-slate-500">
-                            If you get <b>Quota Exceeded</b> errors on a free key, switch to <b>Gemini 1.5 Flash</b> or <b>Gemini 1.5 Flash-8B</b>.
+                            If you get <b>Quota Exceeded</b> errors on a free key, switch to <b>Gemini 3.1 Flash Lite</b>.
                           </p>
                         </div>
                       </div>

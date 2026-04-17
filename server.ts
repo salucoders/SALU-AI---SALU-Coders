@@ -17,7 +17,7 @@ function getSystemConfig() {
   const envKey = process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY || "";
   const defaults = {
     geminiApiKey: (envKey && !envKey.includes('AIzaSyA9TH') && !envKey.includes('AIzaSyCU6n')) ? envKey : "",
-    defaultModel: "gemini-2.0-flash",
+    defaultModel: "gemini-3-flash-preview",
     appName: "SALU AI",
     welcomeMessage: "What can I help with?"
   };
