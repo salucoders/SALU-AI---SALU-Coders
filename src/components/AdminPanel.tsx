@@ -601,7 +601,23 @@ export function AdminPanel({ onClose }: AdminPanelProps) {
                               {showApiKey ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                             </button>
                           </div>
-                          <p className="text-xs text-slate-500 mt-2">This key will be used securely by the backend for AI generation.</p>
+                          <p className="mt-2 text-xs text-slate-500">Get a free key from <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noreferrer" className="text-rose-500 hover:underline">Google AI Studio</a>.</p>
+                        </div>
+
+                        <div>
+                          <label className="block text-sm font-medium text-slate-700 mb-1">Default AI Model</label>
+                          <select 
+                            value={systemConfig.defaultModel}
+                            onChange={(e) => setSystemConfig({...systemConfig, defaultModel: e.target.value})}
+                            className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 transition-all"
+                          >
+                            <option value="gemini-2.0-flash">Gemini 2.0 Flash (Fastest / Recommended)</option>
+                            <option value="gemini-1.5-flash">Gemini 1.5 Flash (Use if you hit Quota errors!)</option>
+                            <option value="gemini-1.5-pro">Gemini 1.5 Pro (Powerful but slower)</option>
+                          </select>
+                          <p className="mt-2 text-xs text-slate-500">
+                            If you get <b>Quota Exceeded</b> errors on a free key, switch to <b>Gemini 1.5 Flash</b>.
+                          </p>
                         </div>
                         <div>
                           <label className="block text-sm font-medium text-slate-700 mb-1">Default AI Model</label>

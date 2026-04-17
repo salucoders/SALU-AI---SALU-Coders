@@ -214,7 +214,10 @@ export async function sendMessage(
       return "System Error: The requested AI model was not found. Please try again later.";
     }
     if (error.message?.includes("429") || error.message?.includes("RESOURCE_EXHAUSTED") || error.message?.includes("quota")) {
-      return `System Error: You have exceeded your Gemini API rate limit or quota. [Key: ${apiKeyForDebug.substring(0, 10)}] [Source: ${keySource}] Please wait a minute and try again.`;
+      return `System Error: Google's API returned "Quota Exceeded/Rate Limited" for this key. 
+If this is a completely new key, Google may have restricted the free-tier quota for your Google Cloud project or region (this is a common Google security measure). 
+To fix this: Go to console.cloud.google.com, ensure your project has an active Billing Account linked, or wait a few hours if you've simply hit the free requests limit. 
+[Key: ${apiKeyForDebug.substring(0, 10)}...] [Source: ${keySource}]`;
     }
     
     // Try to parse JSON errors if they are returned as a string
