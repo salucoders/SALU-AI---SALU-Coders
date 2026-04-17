@@ -64,24 +64,6 @@ export function AdminPanel({ onClose }: AdminPanelProps) {
         messages: messagesSnapshot.size
       });
 
-      // Fetch Server Config via API
-      try {
-        const configRes = await fetch('/api/admin/config', {
-          headers: { 'Authorization': `Bearer ${await user?.getIdToken()}` }
-        });
-        
-        // Ensure it's actually JSON before trying to parse
-        const contentType = configRes.headers.get("content-type");
-        if (configRes.ok && contentType && contentType.includes("application/json")) {
-          const configData = await configRes.json();
-          setSystemConfig(prev => ({ ...prev, ...configData }));
-        } else {
-          console.warn("Backend API not found or returned non-JSON. Are you running as a Static Site?");
-        }
-      } catch (err) {
-        console.error("Failed to fetch from backend API:", err);
-      }
-
       // Fetch Firestore Config
       const fsConfigDoc = await getDoc(doc(db, 'system', 'config'));
       if (fsConfigDoc.exists()) {
@@ -90,7 +72,11 @@ export function AdminPanel({ onClose }: AdminPanelProps) {
           ...prev,
           maintenanceMode: d.maintenanceMode ?? prev.maintenanceMode,
           publicRegistration: d.publicRegistration ?? prev.publicRegistration,
-          liveAiMode: d.liveAiMode ?? prev.liveAiMode
+          liveAiMode: d.liveAiMode ?? prev.liveAiMode,
+          appName: d.appName ?? prev.appName,
+          welcomeMessage: d.welcomeMessage ?? prev.welcomeMessage,
+          geminiApiKey: d.geminiApiKey ?? prev.geminiApiKey,
+          defaultModel: d.defaultModel ?? prev.defaultModel
         }));
       }
 
