@@ -8,7 +8,8 @@ export async function getSystemConfig(): Promise<{ apiKey: string, defaultModel:
 
   try {
     const res = await fetch(`/api/config?t=${new Date().getTime()}`);
-    if (res.ok) {
+    const contentType = res.headers.get("content-type");
+    if (res.ok && contentType && contentType.includes("application/json")) {
       const data = await res.json();
       if (data.geminiApiKey) {
         apiKey = data.geminiApiKey;
@@ -204,6 +205,6 @@ export async function sendMessage(
       // Ignore parsing errors
     }
 
-    return `System Error: ${error.message || "I encountered an unexpected issue."} [Key: ${apiKeyForDebug.substring(0, 10)}]`;
+    return `System Error: ${error.message || "I encountered an unexpected issue."} [Key: ${apiKeyForDebug.substring(0, 10)}] [Source: ${keySource}]`;
   }
 }

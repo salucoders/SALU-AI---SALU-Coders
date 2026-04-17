@@ -64,12 +64,21 @@ export function AdminPanel({ onClose }: AdminPanelProps) {
       });
 
       // Fetch Server Config via API
-      const configRes = await fetch('/api/admin/config', {
-        headers: { 'Authorization': `Bearer ${await user?.getIdToken()}` }
-      });
-      if (configRes.ok) {
-        const configData = await configRes.json();
-        setSystemConfig(prev => ({ ...prev, ...configData }));
+      try {
+        const configRes = await fetch('/api/admin/config', {
+          headers: { 'Authorization': `Bearer ${await user?.getIdToken()}` }
+        });
+        
+        // Ensure it's actually JSON before trying to parse
+        const contentType = configRes.headers.get("content-type");
+        if (configRes.ok && contentType && contentType.includes("application/json")) {
+          const configData = await configRes.json();
+          setSystemConfig(prev => ({ ...prev, ...configData }));
+        } else {
+          console.warn("Backend API not found or returned non-JSON. Are you running as a Static Site?");
+        }
+      } catch (err) {
+        console.error("Failed to fetch from backend API:", err);
       }
 
       // Fetch Firestore Config

@@ -16,7 +16,7 @@ const CONFIG_FILE = path.join(__dirname, 'system-config.json');
 function getSystemConfig() {
   const envKey = process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY || "";
   const defaults = {
-    geminiApiKey: envKey,
+    geminiApiKey: (envKey && !envKey.includes('AIzaSyA9TH') && !envKey.includes('AIzaSyCU6n')) ? envKey : "",
     defaultModel: "gemini-2.0-flash",
     appName: "SALU AI",
     welcomeMessage: "What can I help with?"
@@ -26,11 +26,12 @@ function getSystemConfig() {
     if (fs.existsSync(CONFIG_FILE)) {
       const fileConfig = JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf-8'));
       
-      // If server has an explicitly set environment variable, ALWAYS prefer it over the saved file
-      if (envKey) {
+      // If server has an explicitly set environment variable, ALWAYS prefer it over the saved file, 
+      // UNLESS the environment variable is the old broken key.
+      if (envKey && !envKey.includes('AIzaSyA9TH') && !envKey.includes('AIzaSyCU6n')) {
         fileConfig.geminiApiKey = envKey;
-      } else if (!fileConfig.geminiApiKey || fileConfig.geminiApiKey.includes('AIzaSyA9TH')) {
-        // Also strip out the known bad key just in case it got stuck in the json file
+      } else if (!fileConfig.geminiApiKey || fileConfig.geminiApiKey.includes('AIzaSyA9TH') || fileConfig.geminiApiKey.includes('AIzaSyCU6n')) {
+        // Strip out the known bad key if it got stuck in the json file
         delete fileConfig.geminiApiKey; 
       }
       
@@ -60,6 +61,15 @@ async function startServer() {
   // Public config endpoint (only safe values)
   app.get("/api/config", (req, res) => {
     const config = getSystemConfig();
+    
+    // Log why the key might be empty on the backend
+    console.log("Serving config:", {
+      hasEnvKey: !!process.env.GEMINI_API_KEY,
+      hasViteKey: !!process.env.VITE_GEMINI_API_KEY,
+      keyLength: config.geminiApiKey ? config.geminiApiKey.length : 0,
+      configExists: fs.existsSync(CONFIG_FILE)
+    });
+
     res.json({
       geminiApiKey: config.geminiApiKey,
       defaultModel: config.defaultModel,
