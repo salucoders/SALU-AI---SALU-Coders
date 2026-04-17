@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
-import { Users, Settings, Activity, Shield, Key, Database, Server, X, Check, AlertCircle, Loader2, MessageSquare, Radio, Trash2, Download, Eraser, Palette, Cpu } from 'lucide-react';
+import { Users, Settings, Activity, Shield, Key, Database, Server, X, Check, AlertCircle, Loader2, MessageSquare, Radio, Trash2, Download, Eraser, Palette, Cpu, Eye, EyeOff } from 'lucide-react';
 import { collection, getDocs, doc, updateDoc, deleteDoc, getDoc, setDoc, query, where, collectionGroup } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { useAuth } from '../context/AuthContext';
@@ -130,35 +130,35 @@ export function AdminPanel({ onClose }: AdminPanelProps) {
   const handleSaveConfig = async () => {
     setSaving(true);
     try {
-      // Save to backend
-      const res = await fetch('/api/admin/config', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${await user?.getIdToken()}`
-        },
-        body: JSON.stringify({ 
-          geminiApiKey: systemConfig.geminiApiKey,
-          defaultModel: systemConfig.defaultModel,
-          appName: systemConfig.appName,
-          welcomeMessage: systemConfig.welcomeMessage
-        })
-      });
+      // Save to backend (fallback)
+      try {
+        await fetch('/api/admin/config', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${await user?.getIdToken()}`
+          },
+          body: JSON.stringify({ 
+            geminiApiKey: systemConfig.geminiApiKey,
+            defaultModel: systemConfig.defaultModel,
+            appName: systemConfig.appName,
+            welcomeMessage: systemConfig.welcomeMessage
+          })
+        });
+      } catch (err) { }
       
-      // Save to Firestore for real-time client updates
+      // Save to Firestore for real-time client updates (Primary on Static Sites)
       await setDoc(doc(db, 'system', 'config'), {
         maintenanceMode: systemConfig.maintenanceMode,
         publicRegistration: systemConfig.publicRegistration,
         liveAiMode: systemConfig.liveAiMode,
         appName: systemConfig.appName,
-        welcomeMessage: systemConfig.welcomeMessage
+        welcomeMessage: systemConfig.welcomeMessage,
+        geminiApiKey: systemConfig.geminiApiKey,
+        defaultModel: systemConfig.defaultModel
       }, { merge: true });
 
-      if (res.ok) {
-        showMessage('success', 'System configuration saved successfully');
-      } else {
-        throw new Error('Failed to save backend config');
-      }
+      showMessage('success', 'System configuration saved successfully');
     } catch (error) {
       showMessage('error', 'Failed to save system configuration');
     } finally {
@@ -419,7 +419,9 @@ export function AdminPanel({ onClose }: AdminPanelProps) {
                               <td className="p-4">
                                 <span className={cn(
                                   "px-2.5 py-1 rounded-full text-xs font-bold uppercase tracking-wider",
-                                  u.role === 'admin' ? "bg-rose-100 text-rose-600" : "bg-slate-100 text-slate-600"
+                                  u.role === 'admin' ? "bg-rose-100 text-rose-600" :
+                                  u.role === 'suspended' ? "bg-orange-100 text-orange-600" :
+                                  "bg-slate-100 text-slate-600"
                                 )}>
                                   {u.role}
                                 </span>
@@ -434,6 +436,7 @@ export function AdminPanel({ onClose }: AdminPanelProps) {
                                   >
                                     <option value="user">User</option>
                                     <option value="admin">Admin</option>
+                                    <option value="suspended">Suspended</option>
                                   </select>
                                   <button
                                     onClick={() => handleDeleteUser(u.id)}
@@ -590,13 +593,22 @@ export function AdminPanel({ onClose }: AdminPanelProps) {
                       <div className="space-y-4">
                         <div>
                           <label className="block text-sm font-medium text-slate-700 mb-1">Gemini API Key</label>
-                          <input 
-                            type="password" 
-                            value={systemConfig.geminiApiKey}
-                            onChange={(e) => setSystemConfig({...systemConfig, geminiApiKey: e.target.value})}
-                            placeholder="AIzaSy..."
-                            className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 transition-all"
-                          />
+                          <div className="relative">
+                            <input 
+                              type={showApiKey ? "text" : "password"} 
+                              value={systemConfig.geminiApiKey}
+                              onChange={(e) => setSystemConfig({...systemConfig, geminiApiKey: e.target.value})}
+                              placeholder="AIzaSy..."
+                              className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 transition-all pr-12"
+                            />
+                            <button 
+                              type="button" 
+                              onClick={() => setShowApiKey(!showApiKey)}
+                              className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-600 transition-colors"
+                            >
+                              {showApiKey ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                            </button>
+                          </div>
                           <p className="text-xs text-slate-500 mt-2">This key will be used securely by the backend for AI generation.</p>
                         </div>
                         <div>

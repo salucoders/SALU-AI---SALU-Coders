@@ -94,7 +94,7 @@ service cloud.firestore {
              data.uid is string && data.uid.size() > 0 && data.uid.size() < 100 &&
              data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
              isValidEmail(data.email) && data.email.size() < 100 &&
-             data.role in ['admin', 'user'] &&
+             data.role in ['admin', 'user', 'suspended'] &&
              isValidStringOrOmitted('profilePicture', 1000) &&
              isValidStringOrOmitted('language', 50) &&
              isValidStringOrOmitted('accentColor', 20) &&

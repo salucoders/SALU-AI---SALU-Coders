@@ -1,27 +1,47 @@
 import { Message, Mode, UserPreferences, Persona } from "../types";
 import { GoogleGenAI } from "@google/genai";
+import { doc, getDoc } from "firebase/firestore";
+import { db } from "../lib/firebase";
 
 export async function getSystemConfig(): Promise<{ apiKey: string, defaultModel: string }> {
   let apiKey = "";
   let defaultModel = "gemini-2.0-flash";
   let keySource = "";
 
+  // 1. Try fetching from Firestore (Most reliable for Admin Panel saves on Static Sites)
   try {
-    const res = await fetch(`/api/config?t=${new Date().getTime()}`);
-    const contentType = res.headers.get("content-type");
-    if (res.ok && contentType && contentType.includes("application/json")) {
-      const data = await res.json();
+    const configDoc = await getDoc(doc(db, 'system', 'config'));
+    if (configDoc.exists()) {
+      const data = configDoc.data();
       if (data.geminiApiKey) {
         apiKey = data.geminiApiKey;
-        keySource = "Backend API";
+        keySource = "Firestore Config";
       }
       if (data.defaultModel) defaultModel = data.defaultModel;
     }
   } catch (e) {
-    console.error("Failed to fetch config from backend:", e);
+    console.error("Failed to fetch config from Firestore:", e);
   }
 
-  // Use VITE_ prefixed environment variable if provided (standard for Vite/Netlify)
+  // 2. Fallback to Express backend `/api/config` (if running as Web Service)
+  if (!apiKey) {
+    try {
+      const res = await fetch(`/api/config?t=${new Date().getTime()}`);
+      const contentType = res.headers.get("content-type");
+      if (res.ok && contentType && contentType.includes("application/json")) {
+        const data = await res.json();
+        if (data.geminiApiKey) {
+          apiKey = data.geminiApiKey;
+          keySource = "Backend API";
+        }
+        if (data.defaultModel && data.defaultModel !== "gemini-2.0-flash") defaultModel = data.defaultModel;
+      }
+    } catch (e) {
+      console.warn("Failed to fetch config from backend:", e);
+    }
+  }
+
+  // 3. Fallback to Vite/Node Environment Variables
   if (!apiKey) {
     if (import.meta.env && import.meta.env.VITE_GEMINI_API_KEY) {
       apiKey = import.meta.env.VITE_GEMINI_API_KEY;
@@ -32,10 +52,9 @@ export async function getSystemConfig(): Promise<{ apiKey: string, defaultModel:
     }
   }
 
-  // Actively reject the old leaked keys if they got stuck in Render's environment variables
-  if (apiKey && (apiKey.includes('AIzaSyA9TH') || apiKey.includes('AIzaSyCU6n'))) {
-    console.warn(`Blocked known rate-limited API key coming from: ${keySource}`);
-    apiKey = ""; 
+  // Remove the active block out of an abundance of caution, 
+  // since the user might be reusing their valid API key prefix
+  if (apiKey === "") {
     keySource = "Blocked/Empty";
   }
 

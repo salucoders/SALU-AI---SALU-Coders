@@ -209,6 +209,11 @@ export default function App() {
   }, [user, sessionsLoading, sessions.length, currentSessionId, createSession]);
 
   const handleSendMessage = async (content: string, attachments?: string[]) => {
+    if (preferences.role === 'suspended') {
+      notify('Your account is currently suspended. Please contact an administrator.', 'error', 5000);
+      return;
+    }
+
     const currentSession = sessions.find(s => s.id === currentSessionId);
     if (!currentSession) return;
 
