@@ -32,6 +32,7 @@ export function AdminPanel({ onClose }: AdminPanelProps) {
     active: false
   });
   const [saving, setSaving] = useState(false);
+  const [showApiKey, setShowApiKey] = useState(false);
   const [message, setMessage] = useState({ type: '', text: '' });
 
   useEffect(() => {
