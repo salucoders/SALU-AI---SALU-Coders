@@ -168,7 +168,7 @@ export async function sendMessage(
       return "System Error: The requested AI model was not found. Please try again later.";
     }
     if (error.message?.includes("429") || error.message?.includes("RESOURCE_EXHAUSTED") || error.message?.includes("quota")) {
-      return "System Error: You have exceeded your Gemini API rate limit or quota. Please wait a minute and try again, or check your billing details in Google AI Studio.";
+      return `System Error: You have exceeded your Gemini API rate limit or quota. [Using Key: ${config.apiKey.substring(0, 10)}...] Please wait a minute and try again.`;
     }
     
     // Try to parse JSON errors if they are returned as a string
@@ -176,13 +176,13 @@ export async function sendMessage(
       if (error.message && error.message.startsWith('{')) {
         const parsed = JSON.parse(error.message);
         if (parsed.error && parsed.error.message) {
-          return `System Error: ${parsed.error.message}`;
+          return `System Error: ${parsed.error.message} [Key: ${config.apiKey.substring(0, 10)}]`;
         }
       }
     } catch (e) {
       // Ignore parsing errors
     }
 
-    return `System Error: ${error.message || "I encountered an unexpected issue. Please try again."}`;
+    return `System Error: ${error.message || "I encountered an unexpected issue."} [Key: ${config.apiKey.substring(0, 10)}]`;
   }
 }
