@@ -52,8 +52,13 @@ export async function getSystemConfig(): Promise<{ apiKey: string, defaultModel:
     }
   }
 
-  // Remove the active block out of an abundance of caution, 
-  // since the user might be reusing their valid API key prefix
+  // Actively reject the old leaked keys so it forces the UI to prompt for a new one
+  if (apiKey && (apiKey.includes('AIzaSyA9TH') || apiKey.includes('AIzaSyCU6n'))) {
+    console.warn(`Blocked known rate-limited API key coming from: ${keySource}`);
+    apiKey = ""; 
+    keySource = "Blocked/Empty";
+  }
+
   if (apiKey === "") {
     keySource = "Blocked/Empty";
   }

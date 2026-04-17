@@ -115,6 +115,11 @@ export function AdminPanel({ onClose }: AdminPanelProps) {
   };
 
   const handleSaveConfig = async () => {
+    if (systemConfig.geminiApiKey?.includes('AIzaSyA9TH') || systemConfig.geminiApiKey?.includes('AIzaSyCU6n')) {
+      showMessage('error', 'This specific API key is known to be rate-limited or blocked. Please generate a NEW key at aistudio.google.com and paste it here.');
+      return;
+    }
+
     setSaving(true);
     try {
       // Save to backend (fallback)
