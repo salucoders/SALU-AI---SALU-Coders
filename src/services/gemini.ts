@@ -4,12 +4,16 @@ import { GoogleGenAI } from "@google/genai";
 export async function getSystemConfig(): Promise<{ apiKey: string, defaultModel: string }> {
   let apiKey = "";
   let defaultModel = "gemini-2.0-flash";
+  let keySource = "";
 
   try {
     const res = await fetch(`/api/config?t=${new Date().getTime()}`);
     if (res.ok) {
       const data = await res.json();
-      if (data.geminiApiKey) apiKey = data.geminiApiKey;
+      if (data.geminiApiKey) {
+        apiKey = data.geminiApiKey;
+        keySource = "Backend API";
+      }
       if (data.defaultModel) defaultModel = data.defaultModel;
     }
   } catch (e) {
@@ -20,10 +24,22 @@ export async function getSystemConfig(): Promise<{ apiKey: string, defaultModel:
   if (!apiKey) {
     if (import.meta.env && import.meta.env.VITE_GEMINI_API_KEY) {
       apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+      keySource = "Vite Environment Variable";
     } else if (typeof process !== 'undefined' && process.env && process.env.GEMINI_API_KEY) {
       apiKey = process.env.GEMINI_API_KEY;
+      keySource = "Node Environment Variable";
     }
   }
+
+  // Actively reject the old leaked keys if they got stuck in Render's environment variables
+  if (apiKey && (apiKey.includes('AIzaSyA9TH') || apiKey.includes('AIzaSyCU6n'))) {
+    console.warn(`Blocked known rate-limited API key coming from: ${keySource}`);
+    apiKey = ""; 
+    keySource = "Blocked/Empty";
+  }
+
+  // Attach the source for debugging purposes on error
+  (window as any)._geminiKeySource = keySource;
 
   return { apiKey, defaultModel };
 }
@@ -161,17 +177,19 @@ export async function sendMessage(
       error: error
     });
     
+    const keySource = (window as any)._geminiKeySource || "Unknown";
+    
     if (error.message?.includes("API key not valid")) {
-      return "System Error: The API key provided is invalid. Please check your API key in Google AI Studio.";
+      return `System Error: The API key provided is invalid. (Loaded from: ${keySource}). Please check your API key in Google AI Studio.`;
     }
     if (error.message?.includes("PERMISSION_DENIED")) {
-      return "System Error: Access denied. Your API key might be blocked or restricted. Please ensure it has no website restrictions in Google Cloud Console.";
+      return `System Error: Access denied. Your API key might be blocked or restricted. (Loaded from: ${keySource}).`;
     }
     if (error.message?.includes("404") || error.message?.includes("not found")) {
       return "System Error: The requested AI model was not found. Please try again later.";
     }
     if (error.message?.includes("429") || error.message?.includes("RESOURCE_EXHAUSTED") || error.message?.includes("quota")) {
-      return `System Error: You have exceeded your Gemini API rate limit or quota. [Using Key: ${apiKeyForDebug.substring(0, 10)}...] Please wait a minute and try again.`;
+      return `System Error: You have exceeded your Gemini API rate limit or quota. [Key: ${apiKeyForDebug.substring(0, 10)}] [Source: ${keySource}] Please wait a minute and try again.`;
     }
     
     // Try to parse JSON errors if they are returned as a string
