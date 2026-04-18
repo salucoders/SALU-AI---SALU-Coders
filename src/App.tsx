@@ -21,6 +21,7 @@ import { LiveChatInterface } from './components/LiveChatInterface';
 import { AdminPanel } from './components/AdminPanel';
 import { Toolbox } from './components/Toolbox';
 import { UpgradeModal } from './components/UpgradeModal';
+import { InstallPWA } from './components/InstallPWA';
 
 export default function App() {
   const { preferences, loading: profileLoading, isAdmin, isPaid, updatePreferences } = useUserProfile();
@@ -443,6 +444,8 @@ export default function App() {
         isOpen={isSettingsOpen}
         onClose={() => setIsSettingsOpen(false)}
       />
+
+      <InstallPWA />
       
       <main className="flex-1 flex flex-col min-w-0 h-full relative bg-white overflow-hidden">
         <div className="flex-1 flex flex-col h-full overflow-hidden relative z-10">
