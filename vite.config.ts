@@ -16,7 +16,8 @@ export default defineConfig(({mode}) => {
           enabled: true
         },
         workbox: {
-          maximumFileSizeToCacheInBytes: 5000000 // 5 MiB
+          maximumFileSizeToCacheInBytes: 5000000, // 5 MiB
+          navigateFallbackDenylist: [/^\/api/]
         },
         manifest: {
           name: 'SALU AI Plus',

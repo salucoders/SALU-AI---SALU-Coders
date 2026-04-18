@@ -28,12 +28,17 @@ export const ImageKitGallery: React.FC<ImageKitGalleryProps> = ({ isOpen, onClos
       // ImageKit doesn't have a simple client-side "list" API for security reasons.
       // We should implement a server-side list endpoint.
       const res = await fetch('/api/imagekit/files');
-      if (res.ok) {
+      
+      const contentType = res.headers.get("content-type");
+      if (res.ok && contentType && contentType.indexOf("application/json") !== -1) {
         const data = await res.json();
         setImages(data);
       } else {
-        // Fallback or show error
-        console.warn("Could not fetch images from server");
+        console.warn("Could not fetch images from server, returned invalid format.");
+        // Try to handle API error gracefully
+        if (!res.ok) {
+           console.error("Image API error:", res.status, res.statusText);
+        }
       }
     } catch (error) {
       console.error("Error fetching images:", error);
