@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
-import { MessageSquare, Plus, History, Settings, LogOut, Sparkles, Trash2, X, User, AlertTriangle, Edit2, Archive, ArchiveRestore, Check, GraduationCap, Code, Video, School, ChevronDown, Mic, MoreVertical } from 'lucide-react';
+import { MessageSquare, Plus, History, Settings, LogOut, Sparkles, Trash2, X, User, AlertTriangle, Edit2, Archive, ArchiveRestore, Check, GraduationCap, Code, Video, School, ChevronDown, Mic, MoreVertical, Image as ImageIcon, CheckSquare } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
 import { ChatSession, Mode } from '../types';
 import { useUserProfile } from '../context/UserProfileContext';
 import { useAuth } from '../context/AuthContext';
 import { useNotification } from '../context/NotificationContext';
+import { Lock, Crown } from 'lucide-react';
 
 interface SidebarProps {
   sessions: ChatSession[];
@@ -22,15 +23,18 @@ interface SidebarProps {
   isOpen: boolean;
   onClose: () => void;
   onOpenSettings: () => void;
+  onOpenVault: () => void;
+  onOpenToolbox: () => void;
+  onOpenUpgrade: () => void;
   battery: { level: number; charging: boolean } | null;
 }
 
 const modes: { id: Mode; label: string; icon: any; color: string; description: string }[] = [
-  { id: 'student', label: 'Student', icon: GraduationCap, color: 'text-blue-500 bg-blue-50', description: 'Assignments, Notes, Summaries' },
-  { id: 'developer', label: 'Developer', icon: Code, color: 'text-emerald-500 bg-emerald-50', description: 'Code, Debug, Optimization' },
-  { id: 'creator', label: 'Creator', icon: Video, color: 'text-purple-500 bg-purple-50', description: 'YouTube, SEO, Scripts' },
-  { id: 'assistant', label: 'Assistant', icon: User, color: 'text-orange-500 bg-orange-50', description: 'Emails, Schedules, Advice' },
-  { id: 'salu', label: 'SALU', icon: School, color: 'text-red-500 bg-red-50', description: 'University Updates, Community' },
+  { id: 'student', label: 'Student', icon: GraduationCap, color: 'text-blue-500 bg-blue-50', description: 'Assignments, Notes, AI Images' },
+  { id: 'developer', label: 'Developer', icon: Code, color: 'text-emerald-500 bg-emerald-50', description: 'Code, Debug, AI Diagrams' },
+  { id: 'creator', label: 'Creator', icon: Video, color: 'text-purple-500 bg-purple-50', description: 'YouTube, SEO, AI Art' },
+  { id: 'assistant', label: 'Assistant', icon: User, color: 'text-orange-500 bg-orange-50', description: 'Emails, Schedules, AI Design' },
+  { id: 'salu', label: 'SALU Plus', icon: School, color: 'text-brand-500 bg-brand-50', description: 'University Updates, Community' },
   { id: 'live', label: 'Live AI', icon: Mic, color: 'text-rose-500 bg-rose-50', description: 'Real-time Voice Conversation' },
 ];
 
@@ -49,8 +53,12 @@ export const Sidebar = React.memo(({
   isOpen, 
   onClose, 
   onOpenSettings,
+  onOpenVault,
+  onOpenToolbox,
+  onOpenUpgrade,
+  battery
 }: SidebarProps) => {
-  const { preferences } = useUserProfile();
+  const { preferences, isPaid } = useUserProfile();
   const { user, loginWithGoogle, logout, isAuthenticating } = useAuth();
   const { notify } = useNotification();
   const [sessionToDelete, setSessionToDelete] = useState<string | null>(null);
@@ -198,6 +206,46 @@ export const Sidebar = React.memo(({
               New chat
               <Plus className="w-4 h-4 ml-auto text-slate-500" />
             </button>
+            <button
+              onClick={() => {
+                if (!isPaid) {
+                  onOpenUpgrade();
+                  return;
+                }
+                onOpenToolbox();
+                if (window.innerWidth < 1024) onClose();
+              }}
+              className="flex items-center gap-2 px-3 py-2 hover:bg-slate-200/50 rounded-lg transition-colors text-sm font-medium text-slate-700 ml-1 relative group"
+              title="Study Toolbox"
+            >
+              <div className={cn(
+                "w-7 h-7 rounded-full flex items-center justify-center shadow-sm border",
+                isPaid ? "bg-amber-50 border-amber-100" : "bg-slate-100 border-slate-200"
+              )}>
+                <CheckSquare className={cn("w-3.5 h-3.5", isPaid ? "text-amber-600" : "text-slate-400")} />
+              </div>
+              {!isPaid && <Lock className="w-2.5 h-2.5 absolute -top-1 -right-1 text-slate-400 bg-white rounded-full shadow-sm" />}
+            </button>
+            <button
+              onClick={() => {
+                if (!isPaid) {
+                  onOpenUpgrade();
+                  return;
+                }
+                onOpenVault();
+                if (window.innerWidth < 1024) onClose();
+              }}
+              className="flex items-center gap-2 px-3 py-2 hover:bg-slate-200/50 rounded-lg transition-colors text-sm font-medium text-slate-700 ml-1 relative group"
+              title="Media Vault"
+            >
+              <div className={cn(
+                "w-7 h-7 rounded-full flex items-center justify-center shadow-sm border",
+                isPaid ? "bg-brand-50 border-brand-100" : "bg-slate-100 border-slate-200"
+              )}>
+                <ImageIcon className={cn("w-3.5 h-3.5", isPaid ? "text-brand-600" : "text-slate-400")} />
+              </div>
+              {!isPaid && <Lock className="w-2.5 h-2.5 absolute -top-1 -right-1 text-slate-400 bg-white rounded-full shadow-sm" />}
+            </button>
             <button 
               onClick={onClose}
               className="p-2 hover:bg-slate-200/50 rounded-lg lg:hidden transition-colors text-slate-500 ml-1"
@@ -208,6 +256,9 @@ export const Sidebar = React.memo(({
 
           {/* Mode Selector */}
           <div className="relative">
+            <div className="px-3 mb-1">
+              <span className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em]">SALU AI Modes</span>
+            </div>
             <button
               onClick={() => setIsModeOpen(!isModeOpen)}
               className="w-full flex items-center gap-2 px-3 py-2 hover:bg-slate-200/50 rounded-lg transition-colors text-sm font-medium text-slate-700"
@@ -230,21 +281,32 @@ export const Sidebar = React.memo(({
                     {filteredModes.map((mode) => {
                       const Icon = mode.icon;
                       const isActive = currentMode === mode.id;
+                      const isLocked = !isPaid && ['live', 'assistant'].includes(mode.id);
+                      
                       return (
                         <button
                           key={mode.id}
                           onClick={() => {
+                            if (isLocked) {
+                              onOpenUpgrade();
+                              setIsModeOpen(false);
+                              return;
+                            }
                             onModeChange(mode.id);
                             setIsModeOpen(false);
                           }}
                           className={cn(
-                            "w-full flex items-center gap-3 px-3 py-2 text-sm transition-colors text-left",
-                            isActive ? "bg-slate-100 text-slate-900 font-medium" : "hover:bg-slate-50 text-slate-600"
+                            "w-full flex items-center gap-3 px-3 py-2 text-sm transition-colors text-left relative",
+                            isActive ? "bg-slate-100 text-slate-900 font-medium" : "hover:bg-slate-50 text-slate-600",
+                            isLocked && "opacity-60 cursor-not-allowed"
                           )}
                         >
                           <Icon className={cn("w-4 h-4", isActive ? "text-slate-900" : "text-slate-500")} />
                           <div className="flex-1 min-w-0">
-                            <div>{mode.label}</div>
+                            <div className="flex items-center gap-2">
+                              {mode.label}
+                              {isLocked && <Lock className="w-3 h-3 text-slate-400" />}
+                            </div>
                           </div>
                           {isActive && <Check className="w-4 h-4 text-slate-900" />}
                         </button>
@@ -398,7 +460,54 @@ export const Sidebar = React.memo(({
         </div>
 
         {/* Footer (User Profile) */}
-        <div className="p-3">
+        <div className="p-3 border-t border-slate-200/60 bg-white/50 space-y-2">
+          {user && !isPaid && (
+            <motion.button 
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={onOpenUpgrade}
+              className="w-full relative overflow-hidden p-3 bg-gradient-to-br from-amber-400 via-brand-500 to-rose-600 rounded-xl group"
+            >
+              <div className="absolute inset-0 bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity" />
+              <div className="relative z-10 flex items-center justify-center gap-2">
+                <Crown className="w-4 h-4 text-white animate-pulse" />
+                <span className="text-xs font-black text-white uppercase tracking-widest">Upgrade to Plus</span>
+              </div>
+            </motion.button>
+          )}
+
+          {user && (
+            <div className="px-3 py-2 bg-slate-100/50 rounded-xl border border-slate-200/50 space-y-1.5">
+              <div className="flex items-center justify-between">
+                <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Daily Credits</span>
+                <span className={cn(
+                  "text-[10px] font-black px-1.5 py-0.5 rounded uppercase tracking-tight",
+                  isPaid ? "bg-brand-500 text-white" : "bg-slate-200 text-slate-600"
+                )}>
+                  {isPaid ? 'SALU Plus' : 'Free'}
+                </span>
+              </div>
+              <div className="space-y-1">
+                <div className="flex justify-between text-xs font-bold text-slate-700">
+                  <span>{preferences.creditsTotal! - preferences.creditsUsedToday!} Remaining</span>
+                  <span>{preferences.creditsTotal}</span>
+                </div>
+                <div className="h-1.5 w-full bg-slate-200 rounded-full overflow-hidden">
+                  <motion.div 
+                    initial={{ width: 0 }}
+                    animate={{ width: `${Math.max(0, Math.min(100, (1 - (preferences.creditsUsedToday! / preferences.creditsTotal!)) * 100))}%` }}
+                    className={cn(
+                      "h-full transition-all duration-1000",
+                      isPaid ? "bg-brand-500" : "bg-slate-500"
+                    )}
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+
           {!user ? (
             <button 
               onClick={handleLogin}

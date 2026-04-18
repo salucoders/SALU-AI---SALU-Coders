@@ -23,8 +23,13 @@ export interface UserPreferences {
   dislikes?: string;
   department?: string;
   class?: string;
-  role?: 'admin' | 'user';
+  role?: 'admin' | 'user' | 'suspended';
+  subscription?: 'free' | 'paid';
+  creditsTotal?: number;
+  creditsUsedToday?: number;
+  lastCreditReset?: any;
   updatedAt?: any;
+  uid?: string;
 }
 
 export interface ChatSession {

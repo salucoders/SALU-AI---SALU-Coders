@@ -128,11 +128,30 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
     try {
       const messageId = uuidv4();
+      
+      // Prepare message data
+      let finalAttachments = attachments || [];
+      const estimatedSize = JSON.stringify({ content, attachments: finalAttachments }).length;
+
+      // Firestore document limit is 1MB (~1,048,576 bytes)
+      // If the message is too large, we save a version without large attachments to history
+      // but the AI still gets the full context in the current session
+      if (estimatedSize > 900000) {
+        finalAttachments = finalAttachments.map(att => {
+          if (att.length > 50000) { // If individual attachment is somewhat large
+            const mime = att.split(';')[0].split(':')[1] || 'file';
+            return `[${mime.toUpperCase()} too large for history storage - sent to AI for this turn]`;
+          }
+          return att;
+        });
+        notify?.('Large files sent to AI but skipped for history storage to stay within limits.', 'info', 5000);
+      }
+
       const newMessage = {
         id: messageId,
         role,
         content,
-        attachments: attachments || [],
+        attachments: finalAttachments,
         timestamp: new Date().toISOString()
       };
 

@@ -52,13 +52,7 @@ export async function getSystemConfig(): Promise<{ apiKey: string, defaultModel:
     }
   }
 
-  // Actively reject the old leaked keys so it forces the UI to prompt for a new one
-  if (apiKey && (apiKey.includes('AIzaSyA9TH') || apiKey.includes('AIzaSyCU6n'))) {
-    console.warn(`Blocked known rate-limited API key coming from: ${keySource}`);
-    apiKey = ""; 
-    keySource = "Blocked/Empty";
-  }
-
+  // Removed overzealous key blocking to prevent interference with valid keys
   if (apiKey === "") {
     keySource = "Blocked/Empty";
   }
@@ -126,7 +120,17 @@ export async function sendMessage(
     If they like certain topics, use them in examples. If they dislike something, avoid it. 
     If the preferred language is Urdu or Sindhi, respond primarily in that language but keep technical terms in English.`;
 
-  const systemInstruction = `You are SALU Coders AI. ${getSystemInstruction(mode, preferences, persona)} ${userContext} Be friendly, to the point, smart, and motivational. Avoid unnecessary repetition. Use clear, structured formatting with headings and bullet points.`;
+  const systemInstruction = `You are SALU Coders AI. ${getSystemInstruction(mode, preferences, persona)} ${userContext} 
+    Be friendly, to the point, smart, and motivational. Avoid unnecessary repetition. Use clear, structured formatting with headings and bullet points.
+    
+    IMAGE GENERATION PROTOCOL:
+    If the user requests an image, painting, or picture:
+    1. EXCLUSIVELY output the tag: [IMAGE_GEN: expanded_artistic_prompt]
+    2. Expand the user's simple request into a 50-80 word cinematic-grade masterpiece prompt.
+    3. Include lighting, texture, camera angle, and artistic style (e.g., hyper-realistic, photorealistic, 8k resolution).
+    4. You MUST include the square brackets and the "IMAGE_GEN:" prefix exactly.
+    5. Provide NO OTHER TEXT besides the tag for image generation.
+    6. Be bold and highly descriptive. Use terms like 'cinematic lighting', 'hyper-detailed', 'unreal engine 5'.`;
 
   const recentHistory = history.slice(-10);
   const contents: any[] = recentHistory.map((msg: any) => {
@@ -176,7 +180,7 @@ export async function sendMessage(
     apiKeyForDebug = config.apiKey || "";
     
     if (!config.apiKey) {
-      throw new Error("Gemini API key is missing");
+      throw new Error("SALU AI Engine key is missing");
     }
 
     const ai = new GoogleGenAI({ apiKey: config.apiKey });
@@ -217,7 +221,7 @@ export async function sendMessage(
     } catch(e) {}
     
     if (error.message?.includes("404") || error.message?.includes("not found")) {
-      return `System Error: The requested AI model '${fallbackModelName}' was deprecated or not found. Please try switching to Gemini 3.1 Flash Lite in the Admin Panel.`;
+      return `System Error: The requested AI model '${fallbackModelName}' was deprecated or not found. Please try switching to SALU AI Lite in the Admin Panel.`;
     }
     if (error.message?.includes("429") || error.message?.includes("RESOURCE_EXHAUSTED") || error.message?.includes("quota")) {
       return `System Error: Google's API returned "Quota Exceeded/Rate Limited" for this key. 
@@ -277,7 +281,17 @@ export async function sendMessageStream(
     If they like certain topics, use them in examples. If they dislike something, avoid it. 
     If the preferred language is Urdu or Sindhi, respond primarily in that language but keep technical terms in English.`;
 
-  const systemInstruction = `You are SALU Coders AI. ${getSystemInstruction(mode, preferences, persona)} ${userContext} Be friendly, to the point, smart, and motivational. Avoid unnecessary repetition. Use clear, structured formatting with headings and bullet points.`;
+  const systemInstruction = `You are SALU Coders AI. ${getSystemInstruction(mode, preferences, persona)} ${userContext} 
+    Be friendly, to the point, smart, and motivational. Avoid unnecessary repetition. Use clear, structured formatting with headings and bullet points.
+    
+    IMAGE GENERATION PROTOCOL:
+    If the user requests an image, painting, or picture:
+    1. EXCLUSIVELY output the tag: [IMAGE_GEN: expanded_artistic_prompt]
+    2. Expand the user's simple request into a 50-80 word cinematic-grade masterpiece prompt.
+    3. Include lighting, texture, camera angle, and artistic style (e.g., hyper-realistic, photorealistic, 8k resolution).
+    4. You MUST include the square brackets and the "IMAGE_GEN:" prefix exactly.
+    5. Provide NO OTHER TEXT besides the tag for image generation.
+    6. Be bold and highly descriptive. Use terms like 'cinematic lighting', 'hyper-detailed', 'unreal engine 5'.`;
 
   const recentHistory = history.slice(-10);
   const contents: any[] = recentHistory.map((msg: any) => {
@@ -325,7 +339,7 @@ export async function sendMessageStream(
     apiKeyForDebug = config.apiKey || "";
     
     if (!config.apiKey) {
-      throw new Error("Gemini API key is missing");
+      throw new Error("SALU AI Engine key is missing");
     }
 
     const ai = new GoogleGenAI({ apiKey: config.apiKey });
@@ -374,7 +388,7 @@ export async function sendMessageStream(
       } catch(e) {}
       
       if (error.message?.includes("404") || error.message?.includes("not found")) {
-        errorMessage = `System Error: The requested AI model '${fallbackModelName}' was deprecated or not found. Please try switching to Gemini 3.1 Flash Lite in the Admin Panel.`;
+        errorMessage = `System Error: The requested AI model '${fallbackModelName}' was deprecated or not found. Please try switching to SALU AI Lite in the Admin Panel.`;
       } else if (error.message?.includes("429") || error.message?.includes("RESOURCE_EXHAUSTED") || error.message?.includes("quota")) {
         errorMessage = `System Error: Google's API returned "Quota Exceeded/Rate Limited" for this key. \nIf this is a completely new key, Google may have restricted the free-tier quota for your Google Cloud project or region (this is a common Google security measure). \nTo fix this: Go to console.cloud.google.com, ensure your project has an active Billing Account linked, or wait a few hours if you've simply hit the free requests limit. \n[Key: ${apiKeyForDebug.substring(0, 10)}...] [Source: ${keySource}]`;
       } else {
@@ -382,7 +396,50 @@ export async function sendMessageStream(
       }
     }
     
-    if (onChunk) onChunk(errorMessage);
     return errorMessage;
+  }
+}
+
+export async function generateImageWithSALU(prompt: string): Promise<string> {
+  try {
+    const config = await getSystemConfig();
+    if (!config.apiKey) {
+      throw new Error("SALU AI Engine key is missing");
+    }
+
+    const ai = new GoogleGenAI({ apiKey: config.apiKey });
+    
+    // Using gemini-2.5-flash-image for reliable image generation
+    const response = await ai.models.generateContent({
+      model: 'gemini-2.5-flash-image',
+      contents: {
+        parts: [
+          {
+            text: prompt,
+          },
+        ],
+      },
+      config: {
+        imageConfig: {
+          aspectRatio: "1:1"
+        }
+      }
+    });
+
+    // Find the image part in the response parts
+    const candidates = (response as any).candidates;
+    if (candidates && candidates[0]?.content?.parts) {
+      for (const part of candidates[0].content.parts) {
+        if (part.inlineData) {
+          const base64EncodeString: string = part.inlineData.data;
+          return `data:image/png;base64,${base64EncodeString}`;
+        }
+      }
+    }
+
+    throw new Error("No image was returned by SALU AI Engine");
+  } catch (error: any) {
+    console.error("SALU Image Generation Error:", error);
+    throw new Error(error.message || "Failed to generate image with SALU.");
   }
 }

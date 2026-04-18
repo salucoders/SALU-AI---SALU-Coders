@@ -22,47 +22,56 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+      setUser(currentUser);
+      setLoading(false);
+
       if (currentUser) {
         try {
-          // Fetch system config for registration check
-          const configDoc = await getDoc(doc(db, 'system', 'config'));
-          const config = configDoc.exists() ? configDoc.data() : { publicRegistration: true };
+          // Wrap DB operations in a timeout to prevent hanging the auth flow
+          // and catch connection errors gracefully
+          const configPromise = getDoc(doc(db, 'system', 'config')).catch(() => null);
+          const userDocPromise = getDoc(doc(db, 'users', currentUser.uid)).catch(() => null);
           
-          // Ensure user profile exists in Firestore
-          const userDocRef = doc(db, 'users', currentUser.uid);
-          const userDoc = await getDoc(userDocRef);
+          const [configDoc, userDoc] = await Promise.all([configPromise, userDocPromise]);
+          const config = (configDoc && configDoc.exists()) ? configDoc.data() : { publicRegistration: true };
           
           const isAdmin = currentUser.email === 'salucoders@gmail.com';
 
-          if (!userDoc.exists()) {
+          if (userDoc && !userDoc.exists()) {
             // Check if registration is allowed
             if (!config.publicRegistration && !isAdmin) {
               await signOut(auth);
               notify?.('Registration is currently disabled by administrator', 'error', 5000);
               setUser(null);
-              setLoading(false);
               return;
             }
 
-            await setDoc(userDocRef, {
-              uid: currentUser.uid,
-              name: currentUser.displayName || 'Guest',
-              email: currentUser.email,
-              profilePicture: currentUser.photoURL || '',
-              language: 'English',
-              accentColor: '#0ea5e9',
-              persona: 'friendly',
-              voice: 'female',
-              role: isAdmin ? 'admin' : 'user',
-              updatedAt: serverTimestamp()
-            });
+            // Attempt to create profile, but don't crash if offline
+            try {
+              await setDoc(doc(db, 'users', currentUser.uid), {
+                uid: currentUser.uid,
+                name: currentUser.displayName || 'Guest',
+                email: currentUser.email,
+                profilePicture: currentUser.photoURL || '',
+                language: 'English',
+                accentColor: '#0ea5e9',
+                persona: 'friendly',
+                voice: 'female',
+                role: isAdmin ? 'admin' : 'user',
+                updatedAt: serverTimestamp()
+              });
+            } catch (setErr) {
+              console.warn("Could not create user profile in Firestore (Offline?):", setErr);
+            }
           }
-        } catch (error) {
-          console.error("Error syncing user profile:", error);
+        } catch (error: any) {
+          if (error.code === 'unavailable' || error.message?.includes('offline')) {
+            console.warn("Firestore syncing skipped: Client is operating in offline mode.");
+          } else {
+            console.error("Error syncing user profile:", error);
+          }
         }
       }
-      setUser(currentUser);
-      setLoading(false);
     });
 
     return () => unsubscribe();

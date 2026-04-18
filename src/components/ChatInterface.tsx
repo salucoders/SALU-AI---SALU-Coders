@@ -1,10 +1,11 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { 
   Send, Paperclip, Image as ImageIcon, X, Loader2, Bot, User as UserIcon, AlertCircle, Copy, Check, Sparkles, 
   Code, PenTool, Search, GraduationCap, ImagePlus, ArrowUp, Plus, Mic, MicOff, Telescope, MousePointer2, 
   BookOpen, Globe, AudioLines, Pause, Play, RotateCcw, Bug, Code2, TestTube, Cpu, Video, Volume2, 
   Mail, ListChecks, Clock, ClipboardList, Info, Building2, Megaphone, FileText, Lightbulb, 
-  Calendar, MessageSquare, PlayCircle, Share2, Camera, FileJson, StickyNote, FileSpreadsheet, Presentation
+  Calendar, MessageSquare, PlayCircle, Share2, Camera, FileJson, StickyNote, FileSpreadsheet, Presentation,
+  Download, Maximize2, Layout, Wand2
 } from 'lucide-react';
 import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -18,8 +19,35 @@ import { cn } from '../lib/utils';
 import { CameraModal } from './CameraModal';
 import { useNotification } from '../context/NotificationContext';
 import { useUserProfile } from '../context/UserProfileContext';
+import { generateImageWithSALU } from '../services/gemini';
+import { uploadToImageKit } from '../lib/imagekit';
+import { Toolbox } from './Toolbox';
 
-const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20MB
+// Voice Visualizer Component
+const VoiceVisualizer = ({ isListening }: { isListening: boolean }) => {
+  return (
+    <div className="flex items-center justify-center gap-1 h-12">
+      {[...Array(15)].map((_, i) => (
+        <motion.div
+          key={i}
+          animate={isListening ? {
+            height: [8, Math.random() * 40 + 10, 8],
+            opacity: [0.3, 1, 0.3]
+          } : { height: 4, opacity: 0.2 }}
+          transition={{
+            duration: 0.5 + Math.random() * 0.5,
+            repeat: Infinity,
+            delay: i * 0.05,
+            ease: "easeInOut"
+          }}
+          className="w-1.5 bg-brand-500 rounded-full"
+        />
+      ))}
+    </div>
+  );
+};
+
+const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 const ALLOWED_FILE_TYPES = [
   'image/jpeg', 
   'image/png', 
@@ -262,6 +290,360 @@ const SpeakButton = ({ content, voicePreference }: { content: string, voicePrefe
   );
 };
 
+const ImageResult = ({ prompt }: { prompt: string }) => {
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [seed, setSeed] = useState(() => Math.floor(Math.random() * 1000000));
+  const [imageUrl, setImageUrl] = useState<string | null>(null);
+  const [engine, setEngine] = useState<'together' | 'gemini' | null>(null);
+  const [step, setStep] = useState(0);
+  const generationStarted = React.useRef(false);
+  
+  const steps = [
+    { label: 'Analyzing Prompt', icon: Search },
+    { label: 'Expanding Vision', icon: Wand2 },
+    { label: 'Conceiving Canvas', icon: Layout },
+    { label: 'Refining Masterpiece', icon: Sparkles }
+  ];
+
+  useEffect(() => {
+    if (loading) {
+      const interval = setInterval(() => {
+        setStep(s => (s + 1) % steps.length);
+      }, 2000);
+      return () => clearInterval(interval);
+    }
+  }, [loading]);
+
+  const generateImage = useCallback(async (retryCount = 0) => {
+    if (generationStarted.current && retryCount === 0) return;
+    
+    if (retryCount === 0) {
+      generationStarted.current = true;
+      setLoading(true);
+      setError(null);
+      setEngine(null);
+    }
+    
+    try {
+      // 1. Try SALU AI Engine (Primary)
+      try {
+        const imageUrl = await generateImageWithSALU(prompt);
+        
+        // Auto-save to ImageKit
+        try {
+          const ikResult = await uploadToImageKit(imageUrl, `salu-art-${Date.now()}.png`);
+          setImageUrl(ikResult.url);
+        } catch (ikErr) {
+          console.warn("Saving SALU image to Vault failed:", ikErr);
+          setImageUrl(imageUrl);
+        }
+
+        setEngine('gemini');
+        setLoading(false);
+        return;
+      } catch (e: any) {
+        console.warn("SALU generation failed, trying Together AI fallback...", e);
+        
+        // 2. Try Together AI (Secondary)
+        const togetherResponse = await fetch('/api/generate-together-image', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ prompt, saveToImageKit: true }),
+        });
+
+        if (togetherResponse.ok) {
+          const data = await togetherResponse.json();
+          if (data.image) {
+            setImageUrl(data.image);
+            setEngine('together');
+            setLoading(false);
+            return;
+          }
+        }
+        
+        throw new Error(e.message || "Primary and secondary generation engines failed.");
+      }
+    } catch (err: any) {
+      if (retryCount < 1) {
+        console.warn("Generation failed, retrying once...", err);
+        setTimeout(() => generateImage(retryCount + 1), 2000);
+        return;
+      }
+      console.error("Image generation failed after retries:", err);
+      setError(err.message || "Failed to generate image. All engines are currently unreachable.");
+      setLoading(false);
+    }
+  }, [prompt, seed]);
+
+  useEffect(() => {
+    generateImage();
+  }, [generateImage]);
+
+  const handleRetry = () => {
+    setSeed(Math.floor(Math.random() * 1000000));
+  };
+
+  const handleDownload = async () => {
+    if (!imageUrl) return;
+    try {
+      const response = await fetch(imageUrl);
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `salu-ai-generated-${Date.now()}.png`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (err) {
+      console.error("Failed to download image:", err);
+    }
+  };
+
+  const StepIcon = steps[step].icon;
+
+  return (
+    <div className="flex flex-col gap-6 w-full max-w-2xl py-2">
+      <div className="relative group overflow-hidden rounded-[2.5rem] border border-slate-200 shadow-2xl bg-white aspect-square">
+        {/* Immersive Loading UI */}
+        <AnimatePresence>
+          {loading && !error && (
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-white"
+            >
+              {/* Artistic Background Animation */}
+              <div className="absolute inset-0 overflow-hidden pointer-events-none opacity-20">
+                <motion.div 
+                  animate={{ 
+                    scale: [1, 1.2, 1],
+                    rotate: [0, 90, 180, 270, 360],
+                  }}
+                  transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
+                  className="absolute -top-1/2 -left-1/2 w-[200%] h-[200%] bg-[radial-gradient(circle_at_50%_50%,#f43f5e,transparent_50%),radial-gradient(circle_at_80%_20%,#8b5cf6,transparent_40%),radial-gradient(circle_at_20%_80%,#0ea5e9,transparent_40%)] blur-[80px]"
+                />
+              </div>
+
+              <div className="relative flex flex-col items-center">
+                {/* Visual Core */}
+                <div className="w-24 h-24 mb-8">
+                  <div className="absolute inset-0 bg-brand-500/10 rounded-full blur-2xl animate-pulse" />
+                  <motion.div 
+                    animate={{ rotate: 360 }}
+                    transition={{ duration: 8, repeat: Infinity, ease: "linear" }}
+                    className="w-full h-full rounded-full border-2 border-dashed border-slate-200 p-2"
+                  >
+                    <div className="w-full h-full rounded-full border-t-2 border-brand-500 animate-[spin_2s_linear_infinite]" />
+                  </motion.div>
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <motion.div
+                      key={step}
+                      initial={{ scale: 0, opacity: 0 }}
+                      animate={{ scale: 1, opacity: 1 }}
+                      className="text-brand-600"
+                    >
+                      <StepIcon className="w-8 h-8" />
+                    </motion.div>
+                  </div>
+                </div>
+
+                {/* Status Text */}
+                <div className="text-center space-y-1">
+                  <motion.h4 
+                    key={step}
+                    initial={{ y: 5, opacity: 0 }}
+                    animate={{ y: 0, opacity: 1 }}
+                    className="text-sm font-black text-slate-900 uppercase tracking-widest"
+                  >
+                    {steps[step].label}
+                  </motion.h4>
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                    SALU AI is painting your vision
+                  </p>
+                </div>
+              </div>
+
+              {/* Progress Bar */}
+              <div className="absolute bottom-12 left-12 right-12 h-1 bg-slate-100 rounded-full overflow-hidden">
+                <motion.div 
+                  initial={{ width: "0%" }}
+                  animate={{ width: `${((step + 1) / steps.length) * 100}%` }}
+                  className="h-full bg-brand-500 rounded-full"
+                />
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+        
+        {imageUrl && (
+          <motion.img 
+            initial={{ scale: 1.1, filter: 'blur(20px)' }}
+            animate={{ 
+              scale: loading ? 1.1 : 1, 
+              filter: loading ? 'blur(20px)' : 'blur(0px)' 
+            }}
+            src={imageUrl} 
+            alt={prompt}
+            key={imageUrl}
+            onLoad={() => {
+              // Extra timeout to ensure smooth transition
+              setTimeout(() => setLoading(false), 500);
+            }}
+            onError={() => {
+              setLoading(false);
+              setError("Failed to load the generated image.");
+            }}
+            className={cn(
+              "w-full h-full object-cover transition-all duration-1000",
+              loading ? "opacity-0" : "opacity-100"
+            )}
+            referrerPolicy="no-referrer"
+          />
+        )}
+
+        {/* Overlay Actions */}
+        {!loading && !error && imageUrl && (
+          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-all duration-500 backdrop-blur-[2px] flex items-center justify-center gap-4 z-20">
+            <motion.button 
+              initial={{ y: 20, opacity: 0 }}
+              whileInView={{ y: 0, opacity: 1 }}
+              onClick={handleDownload}
+              className="p-4 bg-white text-slate-900 rounded-3xl hover:scale-110 active:scale-95 transition-all shadow-2xl font-black flex items-center gap-3 text-xs uppercase tracking-widest"
+            >
+              <Download className="w-5 h-5" /> Save Art
+            </motion.button>
+            <motion.a 
+              initial={{ y: 20, opacity: 0 }}
+              whileInView={{ y: 0, opacity: 1 }}
+              transition={{ delay: 0.1 }}
+              href={imageUrl} 
+              target="_blank" 
+              rel="noreferrer"
+              className="p-4 bg-white/20 backdrop-blur-xl text-white border border-white/30 rounded-3xl hover:scale-110 active:scale-95 transition-all shadow-2xl font-black flex items-center gap-3 text-xs uppercase tracking-widest"
+            >
+              <Maximize2 className="w-5 h-5" /> View Full
+            </motion.a>
+          </div>
+        )}
+
+        {/* Error State */}
+        {error && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center bg-rose-50 p-12 text-center z-30">
+            <div className="w-16 h-16 bg-rose-100 rounded-full flex items-center justify-center mb-6">
+              <AlertCircle className="w-8 h-8 text-rose-500" />
+            </div>
+            <h4 className="text-rose-950 font-black uppercase tracking-widest text-sm">Vision Interrupted</h4>
+            <p className="text-rose-600 text-xs mt-3 mb-8 leading-relaxed font-medium">{error}</p>
+            <button 
+              onClick={handleRetry}
+              className="px-8 py-4 bg-rose-500 text-white rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-rose-600 transition-all flex items-center gap-2 shadow-lg shadow-rose-200 active:scale-95"
+            >
+              <RotateCcw className="w-4 h-4" /> Restart Generation
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* Footer Label */}
+      <div className="px-6 py-4 bg-white border border-slate-200 rounded-[2rem] shadow-xl flex items-center gap-4 group/label hover:border-brand-200 transition-colors">
+        <div className="p-2.5 rounded-2xl bg-brand-50 flex items-center justify-center group-hover/label:bg-brand-500 group-hover/label:text-white transition-all">
+          <ImageIcon className="w-5 h-5 text-brand-500 group-hover/label:text-white" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Generation Prompt</p>
+          <p className="text-xs text-slate-700 italic font-medium line-clamp-1">"{prompt}"</p>
+        </div>
+        {!loading && imageUrl && (
+          <div className="flex flex-col items-end shrink-0">
+            <span className={cn(
+              "text-[8px] font-black uppercase tracking-widest px-2 py-1 rounded-md border",
+              engine === 'gemini' ? "bg-indigo-50 text-indigo-600 border-indigo-100" : "bg-emerald-50 text-emerald-600 border-emerald-100"
+            )}>
+              {engine === 'gemini' ? 'SALU Version' : 'Together FLUX'}
+            </span>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+const MessageContent = ({ content, role, preferences }: { content: string, role: 'user' | 'model' | 'assistant', preferences: any }) => {
+  const imageRegex = /\[IMAGE_GEN:\s*([^\]]+)\]/i;
+  const imageMatch = content.match(imageRegex);
+  
+  // Handle partial matching for better UX during streaming
+  const isStartingImageGen = content.toLowerCase().includes('[image_gen:') && !content.includes(']');
+
+  const renderContent = (text: string) => (
+    <div className="markdown-body prose prose-slate max-w-none prose-sm md:prose-base overflow-hidden">
+      <Markdown 
+        remarkPlugins={[remarkGfm]}
+        components={{
+          img: ({ src, ...props }) => <img src={src || null} {...props} referrerPolicy="no-referrer" />,
+          code({ node, inline, className, children, ...props }: any) {
+            const match = /language-(\w+)/.exec(className || '');
+            const codeContent = String(children).replace(/\n$/, '');
+            
+            if (!inline && match) {
+              return <CodeBlock language={match[1]} value={codeContent} {...props} />;
+            }
+
+            if (!inline && !match) {
+              return <CodeBlock value={codeContent} {...props} />;
+            }
+
+            return (
+              <code className={cn("bg-slate-100 text-brand-600 px-1.5 py-0.5 rounded-md font-bold", className)} {...props}>
+                {children}
+              </code>
+            );
+          }
+        }}
+      >
+        {text}
+      </Markdown>
+    </div>
+  );
+
+  if (!imageMatch && !isStartingImageGen) {
+    return renderContent(content);
+  }
+
+  const parts = content.split(imageRegex);
+  const textBefore = parts[0];
+  const textAfter = parts[2];
+
+  return (
+    <div className="space-y-4 w-full">
+      {textBefore && textBefore.trim() && renderContent(textBefore)}
+
+      {isStartingImageGen && !imageMatch && (
+        <div className="flex items-center gap-3 p-4 bg-slate-50 rounded-2xl border border-slate-100 animate-pulse">
+          <Sparkles className="w-5 h-5 text-brand-500" />
+          <p className="text-xs font-black text-slate-400 uppercase tracking-widest">SALU AI is conceiving an image...</p>
+        </div>
+      )}
+
+      {imageMatch && (
+        <motion.div
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ type: "spring", stiffness: 260, damping: 20 }}
+          className="mt-2"
+        >
+          <ImageResult key={imageMatch[1].trim()} prompt={imageMatch[1].trim()} />
+        </motion.div>
+      )}
+
+      {textAfter && textAfter.trim() && renderContent(textAfter)}
+    </div>
+  );
+};
+
 export const ChatInterface = React.memo(({ messages, onSendMessage, isLoading, mode, isStreaming, streamedText }: ChatInterfaceProps) => {
   const { notify } = useNotification();
   const { preferences } = useUserProfile();
@@ -271,6 +653,7 @@ export const ChatInterface = React.memo(({ messages, onSendMessage, isLoading, m
   const [attachments, setAttachments] = useState<string[]>([]);
   const [isUploading, setIsUploading] = useState(false);
   const [isCameraOpen, setIsCameraOpen] = useState(false);
+  const [isToolboxOpen, setIsToolboxOpen] = useState(false);
   const [fileError, setFileError] = useState<string | null>(null);
   const [showAttachmentMenu, setShowAttachmentMenu] = useState(false);
   const [showScrollButton, setShowScrollButton] = useState(false);
@@ -279,8 +662,41 @@ export const ChatInterface = React.memo(({ messages, onSendMessage, isLoading, m
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const recognitionRef = useRef<any>(null);
 
+  const getFileName = (data: string) => {
+    if (!data || typeof data !== 'string') return 'File';
+    if (data.startsWith('http')) {
+      return data.split('/').pop()?.split('?')[0] || 'Image';
+    }
+    if (data.includes('name=')) {
+      const nameMatch = data.match(/name=(.*?);/);
+      if (nameMatch) return decodeURIComponent(nameMatch[1]);
+    }
+    return 'Document';
+  };
+
+  const getFilePreviewSnippet = (data: string) => {
+    try {
+      if (data.includes('base64,')) {
+        const parts = data.split('base64,');
+        const mime = parts[0].split(':')[1].split(';')[0];
+        
+        // Only preview text-like contents
+        if (mime === 'text/plain' || mime === 'text/csv') {
+          const base64 = parts[1];
+          const decoded = decodeURIComponent(escape(atob(base64)));
+          return decoded.trim().slice(0, 150) + (decoded.length > 150 ? '...' : '');
+        }
+      }
+    } catch (e) {
+      return null;
+    }
+    return null;
+  };
+
   const getFileIcon = (data: string) => {
-    if (data.startsWith('data:image/')) return <ImageIcon className="w-5 h-5 text-blue-500" />;
+    if (!data || typeof data !== 'string') return <Paperclip className="w-5 h-5 text-slate-500" />;
+    
+    if (data.startsWith('data:image/') || (data.startsWith('http') && (data.includes('.png') || data.includes('.jpg') || data.includes('.jpeg') || data.includes('.gif') || data.includes('.webp') || data.includes('imagekit')))) return <ImageIcon className="w-5 h-5 text-blue-500" />;
     if (data.startsWith('data:application/pdf')) return <FileText className="w-5 h-5 text-red-500" />;
     if (data.includes('name=') && data.includes('.docx')) return <FileText className="w-5 h-5 text-blue-600" />;
     if (data.includes('name=') && (data.includes('.xlsx') || data.includes('.xls'))) return <FileSpreadsheet className="w-5 h-5 text-emerald-600" />;
@@ -294,7 +710,27 @@ export const ChatInterface = React.memo(({ messages, onSendMessage, isLoading, m
   };
 
   const getFileLabel = (data: string) => {
-    const mime = data.split(';')[0].split(':')[1];
+    if (!data || typeof data !== 'string') return 'File';
+    
+    if (data.startsWith('http')) {
+      if (data.includes('.png') || data.includes('.jpg') || data.includes('.jpeg') || data.includes('.webp')) return 'Image';
+      if (data.includes('imagekit')) return 'Cloud Media';
+      return 'Link';
+    }
+
+    let mime = '';
+    try {
+        const parts = data.split(';');
+        if (parts.length > 0) {
+            const mimePart = parts[0].split(':');
+            if (mimePart.length > 1) {
+                mime = mimePart[1];
+            }
+        }
+    } catch (e) {
+        mime = '';
+    }
+
     if (data.includes('name=')) {
       const nameMatch = data.match(/name=(.*?);/);
       if (nameMatch) {
@@ -305,6 +741,7 @@ export const ChatInterface = React.memo(({ messages, onSendMessage, isLoading, m
         if (name.endsWith('.csv')) return 'CSV';
       }
     }
+    
     if (mime.startsWith('image/')) return 'Image';
     if (mime === 'application/pdf') return 'PDF';
     if (mime === 'text/plain') return 'TXT';
@@ -388,10 +825,33 @@ export const ChatInterface = React.memo(({ messages, onSendMessage, isLoading, m
     e.preventDefault();
     if ((!input.trim() && attachments.length === 0) || isLoading) return;
     
+    // Total payload estimate (for Firestore warnings)
+    const totalSize = attachments.reduce((sum, att) => sum + att.length, 0);
+    if (totalSize > 12 * 1024 * 1024) { // 12MB limit for the UI
+      setFileError("Total attachment size exceeds 10MB. Please remove some files.");
+      notify('Message too large', 'error', 5000);
+      return;
+    }
+
     console.log("Submitting message:", { input, attachmentCount: attachments.length });
     
     try {
-      await onSendMessage(input, attachments);
+      // Logic to save images to ImageKit before sending
+      const processedAttachments = await Promise.all(attachments.map(async (att, idx) => {
+        if (att.startsWith('data:image/')) {
+          try {
+            const fileName = `chat-upload-${Date.now()}-${idx}.png`;
+            const result = await uploadToImageKit(att, fileName);
+            return result.url; // Replace base64 with ImageKit URL
+          } catch (e) {
+            console.warn("Failed to save to ImageKit, using base64 fallback:", e);
+            return att;
+          }
+        }
+        return att;
+      }));
+
+      await onSendMessage(input, processedAttachments);
       setInput('');
       setAttachments([]);
       if (textareaRef.current) {
@@ -417,7 +877,7 @@ export const ChatInterface = React.memo(({ messages, onSendMessage, isLoading, m
     try {
       for (const file of fileList) {
         if (file.size > MAX_FILE_SIZE) {
-          setFileError(`File "${file.name}" is too large. Max size is 20MB.`);
+          setFileError(`"${file.name}" is too large. Max size is 10MB.`);
           continue;
         }
 
@@ -516,14 +976,13 @@ export const ChatInterface = React.memo(({ messages, onSendMessage, isLoading, m
     };
 
     recognition.onresult = (event: any) => {
-      let finalTranscript = '';
-      for (let i = event.resultIndex; i < event.results.length; ++i) {
-        if (event.results[i].isFinal) {
-          finalTranscript += event.results[i][0].transcript;
-        }
+      let fullTranscript = '';
+      for (let i = 0; i < event.results.length; ++i) {
+        fullTranscript += event.results[i][0].transcript;
       }
-      if (finalTranscript) {
-        setInput(prev => prev + (prev ? ' ' : '') + finalTranscript);
+
+      if (fullTranscript) {
+        setInput(fullTranscript);
       }
     };
 
@@ -596,13 +1055,41 @@ export const ChatInterface = React.memo(({ messages, onSendMessage, isLoading, m
         onClose={() => setIsCameraOpen(false)} 
         onCapture={handleCameraCapture} 
       />
+
+      <Toolbox 
+        isOpen={isToolboxOpen} 
+        onClose={() => setIsToolboxOpen(false)} 
+      />
       
       <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 md:p-8 space-y-8 md:space-y-12 scroll-smooth relative custom-scrollbar">
         {messages.length === 0 && (
           <div className="min-h-full flex flex-col items-center justify-center text-center max-w-3xl mx-auto py-12 relative z-10">
-            <h1 className="text-3xl md:text-4xl font-medium text-slate-800 tracking-tight">
+            <h1 className="text-3xl md:text-4xl font-black text-slate-900 tracking-tight mb-8">
               What can I help with?
             </h1>
+            
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full max-w-2xl">
+              {MODE_QUICK_ACTIONS[mode]?.map((action, idx) => (
+                <motion.button
+                  key={idx}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.2 + idx * 0.1 }}
+                  onClick={() => onSendMessage(action.prompt)}
+                  className="flex items-start gap-4 p-5 bg-white border border-slate-200 rounded-[2rem] text-left hover:border-brand-300 hover:shadow-xl hover:shadow-brand-500/5 transition-all active:scale-[0.98] group"
+                >
+                  <div className="p-3 rounded-2xl bg-slate-50 group-hover:bg-brand-50 text-slate-500 group-hover:text-brand-600 transition-colors shrink-0">
+                    {action.icon}
+                  </div>
+                  <div>
+                    <p className="text-sm font-black text-slate-900 mb-1">{action.label}</p>
+                    <p className="text-xs text-slate-500 line-clamp-2 leading-relaxed">
+                      {action.prompt}
+                    </p>
+                  </div>
+                </motion.button>
+              ))}
+            </div>
           </div>
         )}
 
@@ -666,7 +1153,7 @@ export const ChatInterface = React.memo(({ messages, onSendMessage, isLoading, m
                   <div className="flex flex-wrap gap-3 mb-4">
                     {message.attachments.map((att, i) => (
                       <div key={i} className="relative group/att">
-                        {att.startsWith('data:image/') ? (
+                        {(att && typeof att === 'string' && (att.startsWith('data:image/') || att.startsWith('http'))) ? (
                           <img 
                             src={att || null} 
                             alt="attachment" 
@@ -682,7 +1169,10 @@ export const ChatInterface = React.memo(({ messages, onSendMessage, isLoading, m
                             <div className="flex-1 min-w-0">
                               <p className="text-xs font-black text-slate-900 truncate">{getFileLabel(att)}</p>
                               <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">
-                                {att.split(';')[0].split(':')[1].split('/')[1].toUpperCase()}
+                                {att && typeof att === 'string' && att.includes(';') && att.includes(':') 
+                                  ? att.split(';')[0].split(':')[1]?.split('/')[1]?.toUpperCase() || 'FILE'
+                                  : 'FILE'
+                                }
                               </p>
                             </div>
                           </div>
@@ -691,34 +1181,7 @@ export const ChatInterface = React.memo(({ messages, onSendMessage, isLoading, m
                     ))}
                   </div>
                 )}
-                <div className="markdown-body prose prose-slate max-w-none prose-sm md:prose-base overflow-hidden">
-                  <Markdown 
-                    remarkPlugins={[remarkGfm]}
-                    components={{
-                      img: ({ src, ...props }) => <img src={src || null} {...props} referrerPolicy="no-referrer" />,
-                      code({ node, inline, className, children, ...props }: any) {
-                        const match = /language-(\w+)/.exec(className || '');
-                        const codeContent = String(children).replace(/\n$/, '');
-                        
-                        if (!inline && match) {
-                          return <CodeBlock language={match[1]} value={codeContent} {...props} />;
-                        }
-
-                        if (!inline && !match) {
-                          return <CodeBlock value={codeContent} {...props} />;
-                        }
-
-                        return (
-                          <code className={cn("bg-slate-100 text-brand-600 px-1.5 py-0.5 rounded-md font-bold", className)} {...props}>
-                            {children}
-                          </code>
-                        );
-                      }
-                    }}
-                  >
-                    {message.content}
-                  </Markdown>
-                </div>
+                <MessageContent content={message.content} role={message.role} preferences={preferences} />
                 {message.role === 'model' && (
                   <div className="absolute top-3 right-3 flex items-center gap-1.5 opacity-0 group-hover/bubble:opacity-100 transition-all duration-300 translate-y-1 group-hover/bubble:translate-y-0 z-10">
                     <SpeakButton content={message.content} voicePreference={preferences.voice || 'female'} />
@@ -747,25 +1210,7 @@ export const ChatInterface = React.memo(({ messages, onSendMessage, isLoading, m
             {isStreaming && streamedText ? (
               <div className="flex flex-col gap-2 max-w-[85%] md:max-w-[75%] items-start">
                 <div className="relative px-5 py-4 md:px-7 md:py-6 rounded-[2.5rem] transition-all duration-500 rounded-tl-sm bg-white border border-slate-100 text-slate-700 shadow-sm">
-                  <div className="prose prose-slate max-w-none text-[15px] leading-relaxed">
-                    <Markdown
-                      remarkPlugins={[remarkGfm]}
-                      components={{
-                        code({node, inline, className, children, ...props}: any) {
-                          const match = /language-(\w+)/.exec(className || '');
-                          return !inline ? (
-                            <CodeBlock language={match?.[1]} value={String(children).replace(/\n$/, '')} />
-                          ) : (
-                            <code className="bg-emerald-50 text-emerald-600 px-1.5 py-0.5 rounded-md text-sm font-mono border border-emerald-100" {...props}>
-                              {children}
-                            </code>
-                          )
-                        }
-                      }}
-                    >
-                      {streamedText}
-                    </Markdown>
-                  </div>
+                  <MessageContent content={streamedText} role="model" preferences={preferences} />
                 </div>
               </div>
             ) : (
@@ -848,24 +1293,45 @@ export const ChatInterface = React.memo(({ messages, onSendMessage, isLoading, m
                   >
                     {attachments.map((att, i) => (
                       <div key={i} className="relative group/att">
-                        {att.startsWith('data:image/') ? (
+                        {(att && typeof att === 'string' && (att.startsWith('data:image/') || att.startsWith('http'))) ? (
                           <div className="relative">
                             <img 
                               src={att || null} 
                               alt="preview" 
                               referrerPolicy="no-referrer"
-                              className="w-20 h-20 object-cover rounded-2xl border-2 border-white shadow-md transition-all group-hover/att:scale-105 group-hover/att:shadow-lg" 
+                              className="w-24 h-24 object-cover rounded-2xl border-2 border-white shadow-md transition-all group-hover/att:scale-105 group-hover/att:shadow-lg" 
                             />
                             <div className="absolute inset-0 bg-black/5 rounded-2xl pointer-events-none" />
                           </div>
                         ) : (
-                          <div className="w-20 h-20 rounded-2xl bg-white border-2 border-slate-100 shadow-sm flex flex-col items-center justify-center gap-1.5 transition-all group-hover/att:scale-105 group-hover/att:shadow-md group-hover/att:border-brand-100">
-                            <div className="p-2 rounded-xl bg-slate-50 group-hover/att:bg-brand-50 transition-colors">
-                              {getFileIcon(att)}
+                          <div className="w-48 h-24 rounded-2xl bg-white border-2 border-slate-100 shadow-sm flex flex-col p-2.5 transition-all group-hover/att:scale-[1.02] group-hover/att:shadow-md group-hover/att:border-brand-100 overflow-hidden relative text-left">
+                            <div className="flex items-center gap-2 mb-1.5 shrink-0">
+                                <div className="p-1.5 rounded-lg bg-slate-50 group-hover/att:bg-brand-50 transition-colors">
+                                    {getFileIcon(att)}
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                    <p className="text-[10px] font-black text-slate-900 truncate uppercase mt-0.5">
+                                        {getFileName(att)}
+                                    </p>
+                                    <p className="text-[8px] text-slate-400 font-bold uppercase tracking-widest leading-none">
+                                        {getFileLabel(att)}
+                                    </p>
+                                </div>
                             </div>
-                            <span className="text-[9px] font-black text-slate-500 uppercase tracking-wider truncate w-full text-center px-2">
-                              {getFileLabel(att)}
-                            </span>
+                            
+                            {/* Document Content Preview Snippet */}
+                            <div className="flex-1 bg-slate-50/50 rounded-lg p-1.5 overflow-hidden">
+                                {getFilePreviewSnippet(att) ? (
+                                    <p className="text-[9px] text-slate-500 leading-tight line-clamp-3 font-medium font-mono">
+                                        {getFilePreviewSnippet(att)}
+                                    </p>
+                                ) : (
+                                    <div className="h-full flex flex-col items-center justify-center gap-1 opacity-20">
+                                        <FileText className="w-5 h-5 text-slate-400" />
+                                        <span className="text-[7px] font-black uppercase tracking-[0.2em] text-slate-400">Content Locked</span>
+                                    </div>
+                                )}
+                            </div>
                           </div>
                         )}
                         <button
@@ -898,6 +1364,33 @@ export const ChatInterface = React.memo(({ messages, onSendMessage, isLoading, m
                 />
 
                 <div className="flex items-center gap-0.5 relative">
+                  {/* Study Toolbox Trigger */}
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setIsToolboxOpen(true);
+                    }}
+                    className={cn(
+                        "flex items-center gap-2 px-3 py-1.5 rounded-full transition-all shrink-0 border border-slate-200 hover:bg-slate-50 active:scale-95",
+                        isToolboxOpen ? "bg-slate-100 border-slate-300" : "bg-white"
+                    )}
+                    title="Study Toolbox"
+                  >
+                    <div className="flex flex-col gap-0.5 items-center justify-center">
+                        <div className="flex gap-0.5">
+                            <div className="w-1 h-1 rounded-full bg-slate-600" />
+                            <div className="w-1 h-1 rounded-full bg-slate-600" />
+                        </div>
+                        <div className="flex gap-0.5">
+                            <div className="w-1 h-1 rounded-full bg-slate-600" />
+                            <div className="w-1 h-1 rounded-full bg-slate-600" />
+                        </div>
+                    </div>
+                    <span className="text-sm font-medium text-slate-700">Tools</span>
+                  </button>
+
                   <button
                     type="button"
                     disabled={isUploading}
@@ -928,6 +1421,24 @@ export const ChatInterface = React.memo(({ messages, onSendMessage, isLoading, m
                           <Sparkles className="w-3.5 h-3.5 text-brand-500 animate-pulse" />
                         </div>
                         <div className="grid grid-cols-1 gap-1.5">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setInput("Draw a masterpiece of: ");
+                              setShowAttachmentMenu(false);
+                            }}
+                            className="w-full flex items-center gap-4 p-4 hover:bg-emerald-50/50 rounded-2xl transition-all text-left group active:scale-[0.98] border border-transparent hover:border-emerald-100"
+                          >
+                            <div className="w-12 h-12 rounded-xl bg-emerald-50 flex items-center justify-center group-hover:bg-emerald-500 group-hover:text-white transition-all shrink-0 shadow-sm">
+                              <ImageIcon className="w-6 h-6 text-emerald-500 group-hover:text-white" />
+                            </div>
+                            <div className="flex-1">
+                              <p className="text-sm font-black text-slate-900">Magic Image</p>
+                              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">AI Art Generation</p>
+                            </div>
+                          </button>
+
                           <button
                             type="button"
                             onClick={(e) => {
@@ -988,21 +1499,40 @@ export const ChatInterface = React.memo(({ messages, onSendMessage, isLoading, m
                 </div>
 
                 {/* Textarea: Auto-expanding */}
-                <textarea
-                  ref={textareaRef}
-                  value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                  onPaste={handlePaste}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && !e.shiftKey && !isMobile()) {
-                      e.preventDefault();
-                      handleSubmit(e);
-                    }
-                  }}
-                  placeholder="Ask anything"
-                  className="flex-1 bg-transparent border-none focus:ring-0 resize-none py-2.5 px-2 min-h-[40px] max-h-[200px] text-slate-800 placeholder-slate-400 no-scrollbar text-base font-medium leading-relaxed"
-                  rows={1}
-                />
+                <div className="flex-1 relative">
+                  <textarea
+                    ref={textareaRef}
+                    value={input}
+                    onChange={(e) => setInput(e.target.value)}
+                    onPaste={handlePaste}
+                    onKeyDown={(e) => {
+                        if (e.key === 'Enter' && !e.shiftKey && !isMobile()) {
+                        e.preventDefault();
+                        handleSubmit(e);
+                        }
+                    }}
+                    placeholder={isListening ? "" : "Ask anything"}
+                    className={cn(
+                        "w-full bg-transparent border-none focus:ring-0 resize-none py-2.5 px-2 min-h-[40px] max-h-[200px] text-slate-800 placeholder-slate-400 no-scrollbar text-base font-medium leading-relaxed transition-all",
+                        isListening && "blur-[1px] opacity-40"
+                    )}
+                    rows={1}
+                  />
+
+                  {/* Inline Voice Visualizer */}
+                  <AnimatePresence>
+                    {isListening && (
+                      <motion.div 
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="absolute inset-0 flex items-center justify-center pointer-events-none"
+                      >
+                        <VoiceVisualizer isListening={isListening} />
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
                 
                 {/* Right Actions: Mic & Send */}
                 <div className="flex items-center gap-1 shrink-0 pb-1 pr-1">
@@ -1011,11 +1541,22 @@ export const ChatInterface = React.memo(({ messages, onSendMessage, isLoading, m
                     onClick={isListening ? stopListening : startListening}
                     className={cn(
                       "p-2 rounded-full transition-all shrink-0",
-                      isListening && !isPaused ? "text-red-500 bg-red-50 animate-pulse" : "text-slate-500 hover:text-slate-700 hover:bg-slate-200"
+                      isListening 
+                        ? "bg-brand-500 text-white shadow-[0_0_20px_rgba(14,165,233,0.4)] scale-110" 
+                        : "text-slate-500 hover:text-slate-700 hover:bg-slate-200"
                     )}
                     title={isListening ? "Stop listening" : "Voice input"}
                   >
-                    {isListening ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
+                    {isListening ? (
+                        <motion.div
+                            animate={{ scale: [1, 1.2, 1] }}
+                            transition={{ duration: 1.5, repeat: Infinity }}
+                        >
+                            <AudioLines className="w-5 h-5" />
+                        </motion.div>
+                    ) : (
+                        <Mic className="w-5 h-5" />
+                    )}
                   </button>
 
                   <button
@@ -1038,7 +1579,8 @@ export const ChatInterface = React.memo(({ messages, onSendMessage, isLoading, m
                 </div>
               </div>
             </form>
-            <p className="text-xs text-center text-slate-500 mt-3">
+
+            <p className="text-xs text-center text-slate-500 mt-4">
               SALU AI can make mistakes. Check important info.
             </p>
           </div>

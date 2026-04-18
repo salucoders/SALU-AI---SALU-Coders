@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Sidebar } from './components/Sidebar';
 import { ChatInterface } from './components/ChatInterface';
 import { SettingsModal } from './components/SettingsModal';
+import { ImageKitGallery } from './components/ImageKitGallery';
 import { LoginPage } from './components/LoginPage';
 import { Mode, Message, ChatSession, Persona } from './types';
 import { sendMessage, sendMessageStream } from './services/gemini';
@@ -18,9 +19,11 @@ import { db } from './lib/firebase';
 import { Onboarding } from './components/Onboarding';
 import { LiveChatInterface } from './components/LiveChatInterface';
 import { AdminPanel } from './components/AdminPanel';
+import { Toolbox } from './components/Toolbox';
+import { UpgradeModal } from './components/UpgradeModal';
 
 export default function App() {
-  const { preferences, loading: profileLoading, isAdmin } = useUserProfile();
+  const { preferences, loading: profileLoading, isAdmin, isPaid, updatePreferences } = useUserProfile();
   const { user, loading: authLoading } = useAuth();
   const { 
     sessions, 
@@ -41,8 +44,10 @@ export default function App() {
     publicRegistration: true,
     liveAiMode: true,
     maintenanceMode: false,
-    appName: 'SALU AI',
-    welcomeMessage: 'What can I help with?'
+    appName: 'SALU Plus',
+    welcomeMessage: 'What can I help with?',
+    jazzCashNumber: '03000000000',
+    paymentQrUrl: ''
   });
 
   // Broadcast & Config Listener
@@ -71,7 +76,9 @@ export default function App() {
           liveAiMode: data.liveAiMode ?? prev.liveAiMode,
           maintenanceMode: data.maintenanceMode ?? prev.maintenanceMode,
           appName: data.appName ?? prev.appName,
-          welcomeMessage: data.welcomeMessage ?? prev.welcomeMessage
+          welcomeMessage: data.welcomeMessage ?? prev.welcomeMessage,
+          jazzCashNumber: data.jazzCashNumber ?? prev.jazzCashNumber,
+          paymentQrUrl: data.paymentQrUrl ?? prev.paymentQrUrl
         }));
       }
     }, (error) => {
@@ -87,6 +94,9 @@ export default function App() {
   const [isLoading, setIsLoading] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isVaultOpen, setIsVaultOpen] = useState(false);
+  const [isToolboxOpen, setIsToolboxOpen] = useState(false);
+  const [isUpgradeOpen, setIsUpgradeOpen] = useState(false);
   const [isAdminPanelOpen, setIsAdminPanelOpen] = useState(false);
   const [battery, setBattery] = useState<{ level: number; charging: boolean } | null>(null);
   const [showOnboarding, setShowOnboarding] = useState(false);
@@ -217,6 +227,15 @@ export default function App() {
       return;
     }
 
+    const creditsUsed = preferences.creditsUsedToday || 0;
+    const creditsTotal = preferences.creditsTotal || 30;
+
+    if (creditsUsed >= creditsTotal) {
+      setIsUpgradeOpen(true);
+      notify('Daily credit limit reached. Get SALU Plus for 100 daily credits!', 'error', 6000);
+      return;
+    }
+
     const currentSession = sessions.find(s => s.id === currentSessionId);
     if (!currentSession) return;
 
@@ -243,6 +262,11 @@ export default function App() {
 
       // Add finalized model response to Firestore
       await addMessage(currentSession.id, 'model', aiResponse);
+
+      // Deduct Credit
+      await updatePreferences({
+        creditsUsedToday: creditsUsed + 1
+      });
     } catch (error: any) {
       console.error("Failed to send message:", error);
       notify(`Failed to send message: ${error.message || String(error)}`, 'error', 5000);
@@ -365,8 +389,31 @@ export default function App() {
         isOpen={isSidebarOpen}
         onClose={() => setIsSidebarOpen(false)}
         onOpenSettings={() => setIsSettingsOpen(true)}
+        onOpenVault={() => setIsVaultOpen(true)}
+        onOpenToolbox={() => setIsToolboxOpen(true)}
+        onOpenUpgrade={() => setIsUpgradeOpen(true)}
         battery={battery}
       />
+
+      <AnimatePresence>
+        {isToolboxOpen && (
+          <Toolbox 
+            isOpen={isToolboxOpen} 
+            onClose={() => setIsToolboxOpen(false)} 
+            onOpenUpgrade={() => setIsUpgradeOpen(true)}
+          />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {isVaultOpen && (
+          <ImageKitGallery 
+            isOpen={isVaultOpen} 
+            onClose={() => setIsVaultOpen(false)} 
+            onOpenUpgrade={() => setIsUpgradeOpen(true)}
+          />
+        )}
+      </AnimatePresence>
 
       <AnimatePresence>
         {showOnboarding && (
@@ -379,6 +426,14 @@ export default function App() {
         )}
       </AnimatePresence>
       
+      <UpgradeModal 
+        isOpen={isUpgradeOpen}
+        onClose={() => setIsUpgradeOpen(false)}
+        isPaid={isPaid}
+        jazzCashNumber={systemConfig.jazzCashNumber}
+        qrUrl={systemConfig.paymentQrUrl}
+      />
+
       <SettingsModal 
         isOpen={isSettingsOpen}
         onClose={() => setIsSettingsOpen(false)}
@@ -398,8 +453,10 @@ export default function App() {
                   <Menu className="w-5 h-5" />
                 </button>
               )}
-              <button className="flex items-center gap-1 px-2 py-1 hover:bg-slate-100 rounded-lg transition-colors text-slate-800 font-medium text-lg">
-                {systemConfig.appName} <ChevronDown className="w-4 h-4 text-slate-500" />
+              <button className="flex items-center gap-1.5 px-3 py-1.5 hover:bg-slate-100/80 rounded-xl transition-all font-medium text-lg group/modes active:scale-95">
+                <span className="text-slate-900 tracking-tight">SALU AI</span>
+                <span className="px-1.5 py-0.5 rounded-md bg-brand-500 text-white text-[10px] font-black uppercase tracking-[0.15em] shadow-sm shadow-brand-500/20">Plus</span>
+                <ChevronDown className="w-4 h-4 text-slate-400 group-hover/modes:text-slate-600 transition-colors ml-0.5" />
               </button>
             </div>
             

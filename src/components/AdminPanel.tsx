@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
-import { Users, Settings, Activity, Shield, Key, Database, Server, X, Check, AlertCircle, Loader2, MessageSquare, Radio, Trash2, Download, Eraser, Palette, Cpu, Eye, EyeOff } from 'lucide-react';
+import { Users, Settings, Activity, Shield, Key, Database, Server, X, Check, AlertCircle, Loader2, MessageSquare, Radio, Trash2, Download, Eraser, Palette, Cpu, Eye, EyeOff, Crown } from 'lucide-react';
 import { collection, getDocs, doc, updateDoc, deleteDoc, getDoc, setDoc, query, where, collectionGroup } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { useAuth } from '../context/AuthContext';
@@ -14,7 +14,7 @@ interface AdminPanelProps {
 export function AdminPanel({ onClose }: AdminPanelProps) {
   const { user } = useAuth();
   const { preferences } = useUserProfile();
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'users' | 'broadcast' | 'settings' | 'data'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'users' | 'members' | 'broadcast' | 'settings' | 'data'>('dashboard');
   const [users, setUsers] = useState<any[]>([]);
   const [stats, setStats] = useState({ users: 0, sessions: 0, messages: 0 });
   const [loading, setLoading] = useState(true);
@@ -23,9 +23,12 @@ export function AdminPanel({ onClose }: AdminPanelProps) {
     publicRegistration: true,
     liveAiMode: true,
     geminiApiKey: '',
+    togetherApiKey: '',
     defaultModel: 'gemini-3-flash-preview',
-    appName: 'SALU AI',
-    welcomeMessage: 'What can I help with?'
+    appName: 'SALU AI Plus',
+    welcomeMessage: 'What can I help with?',
+    jazzCashNumber: '03000000000',
+    paymentQrUrl: ''
   });
   const [broadcast, setBroadcast] = useState({
     message: '',
@@ -76,7 +79,10 @@ export function AdminPanel({ onClose }: AdminPanelProps) {
           appName: d.appName ?? prev.appName,
           welcomeMessage: d.welcomeMessage ?? prev.welcomeMessage,
           geminiApiKey: d.geminiApiKey ?? prev.geminiApiKey,
-          defaultModel: d.defaultModel ?? prev.defaultModel
+          togetherApiKey: d.togetherApiKey ?? prev.togetherApiKey,
+          defaultModel: d.defaultModel ?? prev.defaultModel,
+          jazzCashNumber: d.jazzCashNumber ?? prev.jazzCashNumber,
+          paymentQrUrl: d.paymentQrUrl ?? prev.paymentQrUrl
         }));
       }
 
@@ -99,6 +105,21 @@ export function AdminPanel({ onClose }: AdminPanelProps) {
       showMessage('success', 'User role updated successfully');
     } catch (error) {
       showMessage('error', 'Failed to update user role');
+    }
+  };
+
+  const handleSubscriptionChange = async (userId: string, tier: 'free' | 'paid') => {
+    try {
+      const creditsTotal = tier === 'paid' ? 100 : 30;
+      await updateDoc(doc(db, 'users', userId), { 
+        subscription: tier,
+        creditsTotal: creditsTotal,
+        creditsUsedToday: 0
+      });
+      setUsers(users.map(u => u.id === userId ? { ...u, subscription: tier, creditsTotal } : u));
+      showMessage('success', `User upgraded to ${tier === 'paid' ? 'SALU Plus' : 'Free'}`);
+    } catch (error) {
+      showMessage('error', 'Failed to update subscription');
     }
   };
 
@@ -132,6 +153,7 @@ export function AdminPanel({ onClose }: AdminPanelProps) {
           },
           body: JSON.stringify({ 
             geminiApiKey: systemConfig.geminiApiKey,
+            togetherApiKey: systemConfig.togetherApiKey,
             defaultModel: systemConfig.defaultModel,
             appName: systemConfig.appName,
             welcomeMessage: systemConfig.welcomeMessage
@@ -147,7 +169,10 @@ export function AdminPanel({ onClose }: AdminPanelProps) {
         appName: systemConfig.appName,
         welcomeMessage: systemConfig.welcomeMessage,
         geminiApiKey: systemConfig.geminiApiKey,
-        defaultModel: systemConfig.defaultModel
+        togetherApiKey: systemConfig.togetherApiKey,
+        defaultModel: systemConfig.defaultModel,
+        jazzCashNumber: systemConfig.jazzCashNumber,
+        paymentQrUrl: systemConfig.paymentQrUrl
       }, { merge: true });
 
       showMessage('success', 'System configuration saved successfully');
@@ -178,7 +203,7 @@ export function AdminPanel({ onClose }: AdminPanelProps) {
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
     link.setAttribute("href", encodedUri);
-    link.setAttribute("download", "salu_ai_users.csv");
+    link.setAttribute("download", "system_users_export.csv");
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -236,7 +261,7 @@ export function AdminPanel({ onClose }: AdminPanelProps) {
               </div>
               <div>
                 <h2 className="font-bold text-lg leading-tight">Admin Panel</h2>
-                <p className="text-xs text-slate-400">SALU AI Dashboard</p>
+                <p className="text-xs text-slate-400">System Management</p>
               </div>
             </div>
             <button onClick={onClose} className="md:hidden p-2 text-slate-400 hover:text-white">
@@ -264,6 +289,16 @@ export function AdminPanel({ onClose }: AdminPanelProps) {
             >
               <Users className="w-5 h-5" />
               <span className="font-medium">User Management</span>
+            </button>
+            <button
+              onClick={() => setActiveTab('members')}
+              className={cn(
+                "flex items-center gap-3 px-4 py-3 rounded-xl transition-all whitespace-nowrap",
+                activeTab === 'members' ? "bg-rose-500 text-white" : "text-slate-400 hover:bg-slate-800 hover:text-white"
+              )}
+            >
+              <Crown className="w-5 h-5" />
+              <span className="font-medium">Paid Members</span>
             </button>
             <button
               onClick={() => setActiveTab('broadcast')}
@@ -394,6 +429,7 @@ export function AdminPanel({ onClose }: AdminPanelProps) {
                           <tr className="bg-slate-50 border-b border-slate-200">
                             <th className="p-4 font-semibold text-slate-600 text-sm">User</th>
                             <th className="p-4 font-semibold text-slate-600 text-sm">Email</th>
+                            <th className="p-4 font-semibold text-slate-600 text-sm">Tier</th>
                             <th className="p-4 font-semibold text-slate-600 text-sm">Role</th>
                             <th className="p-4 font-semibold text-slate-600 text-sm">Actions</th>
                           </tr>
@@ -410,7 +446,15 @@ export function AdminPanel({ onClose }: AdminPanelProps) {
                               <td className="p-4 text-slate-600 text-sm">{u.email}</td>
                               <td className="p-4">
                                 <span className={cn(
-                                  "px-2.5 py-1 rounded-full text-xs font-bold uppercase tracking-wider",
+                                  "px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider",
+                                  u.subscription === 'paid' ? "bg-amber-100 text-amber-600" : "bg-slate-100 text-slate-500"
+                                )}>
+                                  {u.subscription === 'paid' ? 'Plus' : 'Free'}
+                                </span>
+                              </td>
+                              <td className="p-4">
+                                <span className={cn(
+                                  "px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider",
                                   u.role === 'admin' ? "bg-rose-100 text-rose-600" :
                                   u.role === 'suspended' ? "bg-orange-100 text-orange-600" :
                                   "bg-slate-100 text-slate-600"
@@ -444,6 +488,83 @@ export function AdminPanel({ onClose }: AdminPanelProps) {
                           ))}
                         </tbody>
                       </table>
+                    </div>
+                  </div>
+                )}
+
+                {/* Members Tab */}
+                {activeTab === 'members' && (
+                  <div className="space-y-6">
+                    <div className="flex items-center justify-between mb-2">
+                       <h3 className="text-lg font-bold text-slate-800">Paid Subscription Management</h3>
+                       <div className="flex items-center gap-2 px-4 py-2 bg-amber-50 text-amber-700 rounded-xl border border-amber-100">
+                          <Crown className="w-4 h-4" />
+                          <span className="text-sm font-bold">{users.filter(u => u.subscription === 'paid').length} Active SALU Plus Members</span>
+                       </div>
+                    </div>
+                    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-left border-collapse">
+                          <thead>
+                            <tr className="bg-slate-50 border-b border-slate-200">
+                              <th className="p-4 font-semibold text-slate-600 text-sm">User</th>
+                              <th className="p-4 font-semibold text-slate-600 text-sm">Credits Today</th>
+                              <th className="p-4 font-semibold text-slate-600 text-sm">Subscription</th>
+                              <th className="p-4 font-semibold text-slate-600 text-sm">Action</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {users.map(u => (
+                              <tr key={u.id} className="border-b border-slate-100 hover:bg-slate-50/50 transition-colors">
+                                <td className="p-4">
+                                  <div className="flex items-center gap-3">
+                                    <img src={u.profilePicture || `https://ui-avatars.com/api/?name=${u.name}&background=random`} alt={u.name} className="w-8 h-8 rounded-full" />
+                                    <div className="flex flex-col">
+                                      <span className="font-medium text-slate-800">{u.name}</span>
+                                      <span className="text-xs text-slate-500">{u.email}</span>
+                                    </div>
+                                  </div>
+                                </td>
+                                <td className="p-4">
+                                   <div className="w-32">
+                                      <div className="flex justify-between text-[10px] font-bold text-slate-500 mb-1 uppercase tracking-wider">
+                                        <span>Used: {u.creditsUsedToday || 0}</span>
+                                        <span>Limit: {u.creditsTotal || 30}</span>
+                                      </div>
+                                      <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
+                                        <div 
+                                          className={cn("h-full transition-all", u.subscription === 'paid' ? "bg-amber-500" : "bg-slate-400")}
+                                          style={{ width: `${Math.min(100, ((u.creditsUsedToday || 0) / (u.creditsTotal || 30)) * 100)}%` }}
+                                        />
+                                      </div>
+                                   </div>
+                                </td>
+                                <td className="p-4">
+                                  <span className={cn(
+                                    "px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider inline-flex items-center gap-1.5",
+                                    u.subscription === 'paid' ? "bg-amber-100 text-amber-700 border border-amber-200" : "bg-slate-100 text-slate-500 border border-slate-200"
+                                  )}>
+                                    {u.subscription === 'paid' ? <><Crown className="w-3 h-3" /> SALU Plus</> : 'Free Plan'}
+                                  </span>
+                                </td>
+                                <td className="p-4">
+                                  <button
+                                    onClick={() => handleSubscriptionChange(u.id, u.subscription === 'paid' ? 'free' : 'paid')}
+                                    className={cn(
+                                      "px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all active:scale-95 shadow-sm",
+                                      u.subscription === 'paid' 
+                                        ? "bg-rose-50 text-rose-600 border border-rose-100 hover:bg-rose-100" 
+                                        : "bg-amber-500 text-white hover:bg-amber-600 shadow-amber-200"
+                                    )}
+                                  >
+                                    {u.subscription === 'paid' ? 'Revoke Plus' : 'Assign Plus'}
+                                  </button>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
                     </div>
                   </div>
                 )}
@@ -559,7 +680,7 @@ export function AdminPanel({ onClose }: AdminPanelProps) {
                             type="text" 
                             value={systemConfig.appName}
                             onChange={(e) => setSystemConfig({...systemConfig, appName: e.target.value})}
-                            placeholder="SALU AI"
+                            placeholder="Gemini AI"
                             className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 transition-all"
                           />
                         </div>
@@ -572,6 +693,31 @@ export function AdminPanel({ onClose }: AdminPanelProps) {
                             placeholder="What can I help with?"
                             className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 transition-all"
                           />
+                        </div>
+                        <div className="pt-4 border-t border-slate-100">
+                          <h4 className="text-sm font-bold text-slate-800 mb-4">Payment Configuration</h4>
+                          <div className="space-y-4">
+                            <div>
+                              <label className="block text-sm font-medium text-slate-700 mb-1">JazzCash Account Number</label>
+                              <input 
+                                type="text" 
+                                value={systemConfig.jazzCashNumber}
+                                onChange={(e) => setSystemConfig({...systemConfig, jazzCashNumber: e.target.value})}
+                                placeholder="03XXXXXXXXX"
+                                className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 transition-all"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-sm font-medium text-slate-700 mb-1">Payment QR Image URL</label>
+                              <input 
+                                type="text" 
+                                value={systemConfig.paymentQrUrl}
+                                onChange={(e) => setSystemConfig({...systemConfig, paymentQrUrl: e.target.value})}
+                                placeholder="https://image-url.com/qr.jpg"
+                                className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 transition-all"
+                              />
+                            </div>
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -611,13 +757,43 @@ export function AdminPanel({ onClose }: AdminPanelProps) {
                             onChange={(e) => setSystemConfig({...systemConfig, defaultModel: e.target.value})}
                             className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 transition-all"
                           >
-                            <option value="gemini-3-flash-preview">Gemini 3 Flash Preview (Fastest / Recommended)</option>
-                            <option value="gemini-3.1-flash-lite-preview">Gemini 3.1 Flash Lite (Use if you hit Quota errors!)</option>
-                            <option value="gemini-3.1-pro-preview">Gemini 3.1 Pro Preview (Powerful but slower)</option>
+                            <option value="gemini-3-flash-preview">Gemini 1.5 Flash (Fastest / Recommended)</option>
+                            <option value="gemini-3.1-flash-lite-preview">Gemini 1.5 Flash Lite (Use if you hit Quota errors!)</option>
+                            <option value="gemini-3.1-pro-preview">Gemini 1.5 Pro (Powerful but slower)</option>
                           </select>
                           <p className="mt-2 text-xs text-slate-500">
-                            If you get <b>Quota Exceeded</b> errors on a free key, switch to <b>Gemini 3.1 Flash Lite</b>.
+                            If you get <b>Quota Exceeded</b> errors on a free key, switch to <b>Gemini 1.5 Flash Lite</b>.
                           </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 md:p-8 space-y-6">
+                      <div className="flex items-center gap-3 pb-4 border-b border-slate-100">
+                        <Cpu className="w-5 h-5 text-indigo-500" />
+                        <h3 className="text-lg font-bold text-slate-800">Together AI (FLUX & SDXL)</h3>
+                      </div>
+                      
+                      <div className="space-y-4">
+                        <div>
+                          <label className="block text-sm font-medium text-slate-700 mb-1">Together API Key</label>
+                          <div className="relative">
+                            <input 
+                              type={showApiKey ? "text" : "password"} 
+                              value={systemConfig.togetherApiKey || ""}
+                              onChange={(e) => setSystemConfig({...systemConfig, togetherApiKey: e.target.value})}
+                              placeholder="together_..."
+                              className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all pr-12"
+                            />
+                            <button 
+                              type="button" 
+                              onClick={() => setShowApiKey(!showApiKey)}
+                              className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-600 transition-colors"
+                            >
+                              {showApiKey ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                            </button>
+                          </div>
+                          <p className="mt-2 text-xs text-slate-500">Get a key from <a href="https://api.together.xyz/settings/api-keys" target="_blank" rel="noreferrer" className="text-indigo-500 hover:underline">Together AI Settings</a>. Provides ultra-fast generation with FLUX.1 models.</p>
                         </div>
                       </div>
                     </div>

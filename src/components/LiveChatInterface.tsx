@@ -169,7 +169,7 @@ export function LiveChatInterface({ onClose }: LiveChatInterfaceProps) {
     try {
       const config = await getSystemConfig();
       if (!config.apiKey) {
-        setError("Gemini API key is required for Live Voice Chat. Please configure it in the Admin Panel.");
+        setError("SALU AI Engine key is required for Live Voice Chat. Please configure it in the Admin Panel.");
         setIsConnecting(false);
         return;
       }
@@ -218,7 +218,7 @@ export function LiveChatInterface({ onClose }: LiveChatInterfaceProps) {
 CRITICAL RULES:
 1. Your name is SALU AI. 
 2. You are a ${genderText} AI assistant. Adopt a ${genderText} persona in your speech and reactions.
-3. NEVER mention Google, Gemini, or being an LLM unless specifically asked about your technical architecture, and even then, emphasize your identity as SALU AI.
+3. NEVER mention third-party AI providers or being an LLM unless specifically asked about your technical architecture, and even then, emphasize your identity as SALU AI.
 4. Be extremely concise. Keep responses to 1-2 short sentences to maintain a natural conversation flow.
 5. Your personality is ${personaDescriptions[preferences.persona || 'friendly']}.
 6. Use the user's name (${preferences.name || 'Guest'}) occasionally to make it personal.

@@ -4,6 +4,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 import dotenv from "dotenv";
 import fs from "fs";
+import ImageKit from "imagekit";
 
 dotenv.config();
 
@@ -15,8 +16,10 @@ const CONFIG_FILE = path.join(__dirname, 'system-config.json');
 
 function getSystemConfig() {
   const envKey = process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY || "";
+  const togetherKey = process.env.TOGETHER_API_KEY || "";
   const defaults = {
     geminiApiKey: (envKey && !envKey.includes('AIzaSyA9TH') && !envKey.includes('AIzaSyCU6n')) ? envKey : "",
+    togetherApiKey: togetherKey,
     defaultModel: "gemini-3-flash-preview",
     appName: "SALU AI",
     welcomeMessage: "What can I help with?"
@@ -35,6 +38,10 @@ function getSystemConfig() {
         delete fileConfig.geminiApiKey; 
       }
       
+      if (togetherKey) {
+        fileConfig.togetherApiKey = togetherKey;
+      }
+      
       return { ...defaults, ...fileConfig };
     }
   } catch (e) {
@@ -45,6 +52,27 @@ function getSystemConfig() {
 
 function saveSystemConfig(config: any) {
   fs.writeFileSync(CONFIG_FILE, JSON.stringify(config, null, 2));
+}
+
+function getSafeImageKit() {
+  const publicKey = process.env.IMAGEKIT_PUBLIC_KEY || "";
+  const privateKey = process.env.IMAGEKIT_PRIVATE_KEY || "";
+  const urlEndpoint = process.env.IMAGEKIT_URL_ENDPOINT || "";
+
+  if (!publicKey || !privateKey || !urlEndpoint || urlEndpoint === "IMAGEKIT_URL_ENDPOINT") {
+    return null;
+  }
+
+  try {
+    return new ImageKit({
+      publicKey,
+      privateKey,
+      urlEndpoint
+    });
+  } catch (e) {
+    console.error("Failed to initialize ImageKit SDK:", e);
+    return null;
+  }
 }
 
 async function startServer() {
@@ -66,16 +94,167 @@ async function startServer() {
     console.log("Serving config:", {
       hasEnvKey: !!process.env.GEMINI_API_KEY,
       hasViteKey: !!process.env.VITE_GEMINI_API_KEY,
+      hasTogetherKey: !!config.togetherApiKey,
       keyLength: config.geminiApiKey ? config.geminiApiKey.length : 0,
       configExists: fs.existsSync(CONFIG_FILE)
     });
 
     res.json({
       geminiApiKey: config.geminiApiKey,
+      togetherApiKey: config.togetherApiKey ? "configured" : "",
       defaultModel: config.defaultModel,
       appName: config.appName,
       welcomeMessage: config.welcomeMessage
     });
+  });
+
+  // Proxy route for Together AI image generation
+  app.post("/api/generate-together-image", async (req, res) => {
+    const requestId = Math.random().toString(36).substring(7);
+    try {
+      const { prompt, saveToImageKit = false } = req.body;
+      const config = getSystemConfig();
+      const apiKey = config.togetherApiKey?.trim();
+
+      if (!apiKey) {
+        return res.status(400).json({ error: "Together AI API key is not configured." });
+      }
+
+      console.log(`[${requestId}] Generating image with Together AI for prompt:`, prompt.slice(0, 50) + "...");
+
+      const response = await fetch("https://api.together.xyz/v1/images/generations", {
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+        },
+        method: "POST",
+        body: JSON.stringify({ 
+          model: "black-forest-labs/FLUX.1-schnell",
+          prompt: prompt,
+          width: 1024,
+          height: 1024,
+          steps: 4,
+          n: 1,
+          response_format: "b64_json"
+        }),
+      });
+
+      if (!response.ok) {
+        const status = response.status;
+        const errorData = await response.json().catch(() => ({}));
+        console.error("Together AI Error:", status, errorData);
+        return res.status(status).json({ error: errorData.error?.message || "Together AI error" });
+      }
+
+      const data = await response.json();
+      let imageContent = "";
+      if (data.data && data.data[0] && data.data[0].b64_json) {
+        imageContent = `data:image/png;base64,${data.data[0].b64_json}`;
+      } else if (data.data && data.data[0] && data.data[0].url) {
+        imageContent = data.data[0].url;
+      } else {
+        throw new Error("No image data returned from Together AI");
+      }
+
+      // Automatically save to ImageKit if requested
+      if (saveToImageKit && process.env.IMAGEKIT_PRIVATE_KEY) {
+        try {
+          const ik = getSafeImageKit();
+          if (!ik) {
+            console.warn("ImageKit initialization skipped due to missing config");
+            return res.json({ image: imageContent });
+          }
+
+          const uploadResponse = await ik.upload({
+            file: imageContent,
+            fileName: `ai-gen-${Date.now()}.png`,
+            folder: "/salu-ai-generated"
+          });
+          
+          return res.json({ image: uploadResponse.url, imageKitId: uploadResponse.fileId });
+        } catch (ikError) {
+          console.error("ImageKit auto-save error:", ikError);
+          // Fallback to returning base64 if save fails
+          return res.json({ image: imageContent });
+        }
+      }
+
+      res.json({ image: imageContent });
+    } catch (error: any) {
+      console.error("Together Proxy Error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // ImageKit Auth Endpoint
+  app.get("/api/imagekit/auth", (req, res) => {
+    try {
+      const imagekit = getSafeImageKit();
+      if (!imagekit) {
+        return res.status(503).json({ error: "ImageKit not configured on server" });
+      }
+
+      const authenticationParameters = imagekit.getAuthenticationParameters();
+      res.send(authenticationParameters);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // ImageKit Direct Upload (for existing base64 content)
+  app.post("/api/imagekit/upload", async (req, res) => {
+    try {
+      const { file, fileName, tags } = req.body;
+      const imagekit = getSafeImageKit();
+      if (!imagekit) {
+        return res.status(503).json({ error: "ImageKit not configured" });
+      }
+
+      const response = await imagekit.upload({
+        file: file,
+        fileName: fileName || `upload-${Date.now()}`,
+        tags: tags || ["user-upload"]
+      });
+
+      res.json(response);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // ImageKit List Files
+  app.get("/api/imagekit/files", async (req, res) => {
+    try {
+      const imagekit = getSafeImageKit();
+      if (!imagekit) {
+        return res.status(503).json({ error: "ImageKit not configured" });
+      }
+
+      const files = await imagekit.listFiles({
+        sort: "DESC_CREATED",
+        limit: 100
+      });
+
+      res.json(files);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // ImageKit Delete File
+  app.delete("/api/imagekit/files/:fileId", async (req, res) => {
+    try {
+      const { fileId } = req.params;
+      const imagekit = getSafeImageKit();
+      if (!imagekit) {
+        return res.status(503).json({ error: "ImageKit not configured" });
+      }
+
+      await imagekit.deleteFile(fileId);
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
   });
 
   // Admin config endpoint
