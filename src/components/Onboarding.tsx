@@ -59,14 +59,21 @@ const steps: Step[] = [
     icon: <Settings className="w-8 h-8 text-orange-500" />,
     targetId: 'settings-button',
     position: 'right'
+  },
+  {
+    title: "Choose Your Plan",
+    description: "Start with the Free plan to explore, or grab SALU AI Plus with JazzCash for 100 daily credits and exclusive Study Toolbox features.",
+    icon: <Sparkles className="w-8 h-8 text-amber-500" />,
+    position: 'center'
   }
 ];
 
 interface OnboardingProps {
   onComplete: () => void;
+  onUpgradeRequest?: () => void;
 }
 
-export function Onboarding({ onComplete }: OnboardingProps) {
+export function Onboarding({ onComplete, onUpgradeRequest }: OnboardingProps) {
   const [currentStep, setCurrentStep] = useState(0);
   const [coords, setCoords] = useState<{ top: number; left: number; width: number; height: number } | null>(null);
 
@@ -183,8 +190,8 @@ export function Onboarding({ onComplete }: OnboardingProps) {
             </p>
           </div>
 
-          <div className="flex items-center gap-3 pt-4">
-            {currentStep > 0 && (
+          <div className="flex flex-col sm:flex-row items-stretch gap-3 pt-4">
+            {currentStep > 0 && currentStep !== steps.length - 1 && (
               <button
                 onClick={handlePrev}
                 className="flex-1 flex items-center justify-center gap-2 px-4 py-4 bg-slate-50 text-slate-600 rounded-2xl font-bold hover:bg-slate-100 transition-all border border-slate-200"
@@ -193,13 +200,32 @@ export function Onboarding({ onComplete }: OnboardingProps) {
                 Back
               </button>
             )}
-            <button
-              onClick={handleNext}
-              className="flex-[2] flex items-center justify-center gap-2 px-4 py-4 bg-slate-900 text-white rounded-2xl font-bold hover:bg-black shadow-lg shadow-slate-900/20 transition-all group"
-            >
-              {currentStep === steps.length - 1 ? "Get Started" : "Next Step"}
-              <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-            </button>
+            
+            {currentStep !== steps.length - 1 ? (
+              <button
+                onClick={handleNext}
+                className="flex-[2] flex items-center justify-center gap-2 px-4 py-4 bg-slate-900 text-white rounded-2xl font-bold hover:bg-black shadow-lg shadow-slate-900/20 transition-all group"
+              >
+                Next Step
+                <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+              </button>
+            ) : (
+              // Final Step: Plan Selection
+              <>
+                <button
+                  onClick={onComplete}
+                  className="flex-1 flex items-center justify-center px-4 py-4 bg-slate-50 text-slate-600 rounded-2xl font-bold hover:bg-slate-100 transition-all border border-slate-200"
+                >
+                  Start Free
+                </button>
+                <button
+                  onClick={onUpgradeRequest || onComplete}
+                  className="flex-1 flex items-center justify-center px-4 py-4 bg-gradient-to-r from-amber-500 to-rose-600 text-white rounded-2xl font-bold hover:opacity-90 transition-all shadow-lg"
+                >
+                  Get SALU Plus
+                </button>
+              </>
+            )}
           </div>
         </div>
 

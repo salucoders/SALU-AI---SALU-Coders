@@ -132,8 +132,15 @@ export function UpgradeModal({ isOpen, onClose, isPaid, jazzCashNumber, qrUrl }:
                   </div>
                 </div>
 
+                <div className="w-full bg-emerald-50 border border-emerald-100 rounded-2xl p-4 text-center mt-2 flex flex-col gap-1 shadow-sm">
+                  <span className="text-emerald-800 text-xs font-bold uppercase tracking-wide">Important Step</span>
+                  <span className="text-emerald-700 text-xs font-medium">
+                    Send a screenshot of your payment confirmation via WhatsApp to <span className="font-bold">{jazzCashNumber}</span> so the admin can manually assign your Paid status.
+                  </span>
+                </div>
+
                 <div className="text-[10px] text-slate-400 font-medium max-w-xs mx-auto">
-                  After sending payment, please logout and login again or wait for admin to assign your Plus status. Support: salucoders@gmail.com
+                  Your Plus status will be activated once the admin verifies the screenshot. Support: salucoders@gmail.com
                 </div>
               </div>
             </div>

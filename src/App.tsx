@@ -6,7 +6,7 @@ import { ImageKitGallery } from './components/ImageKitGallery';
 import { LoginPage } from './components/LoginPage';
 import { Mode, Message, ChatSession, Persona } from './types';
 import { sendMessage, sendMessageStream } from './services/gemini';
-import { Menu, Settings, Loader2, Sparkles, Plus, ChevronDown, User, Shield } from 'lucide-react';
+import { Menu, Settings, Loader2, Sparkles, Plus, ChevronDown, User, Shield, Crown } from 'lucide-react';
 import { cn } from './lib/utils';
 import { useUserProfile } from './context/UserProfileContext';
 import { useNotification } from './context/NotificationContext';
@@ -422,6 +422,11 @@ export default function App() {
               setShowOnboarding(false);
               localStorage.setItem('salu_ai_onboarding_seen', 'true');
             }} 
+            onUpgradeRequest={() => {
+              setShowOnboarding(false);
+              localStorage.setItem('salu_ai_onboarding_seen', 'true');
+              setIsUpgradeOpen(true);
+            }}
           />
         )}
       </AnimatePresence>
@@ -453,14 +458,39 @@ export default function App() {
                   <Menu className="w-5 h-5" />
                 </button>
               )}
-              <button className="flex items-center gap-1.5 px-3 py-1.5 hover:bg-slate-100/80 rounded-xl transition-all font-medium text-lg group/modes active:scale-95">
+              <button 
+                onClick={() => {
+                  if (!isPaid) {
+                    setIsUpgradeOpen(true);
+                  }
+                }}
+                className={cn(
+                  "flex items-center gap-1.5 px-3 py-1.5 rounded-xl transition-all font-medium text-lg group/modes active:scale-95",
+                  !isPaid ? "hover:bg-slate-100/80 cursor-pointer" : "cursor-default"
+                )}
+              >
                 <span className="text-slate-900 tracking-tight">SALU AI</span>
-                <span className="px-1.5 py-0.5 rounded-md bg-brand-500 text-white text-[10px] font-black uppercase tracking-[0.15em] shadow-sm shadow-brand-500/20">Plus</span>
-                <ChevronDown className="w-4 h-4 text-slate-400 group-hover/modes:text-slate-600 transition-colors ml-0.5" />
+                <span className={cn(
+                  "px-1.5 py-0.5 rounded-md text-[10px] font-black uppercase tracking-[0.15em] shadow-sm",
+                  isPaid ? "bg-brand-500 text-white shadow-brand-500/20" : "bg-slate-200 text-slate-500 shadow-slate-200/50"
+                )}>
+                  {isPaid ? "Plus" : "Free"}
+                </span>
+                {!isPaid && <ChevronDown className="w-4 h-4 text-slate-400 group-hover/modes:text-slate-600 transition-colors ml-0.5" />}
               </button>
             </div>
             
             <div className="flex items-center gap-2 pointer-events-auto">
+              {!isPaid && (
+                <button
+                  onClick={() => setIsUpgradeOpen(true)}
+                  className="hidden md:flex items-center gap-1.5 px-3 py-1.5 mr-2 rounded-xl bg-gradient-to-r from-amber-500 to-rose-600 text-white font-bold text-[11px] uppercase tracking-widest hover:opacity-90 transition-opacity"
+                  title="Get SALU AI Plus"
+                >
+                  <Crown className="w-3.5 h-3.5" />
+                  Get SALU AI Plus
+                </button>
+              )}
               {isAdmin && (
                 <button
                   onClick={() => setIsAdminPanelOpen(true)}

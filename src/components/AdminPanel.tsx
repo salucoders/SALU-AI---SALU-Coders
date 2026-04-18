@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
-import { Users, Settings, Activity, Shield, Key, Database, Server, X, Check, AlertCircle, Loader2, MessageSquare, Radio, Trash2, Download, Eraser, Palette, Cpu, Eye, EyeOff, Crown } from 'lucide-react';
+import { Users, Settings, Activity, Shield, Key, Database, Server, X, Check, AlertCircle, Loader2, MessageSquare, Radio, Trash2, Download, Eraser, Palette, Cpu, Eye, EyeOff, Crown, Upload } from 'lucide-react';
 import { collection, getDocs, doc, updateDoc, deleteDoc, getDoc, setDoc, query, where, collectionGroup } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { useAuth } from '../context/AuthContext';
 import { useUserProfile } from '../context/UserProfileContext';
+import { uploadToImageKit } from '../lib/imagekit';
 import { cn } from '../lib/utils';
 
 interface AdminPanelProps {
@@ -37,6 +38,34 @@ export function AdminPanel({ onClose }: AdminPanelProps) {
   const [saving, setSaving] = useState(false);
   const [showApiKey, setShowApiKey] = useState(false);
   const [message, setMessage] = useState({ type: '', text: '' });
+  const [isUploadingQr, setIsUploadingQr] = useState(false);
+
+  const handleQrUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      showMessage('error', 'Please upload a valid image file');
+      return;
+    }
+
+    if (file.size > 2 * 1024 * 1024) { // 2MB limit
+      showMessage('error', 'Image size should be less than 2MB');
+      return;
+    }
+
+    try {
+      setIsUploadingQr(true);
+      const uploadedImage = await uploadToImageKit(file, `qr-${Date.now()}`);
+      setSystemConfig(prev => ({ ...prev, paymentQrUrl: uploadedImage.url }));
+      showMessage('success', 'QR Code uploaded temporarily. Save configuration to strictly apply.');
+    } catch (error) {
+      console.error("Upload failed", error);
+      showMessage('error', 'Failed to upload QR Code');
+    } finally {
+      setIsUploadingQr(false);
+    }
+  };
 
   useEffect(() => {
     const isSuperAdmin = user?.email === 'salucoders@gmail.com' && user?.emailVerified;
@@ -709,13 +738,49 @@ export function AdminPanel({ onClose }: AdminPanelProps) {
                             </div>
                             <div>
                               <label className="block text-sm font-medium text-slate-700 mb-1">Payment QR Image URL</label>
-                              <input 
-                                type="text" 
-                                value={systemConfig.paymentQrUrl}
-                                onChange={(e) => setSystemConfig({...systemConfig, paymentQrUrl: e.target.value})}
-                                placeholder="https://image-url.com/qr.jpg"
-                                className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 transition-all"
-                              />
+                              <div className="flex gap-2">
+                                <input 
+                                  type="text" 
+                                  value={systemConfig.paymentQrUrl}
+                                  onChange={(e) => setSystemConfig({...systemConfig, paymentQrUrl: e.target.value})}
+                                  placeholder="https://image-url.com/qr.jpg"
+                                  className="flex-1 px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 transition-all"
+                                />
+                                <div className="relative flex">
+                                  <input
+                                    type="file"
+                                    accept="image/*"
+                                    onChange={handleQrUpload}
+                                    disabled={isUploadingQr}
+                                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed"
+                                    title="Upload QR Code"
+                                  />
+                                  <button
+                                    type="button"
+                                    disabled={isUploadingQr}
+                                    className={cn(
+                                      "px-4 py-3 bg-brand-50 text-brand-600 rounded-xl hover:bg-brand-100 transition-colors flex items-center justify-center gap-2 font-medium shrink-0 min-w-[120px]",
+                                      isUploadingQr && "opacity-50"
+                                    )}
+                                  >
+                                    {isUploadingQr ? (
+                                      <><Loader2 className="w-5 h-5 animate-spin" /> <span>Uploading</span></>
+                                    ) : (
+                                      <><Upload className="w-5 h-5" /> <span>Upload File</span></>
+                                    )}
+                                  </button>
+                                </div>
+                              </div>
+                              {systemConfig.paymentQrUrl && (
+                                <div className="mt-3 p-3 bg-slate-50 border border-slate-200 rounded-xl w-fit">
+                                  <img 
+                                    src={systemConfig.paymentQrUrl} 
+                                    alt="Payment QR Preview" 
+                                    className="h-24 w-auto rounded-lg"
+                                    referrerPolicy="no-referrer"
+                                  />
+                                </div>
+                              )}
                             </div>
                           </div>
                         </div>
