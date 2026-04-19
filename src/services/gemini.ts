@@ -70,14 +70,35 @@ export async function getSystemConfig(): Promise<{ apiKey: string, defaultModel:
   return { apiKey, defaultModel, imageGenApiKey };
 }
 
-function getSystemInstruction(mode: Mode, preferences: UserPreferences, persona: Persona) {
+export async function getHiddenConfig(): Promise<{ assistantName: string, activationResponses: string[], customSystemInstructions: string }> {
+  try {
+    const configDoc = await getDoc(doc(db, 'system', 'hidden_config'));
+    if (configDoc.exists()) {
+      const data = configDoc.data();
+      return {
+        assistantName: data.assistantName || 'SALU AI',
+        activationResponses: (data.activationResponses || 'Yes boss, Yes sir, G jan, Ji hukum').split(',').map((s: string) => s.trim()),
+        customSystemInstructions: data.customSystemInstructions || ''
+      };
+    }
+  } catch (e) {
+    console.error("Failed to fetch hidden config:", e);
+  }
+  return {
+    assistantName: 'SALU AI',
+    activationResponses: ['G Jan', 'Yes Boss', 'Yes Sir', 'Ji Janab'],
+    customSystemInstructions: ''
+  };
+}
+
+function getSystemInstruction(mode: Mode, preferences: UserPreferences, persona: Persona, hiddenConfig?: any) {
   const SYSTEM_INSTRUCTIONS: Record<string, string> = {
     student: "You are in STUDENT MODE. Focus on assignment solving, notes generation, summaries, quiz creation, and explaining concepts in simple language for students.",
     developer: "You are in DEVELOPER MODE. Focus on code generation, debugging, line-by-line explanations, project ideas, and best practices/optimization.",
     creator: "You are in CREATOR MODE. Focus on YouTube titles, SEO, descriptions, hashtags, thumbnail ideas, scripts, and social media content.",
     assistant: "You are in ASSISTANT MODE. Focus on formal/informal messaging, email drafting, scheduling, productivity advice, and daily life help.",
     salu: "You are in SALU MODE. Focus on university updates, scholarships, announcements, student guidance, and community support for the SALU community.",
-    live: "You are in LIVE MODE. Focus on real-time voice conversation and quick, smart responses."
+    live: `You are in LIVE MODE. Focus on real-time voice conversation and quick, smart responses. Your name is ${hiddenConfig?.assistantName || 'SALU AI'}. If the user calls you by name, respond with one of these: ${hiddenConfig?.activationResponses?.join(', ') || 'Yes boss'}.`
   };
 
   const PERSONA_INSTRUCTIONS: Record<string, string> = {
@@ -89,8 +110,9 @@ function getSystemInstruction(mode: Mode, preferences: UserPreferences, persona:
   };
 
   const CREATOR_INFO = "The owner and creator of SALU Coders is Babar Ali Arain, a student of IT Batch 2026. Only share this information if explicitly asked about the owner, creator, or Babar Ali Arain.";
+  const EXTRA_TRAINING = hiddenConfig?.customSystemInstructions ? `\nADDITIONAL TRAINING: ${hiddenConfig.customSystemInstructions}` : "";
 
-  return `${SYSTEM_INSTRUCTIONS[mode] || ""} ${PERSONA_INSTRUCTIONS[persona] || ""} User Name: ${preferences?.name || "User"}. ${CREATOR_INFO}`;
+  return `Your name is ${hiddenConfig?.assistantName || "SALU AI"}. ${SYSTEM_INSTRUCTIONS[mode] || ""} ${PERSONA_INSTRUCTIONS[persona] || ""} User Name: ${preferences?.name || "User"}. ${CREATOR_INFO}${EXTRA_TRAINING}`;
 }
 
 export async function sendMessage(
@@ -127,7 +149,8 @@ export async function sendMessage(
     If they like certain topics, use them in examples. If they dislike something, avoid it. 
     If the preferred language is Urdu or Sindhi, respond primarily in that language but keep technical terms in English.`;
 
-  const systemInstruction = `You are SALU Coders AI. ${getSystemInstruction(mode, preferences, persona)} ${userContext} 
+  const hiddenConfig = await getHiddenConfig();
+  const systemInstruction = `You are ${hiddenConfig.assistantName}. ${getSystemInstruction(mode, preferences, persona, hiddenConfig)} ${userContext} 
     Be friendly, to the point, smart, and motivational. Avoid unnecessary repetition. Use clear, structured formatting with headings and bullet points.
     
     IMAGE GENERATION PROTOCOL:
@@ -288,7 +311,8 @@ export async function sendMessageStream(
     If they like certain topics, use them in examples. If they dislike something, avoid it. 
     If the preferred language is Urdu or Sindhi, respond primarily in that language but keep technical terms in English.`;
 
-  const systemInstruction = `You are SALU Coders AI. ${getSystemInstruction(mode, preferences, persona)} ${userContext} 
+  const hiddenConfig = await getHiddenConfig();
+  const systemInstruction = `You are ${hiddenConfig.assistantName}. ${getSystemInstruction(mode, (preferences as UserPreferences), persona, hiddenConfig)} ${userContext} 
     Be friendly, to the point, smart, and motivational. Avoid unnecessary repetition. Use clear, structured formatting with headings and bullet points.
     
     IMAGE GENERATION PROTOCOL:

@@ -4,7 +4,7 @@ import { Mic, MicOff, Volume2, VolumeX, X, Loader2, Sparkles, AlertCircle, User,
 import { GoogleGenAI, Modality, LiveServerMessage } from "@google/genai";
 import { cn } from '../lib/utils';
 import { useUserProfile } from '../context/UserProfileContext';
-import { getSystemConfig } from '../services/gemini';
+import { getSystemConfig, getHiddenConfig } from '../services/gemini';
 
 interface LiveChatInterfaceProps {
   onClose: () => void;
@@ -30,6 +30,13 @@ export function LiveChatInterface({ onClose }: LiveChatInterfaceProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const videoIntervalRef = useRef<number | null>(null);
+  const isVideoEnabledRef = useRef(isVideoEnabled);
+  const isMutedRef = useRef(isMuted);
+
+  useEffect(() => {
+    isVideoEnabledRef.current = isVideoEnabled;
+    isMutedRef.current = isMuted;
+  }, [isVideoEnabled, isMuted]);
 
   const stopLiveSession = useCallback(() => {
     if (sessionRef.current) {
@@ -111,17 +118,23 @@ export function LiveChatInterface({ onClose }: LiveChatInterfaceProps) {
   const startVideoProcessing = () => {
     if (videoIntervalRef.current) window.clearInterval(videoIntervalRef.current);
     videoIntervalRef.current = window.setInterval(() => {
-      if (!sessionRef.current || !videoRef.current || !canvasRef.current || !isVideoEnabled) return;
+      if (!sessionRef.current || !videoRef.current || !canvasRef.current || !isVideoEnabledRef.current) return;
       const video = videoRef.current;
       const canvas = canvasRef.current;
       if (video.readyState >= 2) {
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
+        // Resize to a reasonable dimension for AI vision (max 480px)
+        const maxWidth = 480;
+        const scale = Math.min(1, maxWidth / video.videoWidth);
+        canvas.width = video.videoWidth * scale;
+        canvas.height = video.videoHeight * scale;
+        
         const ctx = canvas.getContext('2d');
         if (ctx) {
           ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-          const base64Data = canvas.toDataURL('image/jpeg', 0.5).split(',')[1];
+          // Slightly higher quality for better feature recognition
+          const base64Data = canvas.toDataURL('image/jpeg', 0.8).split(',')[1];
           try {
+            // Correct format for Multimodal Live API
             sessionRef.current.sendRealtimeInput({
               video: { data: base64Data, mimeType: 'image/jpeg' }
             });
@@ -130,7 +143,7 @@ export function LiveChatInterface({ onClose }: LiveChatInterfaceProps) {
           }
         }
       }
-    }, 1000);
+    }, 500); // 2 FPS for better temporal understanding
   };
 
   const toggleVideo = async () => {
@@ -144,6 +157,7 @@ export function LiveChatInterface({ onClose }: LiveChatInterfaceProps) {
         videoIntervalRef.current = null;
       }
       setIsVideoEnabled(false);
+      isVideoEnabledRef.current = false;
     } else {
       try {
         const videoStream = await navigator.mediaDevices.getUserMedia({ 
@@ -154,6 +168,7 @@ export function LiveChatInterface({ onClose }: LiveChatInterfaceProps) {
           videoRef.current.srcObject = videoStream;
         }
         setIsVideoEnabled(true);
+        isVideoEnabledRef.current = true;
         startVideoProcessing();
       } catch (err) {
         console.error("Video access error:", err);
@@ -168,6 +183,7 @@ export function LiveChatInterface({ onClose }: LiveChatInterfaceProps) {
 
     try {
       const config = await getSystemConfig();
+      const hiddenConfig = await getHiddenConfig();
       if (!config.apiKey) {
         setError("SALU AI Engine key is required for Live Voice Chat. Please configure it in the Admin Panel.");
         setIsConnecting(false);
@@ -206,24 +222,27 @@ export function LiveChatInterface({ onClose }: LiveChatInterfaceProps) {
         creative: 'Imaginative, artistic, and creative.'
       };
 
-      const session = await ai.live.connect({
+      const extraTraining = hiddenConfig.customSystemInstructions ? `\nADDITIONAL TRAINING: ${hiddenConfig.customSystemInstructions}` : "";
+
+      const sessionPromise = ai.live.connect({
         model: "gemini-3.1-flash-live-preview",
         config: {
           responseModalities: [Modality.AUDIO],
           speechConfig: {
             voiceConfig: { prebuiltVoiceConfig: { voiceName } },
           },
-          systemInstruction: `You are SALU Coders AI, an advanced real-time AI assistant developed by Babar Ali Arain for the SALU community. You are currently in Live Mode, having a real-time voice conversation with ${preferences.name || 'Guest'}. 
+          systemInstruction: `You are ${hiddenConfig.assistantName}, an advanced real-time AI assistant developed by Babar Ali Arain for the SALU community. You are currently in Live Mode, having a real-time voice conversation with ${preferences.name || 'Guest'}. 
 
 CRITICAL RULES:
-1. Your name is SALU AI. 
-2. You are a ${genderText} AI assistant. Adopt a ${genderText} persona in your speech and reactions.
-3. NEVER mention third-party AI providers or being an LLM unless specifically asked about your technical architecture, and even then, emphasize your identity as SALU AI.
-4. Be extremely concise. Keep responses to 1-2 short sentences to maintain a natural conversation flow.
-5. Your personality is ${personaDescriptions[preferences.persona || 'friendly']}.
-6. Use the user's name (${preferences.name || 'Guest'}) occasionally to make it personal.
-7. Your creator is Babar Ali Arain (IT Batch 2026).
-8. The user may enable their camera to show you things. If they ask you to look at something, analyze the video frames provided.`,
+1. Your name is ${hiddenConfig.assistantName}. 
+2. If the user calls you by name, respond with one of these: ${hiddenConfig.activationResponses.join(', ')}.
+3. You are a ${genderText} AI assistant. Adopt a ${genderText} persona in your speech and reactions.
+4. YOUR EYES (VISION): You are a multimodal AI with EYES. You receive a continuous stream of video frames at 2 frames per second. You MUST constantly observe what is being shown.
+5. VISION ACTIVATION: When the user asks "what do you see?", "what am I holding?", "is this correct?", or any question involving visual context, look at the most recent frames in your memory and give a precise, intelligent, and detailed response. You are an expert at identifying objects, people, surroundings, text on screens/paper, and math equations.
+6. DESCRIBE AUTOMATICALLY: If the user says "Look at this" or "Look here", don't wait for a follow-up question—analyze the frame immediately and tell them what you see. relate your personality (${personaDescriptions[preferences.persona || 'friendly']}) to your visual observations (e.g., if you see a beautiful sunset, describe it warmly).
+7. NEVER mention being an LLM or third-party provider. Your identity is ${hiddenConfig.assistantName}, created by Babar Ali Arain (IT Batch 2026). Emphasize your ability to see and hear the user simultaneously.
+8. Be extremely concise in speech. 1-2 powerful sentences only. Keep the conversation snappy and natural.
+9. ${extraTraining}`,
           inputAudioTranscription: {},
           outputAudioTranscription: {},
         },
@@ -246,7 +265,7 @@ CRITICAL RULES:
               processorRef.current = audioContextRef.current.createScriptProcessor(4096, 1, 1);
               
               processorRef.current.onaudioprocess = (e) => {
-                if (isMuted || !sessionRef.current) return;
+                if (isMutedRef.current || !sessionRef.current) return;
                 
                 const inputData = e.inputBuffer.getChannelData(0);
                 const int16Data = new Int16Array(inputData.length);
@@ -266,6 +285,7 @@ CRITICAL RULES:
                   
                   if (sessionRef.current) {
                     try {
+                      // Correct format for Multimodal Live API
                       sessionRef.current.sendRealtimeInput({
                         audio: { data: base64Data, mimeType: 'audio/pcm;rate=16000' }
                       });
@@ -348,7 +368,9 @@ CRITICAL RULES:
         }
       });
 
-      sessionRef.current = session;
+      sessionPromise.then(session => {
+        sessionRef.current = session;
+      });
     } catch (err: any) {
       if (err?.message?.includes("aborted") || err?.name === "AbortError") {
         setIsConnecting(false);

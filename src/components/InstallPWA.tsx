@@ -65,9 +65,14 @@ export function InstallPWA() {
             transition={{ type: "spring", stiffness: 400, damping: 30 }}
             className="w-full bg-white/80 backdrop-blur-xl rounded-[2rem] shadow-[0_8px_30px_rgb(0,0,0,0.12)] border border-white/50 overflow-hidden pointer-events-auto flex items-center p-2.5 pr-4 gap-3 relative"
           >
-            <div className="w-12 h-12 bg-gradient-to-br from-brand-50 to-rose-50 rounded-2xl flex items-center justify-center shrink-0 border border-brand-100/50 shadow-sm relative">
-              <Layers className="w-6 h-6 text-brand-500" />
-              <div className="absolute -top-1 -right-1 w-4 h-4 bg-gradient-to-tr from-rose-500 to-orange-400 rounded-full flex items-center justify-center shadow-sm">
+            <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center shrink-0 border border-brand-100/50 shadow-sm relative overflow-hidden p-2">
+              <img 
+                src="https://admission.salu.edu.pk/static/media/logo.793ee5b813bb22366372.png" 
+                alt="SALU Logo" 
+                className="w-full h-full object-contain"
+                referrerPolicy="no-referrer"
+              />
+              <div className="absolute -top-1 -right-1 w-4 h-4 bg-gradient-to-tr from-rose-500 to-orange-400 rounded-full flex items-center justify-center shadow-sm z-20">
                 <Sparkles className="w-2.5 h-2.5 text-white" />
               </div>
             </div>

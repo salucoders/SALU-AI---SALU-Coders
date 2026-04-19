@@ -299,7 +299,7 @@ export function LoginPage() {
             <div className="relative z-10 w-48 h-48 md:w-64 md:h-64 shrink-0">
               <div className="absolute inset-0 bg-brand-500 blur-3xl opacity-20 animate-pulse rounded-full" />
               <img 
-                src="/picture/Babar.jpg" 
+                src="/assets/creator/Babar.jpg" 
                 alt="Babar Ali Arain" 
                 className="w-full h-full object-cover rounded-[2rem] border-2 border-white/10 relative z-10 grayscale hover:grayscale-0 transition-all duration-700"
                 referrerPolicy="no-referrer"
