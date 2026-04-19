@@ -2,57 +2,38 @@ import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Download, X, Layers, Sparkles } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { usePWA } from '../context/PWAContext';
 
 export function InstallPWA() {
-  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [show, setShow] = useState(false);
   const { user } = useAuth();
+  const { canInstall, installed, install } = usePWA();
 
   useEffect(() => {
-    // Check if running on iOS
-    const isIos = () => {
-      const userAgent = window.navigator.userAgent.toLowerCase();
-      return /iphone|ipad|ipod/.test(userAgent);
-    };
-    
-    // Check if already installed
-    const isInStandaloneMode = () => ('standalone' in window.navigator) && (window.navigator as any).standalone;
-
-    const handler = (e: Event) => {
-      // Prevent the mini-infobar from appearing on mobile
-      e.preventDefault();
-      // Stash the event so it can be triggered later.
-      setDeferredPrompt(e);
-      // Wait a bit before showing to not overwhelm the user right after login
-      setTimeout(() => setShow(true), 2000);
-    };
-
-    window.addEventListener('beforeinstallprompt', handler);
-
-    return () => {
-      window.removeEventListener('beforeinstallprompt', handler);
-    };
-  }, []);
-
-  const handleInstallClick = async () => {
-    if (!deferredPrompt) {
-      return;
-    }
-    deferredPrompt.prompt();
-    const { outcome } = await deferredPrompt.userChoice;
-    
-    if (outcome === 'accepted') {
+    if (canInstall && !installed) {
+      // Delay to avoid overwhelming
+      const timer = setTimeout(() => setShow(true), 5000);
+      return () => clearTimeout(timer);
+    } else {
       setShow(false);
     }
-    setDeferredPrompt(null);
+  }, [canInstall, installed]);
+
+  const handleInstallClick = async () => {
+    try {
+      await install();
+      setShow(false);
+    } catch (err) {
+      console.error("Install failed:", err);
+    }
   };
 
   const skipInstall = () => {
     setShow(false);
   };
 
-  // Only show if user is logged in
-  if (!user) return null;
+  // Only show if user is logged in and not already installed
+  if (!user || installed) return null;
 
   return (
     <AnimatePresence>
@@ -63,7 +44,7 @@ export function InstallPWA() {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -10, scale: 0.95 }}
             transition={{ type: "spring", stiffness: 400, damping: 30 }}
-            className="w-full bg-white/80 backdrop-blur-xl rounded-[2rem] shadow-[0_8px_30px_rgb(0,0,0,0.12)] border border-white/50 overflow-hidden pointer-events-auto flex items-center p-2.5 pr-4 gap-3 relative"
+            className="w-full bg-white/90 backdrop-blur-xl rounded-[2rem] shadow-[0_8px_30px_rgb(0,0,0,0.12)] border border-white/50 overflow-hidden pointer-events-auto flex items-center p-2.5 pr-4 gap-3 relative"
           >
             <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center shrink-0 border border-brand-100/50 shadow-sm relative overflow-hidden p-2">
               <img 

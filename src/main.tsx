@@ -6,15 +6,18 @@ import { UserProfileProvider } from './context/UserProfileContext';
 import { NotificationProvider } from './context/NotificationContext';
 import { AuthProvider } from './context/AuthContext';
 import { SessionProvider } from './context/SessionContext';
+import { PWAProvider } from './context/PWAContext';
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <NotificationProvider>
       <AuthProvider>
         <UserProfileProvider>
-          <SessionProvider>
-            <App />
-          </SessionProvider>
+          <PWAProvider>
+            <SessionProvider>
+              <App />
+            </SessionProvider>
+          </PWAProvider>
         </UserProfileProvider>
       </AuthProvider>
     </NotificationProvider>

@@ -6,7 +6,8 @@ import { ChatSession, Mode } from '../types';
 import { useUserProfile } from '../context/UserProfileContext';
 import { useAuth } from '../context/AuthContext';
 import { useNotification } from '../context/NotificationContext';
-import { Lock, Crown } from 'lucide-react';
+import { usePWA } from '../context/PWAContext';
+import { Lock, Crown, Download } from 'lucide-react';
 
 interface SidebarProps {
   sessions: ChatSession[];
@@ -61,6 +62,7 @@ export const Sidebar = React.memo(({
   const { preferences, isPaid } = useUserProfile();
   const { user, loginWithGoogle, logout, isAuthenticating } = useAuth();
   const { notify } = useNotification();
+  const { canInstall, installed, install } = usePWA();
   const [sessionToDelete, setSessionToDelete] = useState<string | null>(null);
   const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
   const [editingTitle, setEditingTitle] = useState('');
@@ -475,6 +477,20 @@ export const Sidebar = React.memo(({
                 <Crown className="w-4 h-4 text-white animate-pulse" />
                 <span className="text-xs font-black text-white uppercase tracking-widest">Upgrade to Plus</span>
               </div>
+            </motion.button>
+          )}
+
+          {canInstall && !installed && (
+            <motion.button
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={() => install()}
+              className="w-full flex items-center justify-center gap-2 p-3 bg-slate-900 text-white rounded-xl font-black text-xs uppercase tracking-widest hover:bg-black transition-all shadow-lg active:scale-95"
+            >
+              <Download className="w-4 h-4" />
+              Install SALU AI
             </motion.button>
           )}
 
