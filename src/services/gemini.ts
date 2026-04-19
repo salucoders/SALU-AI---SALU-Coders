@@ -454,7 +454,7 @@ export async function performWebSearch(query: string): Promise<string> {
 
     const ai = new GoogleGenAI({ apiKey: config.apiKey });
     const response = await ai.models.generateContent({
-      model: 'gemini-3.1-pro-preview', // Force model that strongly supports Google Search
+      model: config.defaultModel && config.defaultModel.includes('flash') ? config.defaultModel : 'gemini-3.1-pro-preview', // prioritize system preference but default to pro for search ability
       contents: query,
       config: {
         systemInstruction: "You are an expert web search researcher. Provide a highly organized, beautifully formatted Markdown response based on your search results. Use markdown H3 (###) for main sections, bullet points, and always provide clickable markdown links [Source Name](URL) for your references at the end.",

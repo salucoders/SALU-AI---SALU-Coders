@@ -20,6 +20,9 @@ function getSystemConfig() {
   const defaults = {
     geminiApiKey: (envKey && !envKey.includes('AIzaSyA9TH') && !envKey.includes('AIzaSyCU6n')) ? envKey : "",
     togetherApiKey: togetherKey,
+    imageKitPublicKey: process.env.VITE_IMAGEKIT_PUBLIC_KEY || process.env.IMAGEKIT_PUBLIC_KEY || "",
+    imageKitPrivateKey: process.env.IMAGEKIT_PRIVATE_KEY || "",
+    imageKitUrlEndpoint: process.env.VITE_IMAGEKIT_URL_ENDPOINT || process.env.IMAGEKIT_URL_ENDPOINT || "",
     defaultModel: "gemini-3-flash-preview",
     appName: "SALU AI",
     welcomeMessage: "What can I help with?"
@@ -42,6 +45,11 @@ function getSystemConfig() {
         fileConfig.togetherApiKey = togetherKey;
       }
       
+      // Preserve env vars if missing in file
+      if (!fileConfig.imageKitPublicKey && defaults.imageKitPublicKey) fileConfig.imageKitPublicKey = defaults.imageKitPublicKey;
+      if (!fileConfig.imageKitPrivateKey && defaults.imageKitPrivateKey) fileConfig.imageKitPrivateKey = defaults.imageKitPrivateKey;
+      if (!fileConfig.imageKitUrlEndpoint && defaults.imageKitUrlEndpoint) fileConfig.imageKitUrlEndpoint = defaults.imageKitUrlEndpoint;
+
       return { ...defaults, ...fileConfig };
     }
   } catch (e) {
@@ -55,9 +63,10 @@ function saveSystemConfig(config: any) {
 }
 
 function getSafeImageKit() {
-  const publicKey = process.env.IMAGEKIT_PUBLIC_KEY || "";
-  const privateKey = process.env.IMAGEKIT_PRIVATE_KEY || "";
-  const urlEndpoint = process.env.IMAGEKIT_URL_ENDPOINT || "";
+  const config = getSystemConfig();
+  const publicKey = config.imageKitPublicKey || process.env.IMAGEKIT_PUBLIC_KEY || "";
+  const privateKey = config.imageKitPrivateKey || process.env.IMAGEKIT_PRIVATE_KEY || "";
+  const urlEndpoint = config.imageKitUrlEndpoint || process.env.IMAGEKIT_URL_ENDPOINT || "";
 
   if (!publicKey || !privateKey || !urlEndpoint || urlEndpoint === "IMAGEKIT_URL_ENDPOINT") {
     return null;
@@ -102,6 +111,8 @@ async function startServer() {
     res.json({
       geminiApiKey: config.geminiApiKey,
       togetherApiKey: config.togetherApiKey ? "configured" : "",
+      imageKitPublicKey: config.imageKitPublicKey,
+      imageKitUrlEndpoint: config.imageKitUrlEndpoint,
       defaultModel: config.defaultModel,
       appName: config.appName,
       welcomeMessage: config.welcomeMessage
@@ -157,7 +168,7 @@ async function startServer() {
       }
 
       // Automatically save to ImageKit if requested
-      if (saveToImageKit && process.env.IMAGEKIT_PRIVATE_KEY) {
+      if (saveToImageKit && (config.imageKitPrivateKey || process.env.IMAGEKIT_PRIVATE_KEY)) {
         try {
           const ik = getSafeImageKit();
           if (!ik) {

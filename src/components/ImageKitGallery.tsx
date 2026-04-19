@@ -18,6 +18,7 @@ export const ImageKitGallery: React.FC<ImageKitGalleryProps> = ({ isOpen, onClos
   const [images, setImages] = useState<ImageKitFile[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedImage, setSelectedImage] = useState<ImageKitFile | null>(null);
+  const [systemConfig, setSystemConfig] = useState<{ imageKitUrlEndpoint?: string } | null>(null);
   const { notify } = useNotification();
   const { isPaid } = useUserProfile();
 
@@ -25,8 +26,18 @@ export const ImageKitGallery: React.FC<ImageKitGalleryProps> = ({ isOpen, onClos
     if (!isPaid) return;
     setLoading(true);
     try {
-      // ImageKit doesn't have a simple client-side "list" API for security reasons.
-      // We should implement a server-side list endpoint.
+      // First try to grab config to know if we even CAN use ImageKit
+      const sysRes = await fetch('/api/config');
+      if (sysRes.ok) {
+        const conf = await sysRes.json();
+        setSystemConfig(conf);
+        if (!conf.imageKitUrlEndpoint) {
+          setLoading(false);
+          return;
+        }
+      }
+
+      // Then grab the files
       const res = await fetch('/api/imagekit/files');
       
       const contentType = res.headers.get("content-type");
@@ -35,7 +46,6 @@ export const ImageKitGallery: React.FC<ImageKitGalleryProps> = ({ isOpen, onClos
         setImages(data);
       } else {
         console.warn("Could not fetch images from server, returned invalid format.");
-        // Try to handle API error gracefully
         if (!res.ok) {
            console.error("Image API error:", res.status, res.statusText);
         }
@@ -197,11 +207,11 @@ export const ImageKitGallery: React.FC<ImageKitGalleryProps> = ({ isOpen, onClos
                       selectedImage?.fileId === image.fileId ? "border-brand-500 ring-4 ring-brand-500/10" : "border-transparent bg-slate-100"
                     )}
                   >
-                    {isImageKitConfigured() ? (
-                      <IKContext urlEndpoint={imageKitConfig.urlEndpoint}>
+                    {systemConfig?.imageKitUrlEndpoint ? (
+                      <IKContext urlEndpoint={systemConfig.imageKitUrlEndpoint}>
                         <IKImage
                           path={image.filePath}
-                          urlEndpoint={imageKitConfig.urlEndpoint}
+                          urlEndpoint={systemConfig.imageKitUrlEndpoint}
                           transformation={[{ height: "300", width: "300", cropMode: "extract" }]}
                           className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
                           loading="lazy"

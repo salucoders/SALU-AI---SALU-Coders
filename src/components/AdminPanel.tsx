@@ -26,6 +26,7 @@ export function AdminPanel({ onClose }: AdminPanelProps) {
     geminiApiKey: '',
     togetherApiKey: '',
     imageKitPublicKey: '',
+    imageKitPrivateKey: '',
     imageKitUrlEndpoint: '',
     defaultModel: 'gemini-3-flash-preview',
     appName: 'SALU AI Plus',
@@ -112,6 +113,7 @@ export function AdminPanel({ onClose }: AdminPanelProps) {
           geminiApiKey: d.geminiApiKey ?? prev.geminiApiKey,
           togetherApiKey: d.togetherApiKey ?? prev.togetherApiKey,
           imageKitPublicKey: d.imageKitPublicKey ?? prev.imageKitPublicKey,
+          imageKitPrivateKey: d.imageKitPrivateKey ?? prev.imageKitPrivateKey,
           imageKitUrlEndpoint: d.imageKitUrlEndpoint ?? prev.imageKitUrlEndpoint,
           defaultModel: d.defaultModel ?? prev.defaultModel,
           jazzCashNumber: d.jazzCashNumber ?? prev.jazzCashNumber,
@@ -188,6 +190,7 @@ export function AdminPanel({ onClose }: AdminPanelProps) {
             geminiApiKey: systemConfig.geminiApiKey,
             togetherApiKey: systemConfig.togetherApiKey,
             imageKitPublicKey: systemConfig.imageKitPublicKey,
+            imageKitPrivateKey: systemConfig.imageKitPrivateKey,
             imageKitUrlEndpoint: systemConfig.imageKitUrlEndpoint,
             defaultModel: systemConfig.defaultModel,
             appName: systemConfig.appName,
@@ -206,6 +209,7 @@ export function AdminPanel({ onClose }: AdminPanelProps) {
         geminiApiKey: systemConfig.geminiApiKey,
         togetherApiKey: systemConfig.togetherApiKey,
         imageKitPublicKey: systemConfig.imageKitPublicKey,
+        imageKitPrivateKey: systemConfig.imageKitPrivateKey,
         imageKitUrlEndpoint: systemConfig.imageKitUrlEndpoint,
         defaultModel: systemConfig.defaultModel,
         jazzCashNumber: systemConfig.jazzCashNumber,
@@ -870,89 +874,40 @@ export function AdminPanel({ onClose }: AdminPanelProps) {
 
                     <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 md:p-8 space-y-6">
                       <div className="flex items-center gap-3 pb-4 border-b border-slate-100">
-                        <Settings className="w-5 h-5 text-rose-500" />
-                        <h3 className="text-lg font-bold text-slate-800">System Preferences</h3>
-                      </div>
-                      
-                      <div className="space-y-4">
-                        <label className="flex items-center justify-between p-4 border border-slate-200 rounded-xl cursor-pointer hover:bg-slate-50 transition-colors">
-                          <div>
-                            <p className="font-medium text-slate-800">Live AI Mode</p>
-                            <p className="text-sm text-slate-500">Enable real-time voice and video AI features</p>
-                          </div>
-                          <div className="relative inline-flex items-center cursor-pointer">
-                            <input 
-                              type="checkbox" 
-                              className="sr-only peer"
-                              checked={systemConfig.liveAiMode}
-                              onChange={(e) => setSystemConfig({...systemConfig, liveAiMode: e.target.checked})}
-                            />
-                            <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-rose-500"></div>
-                          </div>
-                        </label>
-
-                        <label className="flex items-center justify-between p-4 border border-slate-200 rounded-xl cursor-pointer hover:bg-slate-50 transition-colors">
-                          <div>
-                            <p className="font-medium text-slate-800">Maintenance Mode</p>
-                            <p className="text-sm text-slate-500">Disable access for non-admin users</p>
-                          </div>
-                          <div className="relative inline-flex items-center cursor-pointer">
-                            <input 
-                              type="checkbox" 
-                              className="sr-only peer"
-                              checked={systemConfig.maintenanceMode}
-                              onChange={(e) => setSystemConfig({...systemConfig, maintenanceMode: e.target.checked})}
-                            />
-                            <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-rose-500"></div>
-                          </div>
-                        </label>
-
-                        <label className="flex items-center justify-between p-4 border border-slate-200 rounded-xl cursor-pointer hover:bg-slate-50 transition-colors">
-                          <div>
-                            <p className="font-medium text-slate-800">Public Registration</p>
-                            <p className="text-sm text-slate-500">Allow new users to sign up</p>
-                          </div>
-                          <div className="relative inline-flex items-center cursor-pointer">
-                            <input 
-                              type="checkbox" 
-                              className="sr-only peer"
-                              checked={systemConfig.publicRegistration}
-                              onChange={(e) => setSystemConfig({...systemConfig, publicRegistration: e.target.checked})}
-                            />
-                            <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-rose-500"></div>
-                          </div>
-                        </label>
-                      </div>
-                    </div>
-
-                    <div className="flex justify-end">
-                      <button
-                        onClick={handleSaveConfig}
-                        disabled={saving}
-                        className="flex items-center gap-2 px-6 py-3 bg-rose-500 text-white font-bold rounded-xl hover:bg-rose-600 transition-colors disabled:opacity-50"
-                      >
-                        {saving ? <Loader2 className="w-5 h-5 animate-spin" /> : <Check className="w-5 h-5" />}
-                        Save Changes
-                      </button>
-                    </div>
-                  </div>
-                )}
-                    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 md:p-8 space-y-6">
-                      <div className="flex items-center gap-3 pb-4 border-b border-slate-100">
-                        <Cpu className="w-5 h-5 text-rose-500" />
-                        <h3 className="text-lg font-bold text-slate-800">AI Configuration</h3>
+                        <Database className="w-5 h-5 text-emerald-500" />
+                        <h3 className="text-lg font-bold text-slate-800">ImageKit Web Vault Settings</h3>
                       </div>
                       
                       <div className="space-y-4">
                         <div>
-                          <label className="block text-sm font-medium text-slate-700 mb-1">Gemini API Key</label>
+                          <label className="block text-sm font-medium text-slate-700 mb-1">ImageKit Public Key</label>
+                          <input 
+                            type="text" 
+                            value={systemConfig.imageKitPublicKey || ''}
+                            onChange={(e) => setSystemConfig({...systemConfig, imageKitPublicKey: e.target.value})}
+                            placeholder="public_..."
+                            className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all text-slate-800 font-mono text-sm"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-slate-700 mb-1">ImageKit URL Endpoint</label>
+                          <input 
+                            type="text" 
+                            value={systemConfig.imageKitUrlEndpoint || ''}
+                            onChange={(e) => setSystemConfig({...systemConfig, imageKitUrlEndpoint: e.target.value})}
+                            placeholder="https://ik.imagekit.io/your_id/"
+                            className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all text-slate-800 font-mono text-sm"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-slate-700 mb-1">ImageKit Private Key (Optional)</label>
                           <div className="relative">
                             <input 
                               type={showApiKey ? "text" : "password"} 
-                              value={systemConfig.geminiApiKey}
-                              onChange={(e) => setSystemConfig({...systemConfig, geminiApiKey: e.target.value})}
-                              placeholder="AIzaSy..."
-                              className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 transition-all pr-12"
+                              value={systemConfig.imageKitPrivateKey || ''}
+                              onChange={(e) => setSystemConfig({...systemConfig, imageKitPrivateKey: e.target.value})}
+                              placeholder="private_..."
+                              className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all text-slate-800 font-mono text-sm pr-12"
                             />
                             <button 
                               type="button" 
@@ -962,54 +917,10 @@ export function AdminPanel({ onClose }: AdminPanelProps) {
                               {showApiKey ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                             </button>
                           </div>
-                          <p className="mt-2 text-xs text-slate-500">Get a free key from <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noreferrer" className="text-rose-500 hover:underline">Google AI Studio</a>.</p>
                         </div>
-
-                        <div>
-                          <label className="block text-sm font-medium text-slate-700 mb-1">Default AI Model</label>
-                          <select 
-                            value={systemConfig.defaultModel}
-                            onChange={(e) => setSystemConfig({...systemConfig, defaultModel: e.target.value})}
-                            className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 transition-all"
-                          >
-                            <option value="gemini-3-flash-preview">Gemini 1.5 Flash (Fastest / Recommended)</option>
-                            <option value="gemini-3.1-flash-lite-preview">Gemini 1.5 Flash Lite (Use if you hit Quota errors!)</option>
-                            <option value="gemini-3.1-pro-preview">Gemini 1.5 Pro (Powerful but slower)</option>
-                          </select>
-                          <p className="mt-2 text-xs text-slate-500">
-                            If you get <b>Quota Exceeded</b> errors on a free key, switch to <b>Gemini 1.5 Flash Lite</b>.
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 md:p-8 space-y-6">
-                      <div className="flex items-center gap-3 pb-4 border-b border-slate-100">
-                        <Cpu className="w-5 h-5 text-indigo-500" />
-                        <h3 className="text-lg font-bold text-slate-800">Together AI (FLUX & SDXL)</h3>
-                      </div>
-                      
-                      <div className="space-y-4">
-                        <div>
-                          <label className="block text-sm font-medium text-slate-700 mb-1">Together API Key</label>
-                          <div className="relative">
-                            <input 
-                              type={showApiKey ? "text" : "password"} 
-                              value={systemConfig.togetherApiKey || ""}
-                              onChange={(e) => setSystemConfig({...systemConfig, togetherApiKey: e.target.value})}
-                              placeholder="together_..."
-                              className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all pr-12"
-                            />
-                            <button 
-                              type="button" 
-                              onClick={() => setShowApiKey(!showApiKey)}
-                              className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-600 transition-colors"
-                            >
-                              {showApiKey ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                            </button>
-                          </div>
-                          <p className="mt-2 text-xs text-slate-500">Get a key from <a href="https://api.together.xyz/settings/api-keys" target="_blank" rel="noreferrer" className="text-indigo-500 hover:underline">Together AI Settings</a>. Provides ultra-fast generation with FLUX.1 models.</p>
-                        </div>
+                        <p className="mt-2 text-xs text-slate-500">
+                          These keys let the app securely save generated media into your public <a href="https://imagekit.io" target="_blank" rel="noreferrer" className="text-emerald-600 hover:underline">ImageKit</a> gallery. 
+                        </p>
                       </div>
                     </div>
 
@@ -1082,6 +993,8 @@ export function AdminPanel({ onClose }: AdminPanelProps) {
                     </div>
                   </div>
                 )}
+              </div>
+            )}
           </div>
         </div>
       </div>
