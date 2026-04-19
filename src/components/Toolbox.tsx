@@ -2,11 +2,15 @@ import React, { useState, useEffect } from 'react';
 import { 
   X, Timer, CheckSquare, Calculator, Languages, FileText, 
   Play, Pause, RotateCcw, Plus, Trash2, Globe, Copy, Check,
-  ChevronRight, ChevronLeft, Save, Lock, Crown
+  ChevronRight, ChevronLeft, Save, Lock, Crown,
+  ArrowRightLeft, Layers, Search, Loader2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useUserProfile } from '../context/UserProfileContext';
 import { cn } from '../lib/utils';
+import { performWebSearch } from '../services/gemini';
+import Markdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 
 interface ToolboxProps {
   isOpen: boolean;
@@ -14,7 +18,7 @@ interface ToolboxProps {
   onOpenUpgrade?: () => void;
 }
 
-type ToolType = 'pomodoro' | 'tasks' | 'calculator' | 'translator' | 'notes' | null;
+type ToolType = 'pomodoro' | 'tasks' | 'calculator' | 'translator' | 'notes' | 'unit_converter' | 'flashcards' | 'web_search' | null;
 
 export const Toolbox: React.FC<ToolboxProps> = ({ isOpen, onClose, onOpenUpgrade }) => {
   const [activeTool, setActiveTool] = useState<ToolType>(null);
@@ -26,6 +30,9 @@ export const Toolbox: React.FC<ToolboxProps> = ({ isOpen, onClose, onOpenUpgrade
     { id: 'calculator', name: 'Expert Calculator', icon: Calculator, color: 'text-emerald-500', bg: 'bg-emerald-50', new: true },
     { id: 'translator', name: 'Lingo Translator', icon: Languages, color: 'text-purple-500', bg: 'bg-purple-50', new: true },
     { id: 'notes', name: 'Quick Notes', icon: FileText, color: 'text-amber-500', bg: 'bg-amber-50', new: false },
+    { id: 'unit_converter', name: 'Unit Converter', icon: ArrowRightLeft, color: 'text-indigo-500', bg: 'bg-indigo-50', new: true },
+    { id: 'flashcards', name: 'Study Flashcards', icon: Layers, color: 'text-pink-500', bg: 'bg-pink-50', new: true },
+    { id: 'web_search', name: 'Web Search', icon: Search, color: 'text-cyan-500', bg: 'bg-cyan-50', new: true },
   ];
 
   return (
@@ -122,6 +129,9 @@ export const Toolbox: React.FC<ToolboxProps> = ({ isOpen, onClose, onOpenUpgrade
                     {activeTool === 'calculator' && <CalculatorTool />}
                     {activeTool === 'translator' && <TranslatorTool />}
                     {activeTool === 'notes' && <NotesTool />}
+                    {activeTool === 'unit_converter' && <UnitConverterTool />}
+                    {activeTool === 'flashcards' && <FlashcardsTool />}
+                    {activeTool === 'web_search' && <WebSearchTool />}
                   </div>
                 </div>
               )}
@@ -441,6 +451,248 @@ const NotesTool = () => {
         <div className="flex items-center gap-1.5">
             {content.length} Characters
         </div>
+      </div>
+    </div>
+  );
+};
+
+const UnitConverterTool = () => {
+  const [category, setCategory] = useState<'length' | 'weight' | 'temperature'>('length');
+  const [value, setValue] = useState('1');
+  const [fromUnit, setFromUnit] = useState('m');
+  const [toUnit, setToUnit] = useState('ft');
+  
+  const units = {
+    length: ['m', 'km', 'cm', 'mm', 'in', 'ft', 'yd', 'mi'],
+    weight: ['kg', 'g', 'mg', 'lb', 'oz'],
+    temperature: ['°C', '°F', 'K']
+  };
+
+  useEffect(() => {
+    setFromUnit(units[category][0]);
+    setToUnit(units[category][1]);
+  }, [category]);
+
+  const ratios: Record<string, number> = {
+    'm': 1, 'km': 1000, 'cm': 0.01, 'mm': 0.001, 'in': 0.0254, 'ft': 0.3048, 'yd': 0.9144, 'mi': 1609.34,
+    'kg': 1, 'g': 0.001, 'mg': 0.000001, 'lb': 0.453592, 'oz': 0.0283495
+  };
+
+  const convert = () => {
+    const num = parseFloat(value);
+    if (isNaN(num)) return '0';
+    if (category === 'temperature') {
+        if (fromUnit === toUnit) return num.toFixed(2);
+        let c = 0;
+        if (fromUnit === '°C') c = num;
+        else if (fromUnit === '°F') c = (num - 32) * 5/9;
+        else if (fromUnit === 'K') c = num - 273.15;
+        
+        if (toUnit === '°C') return c.toFixed(2);
+        if (toUnit === '°F') return ((c * 9/5) + 32).toFixed(2);
+        if (toUnit === 'K') return (c + 273.15).toFixed(2);
+        return '0';
+    } else {
+        const inBase = num * ratios[fromUnit];
+        const res = (inBase / ratios[toUnit]).toFixed(4);
+        return res.replace(/\.?0+$/, '') || '0';
+    }
+  };
+
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="flex bg-slate-100 p-1 rounded-2xl">
+        {(['length', 'weight', 'temperature'] as const).map(c => (
+          <button 
+            key={c} onClick={() => setCategory(c)}
+            className={cn("flex-1 py-2 text-xs font-black uppercase tracking-wider rounded-xl transition-all", category === c ? "bg-indigo-500 text-white shadow" : "text-slate-400")}
+          >
+            {c}
+          </button>
+        ))}
+      </div>
+      
+      <div className="flex flex-col gap-2">
+        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-2">From</label>
+        <div className="flex gap-2">
+          <input type="number" value={value} onChange={e => setValue(e.target.value)} className="flex-1 bg-slate-50 border border-slate-100 rounded-2xl px-4 py-3 focus:ring-2 focus:ring-indigo-500 text-lg font-bold" />
+          <select value={fromUnit} onChange={e => setFromUnit(e.target.value)} className="w-24 bg-slate-100 border-none rounded-2xl font-bold text-slate-700 outline-none focus:ring-2 focus:ring-indigo-500">
+            {units[category].map(u => <option key={u} value={u}>{u}</option>)}
+          </select>
+        </div>
+      </div>
+
+      <div className="flex justify-center -my-2 z-10 relative">
+        <button onClick={() => {const temp=fromUnit; setFromUnit(toUnit); setToUnit(temp);}} className="w-10 h-10 bg-indigo-500 text-white shadow-lg shadow-indigo-200 rounded-full flex items-center justify-center hover:scale-105 active:scale-95 transition-all">
+          <ArrowRightLeft className="w-5 h-5" />
+        </button>
+      </div>
+
+      <div className="flex flex-col gap-2">
+        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-2">To</label>
+        <div className="flex gap-2">
+          <div className="flex-1 bg-indigo-50 border border-indigo-100 text-indigo-700 rounded-2xl px-4 py-3 text-lg font-black flex items-center overflow-x-auto no-scrollbar">
+            {convert()}
+          </div>
+          <select value={toUnit} onChange={e => setToUnit(e.target.value)} className="w-24 bg-slate-100 border-none rounded-2xl font-bold text-slate-700 outline-none focus:ring-2 focus:ring-indigo-500">
+            {units[category].map(u => <option key={u} value={u}>{u}</option>)}
+          </select>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const FlashcardsTool = () => {
+  const [cards, setCards] = useState<{id:number, front:string, back:string}[]>(() => {
+    const saved = localStorage.getItem('toolbox_flashcards');
+    return saved ? JSON.parse(saved) : [{id:1, front: "Mitosis", back: "Cell division resulting in two identical daughter cells"}];
+  });
+  
+  useEffect(() => { localStorage.setItem('toolbox_flashcards', JSON.stringify(cards)); }, [cards]);
+
+  const [mode, setMode] = useState<'study' | 'edit'>('study');
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [isFlipped, setIsFlipped] = useState(false);
+  
+  const [newFront, setNewFront] = useState('');
+  const [newBack, setNewBack] = useState('');
+
+  const addCard = () => {
+    if (!newFront.trim() || !newBack.trim()) return;
+    setCards([...cards, { id: Date.now(), front: newFront, back: newBack }]);
+    setNewFront(''); setNewBack('');
+  };
+
+  const removeCard = (id: number) => {
+    setCards(cards.filter(c => c.id !== id));
+    if (currentIndex >= cards.length - 1) setCurrentIndex(Math.max(0, cards.length - 2));
+  };
+
+  const nextCard = () => { setIsFlipped(false); setCurrentIndex((prev) => (prev + 1) % cards.length); };
+  const prevCard = () => { setIsFlipped(false); setCurrentIndex((prev) => (prev - 1 + cards.length) % cards.length); };
+
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="flex bg-slate-100 p-1 rounded-2xl mb-2">
+        <button onClick={() => setMode('study')} className={cn("flex-1 py-2 text-xs font-black uppercase tracking-wider rounded-xl transition-all", mode === 'study' ? "bg-pink-500 text-white shadow" : "text-slate-400")}>Study</button>
+        <button onClick={() => setMode('edit')} className={cn("flex-1 py-2 text-xs font-black uppercase tracking-wider rounded-xl transition-all", mode === 'edit' ? "bg-pink-500 text-white shadow" : "text-slate-400")}>Edit Cards ({cards.length})</button>
+      </div>
+
+      {mode === 'study' ? (
+        cards.length > 0 ? (
+            <div className="flex flex-col items-center gap-6">
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{currentIndex + 1} / {cards.length}</p>
+                
+                <div 
+                  onClick={() => setIsFlipped(!isFlipped)} 
+                  className="w-full aspect-[4/3] cursor-pointer group"
+                >
+                  <div className={cn("w-full h-full transition-all duration-300 shadow-xl rounded-3xl flex items-center justify-center p-6 text-center border-2", isFlipped ? "bg-pink-500 border-pink-500 text-white shadow-pink-200" : "bg-white border-pink-100 text-slate-800")}>
+                      <div className="animate-in fade-in duration-300">
+                        {isFlipped ? (
+                            <p className="text-lg font-medium">{cards[currentIndex].back}</p>
+                        ) : (
+                            <p className="text-xl font-bold">{cards[currentIndex].front}</p>
+                        )}
+                      </div>
+                  </div>
+                </div>
+
+                <div className="flex gap-4 w-full">
+                    <button onClick={prevCard} className="flex-1 p-4 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-2xl flex justify-center active:scale-95 transition-all"><ChevronLeft className="w-5 h-5"/></button>
+                    <button onClick={nextCard} className="flex-1 p-4 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-2xl flex justify-center active:scale-95 transition-all"><ChevronRight className="w-5 h-5"/></button>
+                </div>
+            </div>
+        ) : (
+            <div className="py-12 text-center text-slate-400 flex flex-col items-center gap-3">
+              <Layers className="w-12 h-12 opacity-20" />
+              <p className="text-xs font-bold uppercase tracking-widest italic">No flashcards yet!</p>
+              <button onClick={() => setMode('edit')} className="mt-4 px-4 py-2 bg-pink-50 text-pink-600 rounded-lg text-xs font-bold uppercase tracking-widest">Add Cards</button>
+            </div>
+        )
+      ) : (
+        <div className="flex flex-col gap-4 max-h-[400px] overflow-y-auto no-scrollbar">
+            <div className="bg-slate-50 p-4 rounded-2xl flex flex-col gap-2 border border-slate-100">
+                <input value={newFront} onChange={e=>setNewFront(e.target.value)} placeholder="Front (e.g. Concept)" className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-pink-500 outline-none" />
+                <textarea value={newBack} onChange={e=>setNewBack(e.target.value)} placeholder="Back (e.g. Definition)" rows={2} className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-pink-500 outline-none resize-none" />
+                <button onClick={addCard} className="w-full py-3 bg-pink-500 text-white rounded-xl text-xs font-bold uppercase tracking-widest mt-2 active:scale-95 shadow-md shadow-pink-200">Add Card</button>
+            </div>
+            
+            <div className="flex flex-col gap-2">
+                {cards.map(c => (
+                    <div key={c.id} className="bg-white border border-slate-100 p-3 rounded-2xl flex justify-between items-center group shadow-sm">
+                        <div className="flex flex-col overflow-hidden">
+                            <span className="text-sm font-bold text-slate-800 truncate">{c.front}</span>
+                            <span className="text-xs text-slate-400 truncate max-w-[200px]">{c.back}</span>
+                        </div>
+                        <button onClick={() => removeCard(c.id)} className="p-2 text-slate-300 hover:bg-red-50 hover:text-red-500 rounded-lg transition-all ml-2">
+                            <Trash2 className="w-4 h-4"/>
+                        </button>
+                    </div>
+                ))}
+            </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+const WebSearchTool = () => {
+  const [query, setQuery] = useState('');
+  const [result, setResult] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+
+  const handleSearch = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!query.trim() || isLoading) return;
+    setIsLoading(true);
+    setResult('');
+    try {
+      const res = await performWebSearch(query);
+      setResult(res);
+    } catch (err: any) {
+      setResult('Error: ' + err.message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <div className="flex flex-col h-full gap-4 max-h-[400px]">
+      <form onSubmit={handleSearch} className="flex gap-2 shrink-0">
+        <input 
+          type="text" 
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Search the web..."
+          className="flex-1 bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-sm focus:ring-2 focus:ring-cyan-500 outline-none"
+        />
+        <button 
+          type="submit" 
+          disabled={isLoading || !query.trim()}
+          className="p-3 bg-cyan-500 text-white rounded-2xl shadow-lg shadow-cyan-100 active:scale-95 disabled:opacity-50 transition-all flex items-center justify-center shrink-0 w-12"
+        >
+          {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Search className="w-5 h-5" />}
+        </button>
+      </form>
+
+      <div className="flex-1 overflow-y-auto no-scrollbar bg-slate-50 rounded-2xl p-4 border border-slate-100 flex flex-col">
+        {isLoading && !result ? (
+          <div className="flex flex-col items-center justify-center h-full gap-3 text-cyan-500 my-8">
+            <Search className="w-8 h-8 animate-pulse opacity-50" />
+            <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Searching web...</p>
+          </div>
+        ) : result ? (
+          <div className="w-full text-sm text-slate-700 leading-relaxed select-text markdown-body">
+            <Markdown remarkPlugins={[remarkGfm]}>{result}</Markdown>
+          </div>
+        ) : (
+          <div className="flex flex-col items-center justify-center h-full gap-3 text-slate-400 my-8 opacity-50">
+            <Globe className="w-12 h-12" />
+            <p className="text-[10px] font-bold uppercase tracking-widest text-center">Enter a query above to <br/> search the internet</p>
+          </div>
+        )}
       </div>
     </div>
   );

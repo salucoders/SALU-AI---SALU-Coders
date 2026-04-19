@@ -148,27 +148,42 @@ const CodeBlock = ({ language, value }: { language?: string; value: string }) =>
   };
 
   return (
-    <div className="relative group/code">
-      <SyntaxHighlighter
-        style={vscDarkPlus}
-        language={language || 'text'}
-        PreTag="div"
-        className="rounded-xl !my-4 shadow-lg"
-      >
-        {value}
-      </SyntaxHighlighter>
-      <button
-        onClick={handleCopy}
-        className="absolute top-3 right-3 p-2 bg-white/10 hover:bg-white/20 text-white/50 hover:text-white rounded-lg opacity-0 group-hover/code:opacity-100 transition-all backdrop-blur-sm border border-white/10"
-        title="Copy Code"
-      >
-        {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-      </button>
-      {language && (
-        <div className="absolute top-3 left-3 px-2 py-1 bg-white/10 rounded text-[10px] font-black text-white/40 uppercase tracking-widest backdrop-blur-sm border border-white/5">
-          {language}
+    <div className="relative group/code w-full my-4 rounded-xl border border-slate-700 bg-[#1e1e1e] overflow-hidden">
+      {/* Header bar area */}
+      <div className="flex items-center justify-between px-4 py-2 bg-slate-800/50 border-b border-slate-700 shrink-0">
+        <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest truncate mr-2">
+          {language || 'code'}
         </div>
-      )}
+        <button
+          onClick={handleCopy}
+          className="flex items-center gap-1.5 px-2 py-1 rounded bg-slate-700/50 hover:bg-slate-600/50 text-slate-300 hover:text-white transition-all text-xs border border-slate-600 shrink-0"
+          title="Copy Code"
+        >
+          {copied ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+          <span className="hidden sm:inline">{copied ? 'Copied' : 'Copy'}</span>
+        </button>
+      </div>
+      
+      {/* Code area - strictly width limited for responsiveness */}
+      <div className="w-full">
+        <SyntaxHighlighter
+          style={vscDarkPlus}
+          language={language || 'text'}
+          PreTag="div"
+          customStyle={{ 
+            margin: 0, 
+            padding: '0.75rem', 
+            width: '100%', 
+            fontSize: '0.75rem',
+            lineHeight: '1.6',
+            whiteSpace: 'pre-wrap',
+            wordBreak: 'break-word'
+          }}
+          className="!m-0 md:text-sm"
+        >
+          {value}
+        </SyntaxHighlighter>
+      </div>
     </div>
   );
 };
@@ -579,10 +594,11 @@ const MessageContent = ({ content, role, preferences }: { content: string, role:
   const isStartingImageGen = content.toLowerCase().includes('[image_gen:') && !content.includes(']');
 
   const renderContent = (text: string) => (
-    <div className="markdown-body prose prose-slate max-w-none prose-sm md:prose-base overflow-hidden">
+    <div className="markdown-body prose prose-slate max-w-none prose-sm md:prose-base overflow-hidden prose-pre:!max-w-full">
       <Markdown 
         remarkPlugins={[remarkGfm]}
         components={{
+          p: 'div',
           img: ({ src, ...props }) => <img src={src || null} {...props} referrerPolicy="no-referrer" />,
           code({ node, inline, className, children, ...props }: any) {
             const match = /language-(\w+)/.exec(className || '');
@@ -1134,8 +1150,8 @@ export const ChatInterface = React.memo(({ messages, onSendMessage, isLoading, m
               <div className={cn(
                 "relative group/bubble transition-all duration-300",
                 message.role === 'user' 
-                  ? "bg-[#f0f4f9] text-slate-800 px-5 py-3.5 rounded-3xl rounded-tr-lg" 
-                  : "bg-transparent text-slate-800 pt-1" 
+                  ? "bg-[#f0f4f9] text-slate-800 px-5 py-3.5 rounded-3xl rounded-tr-lg hover:bg-[#e4ebf2] transition-colors" 
+                  : "bg-transparent text-slate-800 pt-1 hover:bg-slate-50 hover:px-2 hover:-ml-2 hover:rounded-xl transition-all" 
               )}>
                 {/* Message Actions (Copy) - User Only */}
                 {message.role === 'user' && (

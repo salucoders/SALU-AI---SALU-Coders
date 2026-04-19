@@ -218,7 +218,7 @@ export default function App() {
   // Auto-create session if none exists
   useEffect(() => {
     if (user && !sessionsLoading && sessions.length === 0 && !currentSessionId) {
-      createSession('student').catch(e => console.error("Auto-create session failed:", e));
+      createSession(preferences.preferredMode || 'student').catch(e => console.error("Auto-create session failed:", e));
     }
   }, [user, sessionsLoading, sessions.length, currentSessionId, createSession]);
 
@@ -284,6 +284,7 @@ export default function App() {
       const sessionRef = sessions.find(s => s.id === currentSessionId);
       if (sessionRef) {
         await updateDoc(doc(db, 'sessions', currentSessionId), { mode, updatedAt: serverTimestamp() });
+        await updatePreferences({ preferredMode: mode });
         notify(`Switched to ${mode.charAt(0).toUpperCase() + mode.slice(1)} Mode`, 'change', 2000);
       }
     } catch (e) {
@@ -352,7 +353,7 @@ export default function App() {
         onModeChange={handleModeChange}
         onNewChat={async () => {
           try {
-            await createSession('student');
+            await createSession(preferences.preferredMode || 'student');
           } catch (e) {
             console.error("Failed to create session:", e);
           }
@@ -535,7 +536,7 @@ export default function App() {
                     <button
                       onClick={async () => {
                         try {
-                          await createSession('student');
+                          await createSession(preferences.preferredMode || 'student');
                         } catch (e) {
                           console.error("Failed to create session:", e);
                         }

@@ -18,6 +18,7 @@ const defaultPreferences: UserPreferences = {
   accentColor: '#0ea5e9',
   theme: 'light',
   persona: 'friendly',
+  preferredMode: 'student',
   voice: 'female',
   likes: '',
   dislikes: '',

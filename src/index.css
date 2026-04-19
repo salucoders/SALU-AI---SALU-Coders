@@ -49,6 +49,7 @@
 .markdown-body code { @apply bg-slate-100/80 px-1.5 py-0.5 rounded font-mono text-[0.85em] text-brand-600 font-medium; }
 .markdown-body pre { @apply bg-slate-900 text-slate-50 p-5 rounded-2xl mb-6 overflow-x-auto shadow-xl border border-white/5; }
 .markdown-body pre code { @apply bg-transparent p-0 text-slate-50 font-normal; }
+.markdown-body a { @apply text-brand-500 font-medium hover:underline; }
 
 /* Tables */
 .markdown-body table { @apply w-full border-collapse mb-6 overflow-hidden rounded-xl border border-slate-200 shadow-sm; }

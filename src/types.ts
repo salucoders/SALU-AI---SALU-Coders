@@ -18,6 +18,7 @@ export interface UserPreferences {
   accentColor: string; // hex or tailwind color name
   theme: 'light' | 'dark' | 'system';
   persona: Persona;
+  preferredMode: Mode;
   voice: 'male' | 'female';
   likes?: string;
   dislikes?: string;

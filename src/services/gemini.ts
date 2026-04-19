@@ -401,6 +401,7 @@ export async function sendMessageStream(
 }
 
 export async function generateImageWithSALU(prompt: string): Promise<string> {
+  // ... existing gemini image code ...
   try {
     const config = await getSystemConfig();
     if (!config.apiKey) {
@@ -441,5 +442,34 @@ export async function generateImageWithSALU(prompt: string): Promise<string> {
   } catch (error: any) {
     console.error("SALU Image Generation Error:", error);
     throw new Error(error.message || "Failed to generate image with SALU.");
+  }
+}
+
+export async function performWebSearch(query: string): Promise<string> {
+  try {
+    const config = await getSystemConfig();
+    if (!config.apiKey) {
+      throw new Error("SALU AI Engine key is missing");
+    }
+
+    const ai = new GoogleGenAI({ apiKey: config.apiKey });
+    const response = await ai.models.generateContent({
+      model: 'gemini-3.1-pro-preview', // Force model that strongly supports Google Search
+      contents: query,
+      config: {
+        systemInstruction: "You are an expert web search researcher. Provide a highly organized, beautifully formatted Markdown response based on your search results. Use markdown H3 (###) for main sections, bullet points, and always provide clickable markdown links [Source Name](URL) for your references at the end.",
+        tools: [{ googleSearch: {} }]
+      }
+    });
+
+    const text = response.text;
+    if (!text) {
+      throw new Error("No results found or empty response from AI.");
+    }
+
+    return text;
+  } catch (error: any) {
+    console.error("Web Search Error Details:", error);
+    throw new Error(error.message || "Failed to perform web search.");
   }
 }
