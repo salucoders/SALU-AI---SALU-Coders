@@ -1135,7 +1135,7 @@ export const ChatInterface = React.memo(({ messages, onSendMessage, isLoading, m
             {message.role !== 'user' && (
               <div className="w-8 h-8 md:w-10 md:h-10 rounded-full flex items-center justify-center shrink-0 mt-1">
                 <img 
-                  src="https://admission.salu.edu.pk/static/media/logo.793ee5b813bb22366372.png" 
+                  src="/assets/logo/salu_logo.png" 
                   alt="SALU AI" 
                   className="w-6 h-6 md:w-8 md:h-8 object-contain drop-shadow-sm"
                   referrerPolicy="no-referrer"
@@ -1216,7 +1216,7 @@ export const ChatInterface = React.memo(({ messages, onSendMessage, isLoading, m
           >
             <div className="w-8 h-8 md:w-10 md:h-10 rounded-full flex items-center justify-center shrink-0 mt-1">
               <img 
-                src="https://admission.salu.edu.pk/static/media/logo.793ee5b813bb22366372.png" 
+                src="/assets/logo/salu_logo.png" 
                 alt="SALU AI" 
                 className="w-6 h-6 md:w-8 md:h-8 object-contain drop-shadow-sm animate-pulse"
                 referrerPolicy="no-referrer"
