@@ -19,6 +19,7 @@ function getSystemConfig() {
   const togetherKey = process.env.TOGETHER_API_KEY || "";
   const defaults = {
     geminiApiKey: (envKey && !envKey.includes('AIzaSyA9TH') && !envKey.includes('AIzaSyCU6n')) ? envKey : "",
+    geminiImageGenApiKey: "",
     togetherApiKey: togetherKey,
     imageKitPublicKey: process.env.VITE_IMAGEKIT_PUBLIC_KEY || process.env.IMAGEKIT_PUBLIC_KEY || "",
     imageKitPrivateKey: process.env.IMAGEKIT_PRIVATE_KEY || "",

@@ -3,8 +3,9 @@ import { GoogleGenAI } from "@google/genai";
 import { doc, getDoc } from "firebase/firestore";
 import { db } from "../lib/firebase";
 
-export async function getSystemConfig(): Promise<{ apiKey: string, defaultModel: string }> {
+export async function getSystemConfig(): Promise<{ apiKey: string, defaultModel: string, imageGenApiKey?: string }> {
   let apiKey = "";
+  let imageGenApiKey = "";
   let defaultModel = "gemini-3-flash-preview";
   let keySource = "";
 
@@ -17,6 +18,9 @@ export async function getSystemConfig(): Promise<{ apiKey: string, defaultModel:
         apiKey = data.geminiApiKey;
         keySource = "Firestore Config";
       }
+      if (data.geminiImageGenApiKey) {
+        imageGenApiKey = data.geminiImageGenApiKey;
+      }
       if (data.defaultModel) defaultModel = data.defaultModel;
     }
   } catch (e) {
@@ -24,17 +28,20 @@ export async function getSystemConfig(): Promise<{ apiKey: string, defaultModel:
   }
 
   // 2. Fallback to Express backend `/api/config` (if running as Web Service)
-  if (!apiKey) {
+  if (!apiKey || !imageGenApiKey) {
     try {
       const res = await fetch(`/api/config?t=${new Date().getTime()}`);
       const contentType = res.headers.get("content-type");
       if (res.ok && contentType && contentType.includes("application/json")) {
         const data = await res.json();
-        if (data.geminiApiKey) {
+        if (data.geminiApiKey && !apiKey) {
           apiKey = data.geminiApiKey;
           keySource = "Backend API";
         }
-        if (data.defaultModel) defaultModel = data.defaultModel;
+        if (data.geminiImageGenApiKey && !imageGenApiKey) {
+          imageGenApiKey = data.geminiImageGenApiKey;
+        }
+        if (data.defaultModel && defaultModel === "gemini-3-flash-preview") defaultModel = data.defaultModel;
       }
     } catch (e) {
       console.warn("Failed to fetch config from backend:", e);
@@ -60,7 +67,7 @@ export async function getSystemConfig(): Promise<{ apiKey: string, defaultModel:
   // Attach the source for debugging purposes on error
   (window as any)._geminiKeySource = keySource;
 
-  return { apiKey, defaultModel };
+  return { apiKey, defaultModel, imageGenApiKey };
 }
 
 function getSystemInstruction(mode: Mode, preferences: UserPreferences, persona: Persona) {
@@ -404,11 +411,12 @@ export async function generateImageWithSALU(prompt: string): Promise<string> {
   // ... existing gemini image code ...
   try {
     const config = await getSystemConfig();
-    if (!config.apiKey) {
-      throw new Error("SALU AI Engine key is missing");
+    const activeKey = config.imageGenApiKey || config.apiKey;
+    if (!activeKey) {
+      throw new Error("SALU AI Engine key is missing for image generation");
     }
 
-    const ai = new GoogleGenAI({ apiKey: config.apiKey });
+    const ai = new GoogleGenAI({ apiKey: activeKey });
     
     // Using gemini-2.5-flash-image for reliable image generation
     const response = await ai.models.generateContent({

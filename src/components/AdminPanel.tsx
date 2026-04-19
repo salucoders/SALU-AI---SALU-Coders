@@ -24,6 +24,7 @@ export function AdminPanel({ onClose }: AdminPanelProps) {
     publicRegistration: true,
     liveAiMode: true,
     geminiApiKey: '',
+    geminiImageGenApiKey: '',
     togetherApiKey: '',
     imageKitPublicKey: '',
     imageKitPrivateKey: '',
@@ -111,6 +112,7 @@ export function AdminPanel({ onClose }: AdminPanelProps) {
           appName: d.appName ?? prev.appName,
           welcomeMessage: d.welcomeMessage ?? prev.welcomeMessage,
           geminiApiKey: d.geminiApiKey ?? prev.geminiApiKey,
+          geminiImageGenApiKey: d.geminiImageGenApiKey ?? prev.geminiImageGenApiKey,
           togetherApiKey: d.togetherApiKey ?? prev.togetherApiKey,
           imageKitPublicKey: d.imageKitPublicKey ?? prev.imageKitPublicKey,
           imageKitPrivateKey: d.imageKitPrivateKey ?? prev.imageKitPrivateKey,
@@ -188,6 +190,7 @@ export function AdminPanel({ onClose }: AdminPanelProps) {
           },
           body: JSON.stringify({ 
             geminiApiKey: systemConfig.geminiApiKey,
+            geminiImageGenApiKey: systemConfig.geminiImageGenApiKey,
             togetherApiKey: systemConfig.togetherApiKey,
             imageKitPublicKey: systemConfig.imageKitPublicKey,
             imageKitPrivateKey: systemConfig.imageKitPrivateKey,
@@ -207,6 +210,7 @@ export function AdminPanel({ onClose }: AdminPanelProps) {
         appName: systemConfig.appName,
         welcomeMessage: systemConfig.welcomeMessage,
         geminiApiKey: systemConfig.geminiApiKey,
+        geminiImageGenApiKey: systemConfig.geminiImageGenApiKey,
         togetherApiKey: systemConfig.togetherApiKey,
         imageKitPublicKey: systemConfig.imageKitPublicKey,
         imageKitPrivateKey: systemConfig.imageKitPrivateKey,
@@ -822,6 +826,27 @@ export function AdminPanel({ onClose }: AdminPanelProps) {
                             </button>
                           </div>
                           <p className="mt-2 text-xs text-slate-500">Get a free key from <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noreferrer" className="text-rose-500 hover:underline">Google AI Studio</a>.</p>
+                        </div>
+
+                        <div>
+                          <label className="block text-sm font-medium text-slate-700 mb-1">Gemini API Key (Image Generation)</label>
+                          <div className="relative">
+                            <input 
+                              type={showApiKey ? "text" : "password"} 
+                              value={systemConfig.geminiImageGenApiKey || ''}
+                              onChange={(e) => setSystemConfig({...systemConfig, geminiImageGenApiKey: e.target.value})}
+                              placeholder="Leave empty to use main key"
+                              className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 transition-all pr-12"
+                            />
+                            <button 
+                              type="button" 
+                              onClick={() => setShowApiKey(!showApiKey)}
+                              className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-600 transition-colors"
+                            >
+                              {showApiKey ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                            </button>
+                          </div>
+                          <p className="mt-2 text-xs text-slate-500">Use a secondary key purely for Image Generation. Leaves main free quota safe.</p>
                         </div>
 
                         <div>
