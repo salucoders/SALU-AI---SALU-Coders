@@ -62,11 +62,13 @@ function saveSystemConfig(config: any) {
   fs.writeFileSync(CONFIG_FILE, JSON.stringify(config, null, 2));
 }
 
-function getSafeImageKit() {
+function getSafeImageKit(req?: express.Request) {
   const config = getSystemConfig();
-  const publicKey = config.imageKitPublicKey || process.env.IMAGEKIT_PUBLIC_KEY || "";
-  const privateKey = config.imageKitPrivateKey || process.env.IMAGEKIT_PRIVATE_KEY || "";
-  const urlEndpoint = config.imageKitUrlEndpoint || process.env.IMAGEKIT_URL_ENDPOINT || "";
+  
+  // Give priority to headers provided by frontend, fallback to server config
+  const publicKey = (req?.headers['x-imagekit-public-key'] as string) || config.imageKitPublicKey || process.env.IMAGEKIT_PUBLIC_KEY || "";
+  const privateKey = (req?.headers['x-imagekit-private-key'] as string) || config.imageKitPrivateKey || process.env.IMAGEKIT_PRIVATE_KEY || "";
+  const urlEndpoint = (req?.headers['x-imagekit-url-endpoint'] as string) || config.imageKitUrlEndpoint || process.env.IMAGEKIT_URL_ENDPOINT || "";
 
   if (!publicKey || !privateKey || !urlEndpoint || urlEndpoint === "IMAGEKIT_URL_ENDPOINT") {
     return null;
@@ -216,7 +218,7 @@ async function startServer() {
   app.post("/api/imagekit/upload", async (req, res) => {
     try {
       const { file, fileName, tags } = req.body;
-      const imagekit = getSafeImageKit();
+      const imagekit = getSafeImageKit(req);
       if (!imagekit) {
         return res.status(503).json({ error: "ImageKit not configured" });
       }
@@ -236,7 +238,7 @@ async function startServer() {
   // ImageKit List Files
   app.get("/api/imagekit/files", async (req, res) => {
     try {
-      const imagekit = getSafeImageKit();
+      const imagekit = getSafeImageKit(req);
       if (!imagekit) {
         return res.status(503).json({ error: "ImageKit not configured" });
       }
@@ -256,7 +258,7 @@ async function startServer() {
   app.delete("/api/imagekit/files/:fileId", async (req, res) => {
     try {
       const { fileId } = req.params;
-      const imagekit = getSafeImageKit();
+      const imagekit = getSafeImageKit(req);
       if (!imagekit) {
         return res.status(503).json({ error: "ImageKit not configured" });
       }

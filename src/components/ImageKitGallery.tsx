@@ -25,20 +25,52 @@ export const ImageKitGallery: React.FC<ImageKitGalleryProps> = ({ isOpen, onClos
   const fetchImages = async () => {
     if (!isPaid) return;
     setLoading(true);
+    let imageKitCredentials = {
+       publicKey: '',
+       privateKey: '',
+       urlEndpoint: ''
+    };
+
     try {
-      // First try to grab config to know if we even CAN use ImageKit
-      const sysRes = await fetch('/api/config');
-      if (sysRes.ok) {
-        const conf = await sysRes.json();
-        setSystemConfig(conf);
-        if (!conf.imageKitUrlEndpoint) {
-          setLoading(false);
-          return;
+      const { doc, getDoc } = await import('firebase/firestore');
+      const { db } = await import('../lib/firebase');
+      
+      const configDoc = await getDoc(doc(db, 'system', 'config'));
+      if (configDoc.exists()) {
+        const data = configDoc.data();
+        imageKitCredentials = {
+           publicKey: data.imageKitPublicKey || '',
+           privateKey: data.imageKitPrivateKey || '',
+           urlEndpoint: data.imageKitUrlEndpoint || ''
+        };
+        setSystemConfig(data as any);
+      } else {
+        // Fallback to backend config if Firestore empty
+        const sysRes = await fetch('/api/config');
+        if (sysRes.ok) {
+          const conf = await sysRes.json();
+          setSystemConfig(conf);
+          imageKitCredentials = {
+             publicKey: conf.imageKitPublicKey || '',
+             privateKey: conf.imageKitPrivateKey || '',
+             urlEndpoint: conf.imageKitUrlEndpoint || ''
+          };
         }
       }
 
-      // Then grab the files
-      const res = await fetch('/api/imagekit/files');
+      if (!imageKitCredentials.urlEndpoint) {
+        setLoading(false);
+        return;
+      }
+
+      // Then grab the files passing the required credentials safely to our backend
+      const res = await fetch('/api/imagekit/files', {
+        headers: {
+          'x-imagekit-public-key': imageKitCredentials.publicKey,
+          'x-imagekit-private-key': imageKitCredentials.privateKey,
+          'x-imagekit-url-endpoint': imageKitCredentials.urlEndpoint,
+        }
+      });
       
       const contentType = res.headers.get("content-type");
       if (res.ok && contentType && contentType.indexOf("application/json") !== -1) {
@@ -67,7 +99,29 @@ export const ImageKitGallery: React.FC<ImageKitGalleryProps> = ({ isOpen, onClos
     if (!confirm("Are you sure you want to delete this image?")) return;
     
     try {
-      const res = await fetch(`/api/imagekit/files/${fileId}`, { method: 'DELETE' });
+      const { doc, getDoc } = await import('firebase/firestore');
+      const { db } = await import('../lib/firebase');
+      
+      let privateKey = '';
+      let urlEndpoint = '';
+      let publicKey = '';
+      
+      const configDoc = await getDoc(doc(db, 'system', 'config'));
+      if (configDoc.exists()) {
+        const data = configDoc.data();
+        privateKey = data.imageKitPrivateKey || '';
+        urlEndpoint = data.imageKitUrlEndpoint || '';
+        publicKey = data.imageKitPublicKey || '';
+      }
+
+      const res = await fetch(`/api/imagekit/files/${fileId}`, { 
+        method: 'DELETE',
+        headers: {
+          'x-imagekit-public-key': publicKey,
+          'x-imagekit-private-key': privateKey,
+          'x-imagekit-url-endpoint': urlEndpoint,
+        }
+      });
       if (res.ok) {
         setImages(prev => prev.filter(img => img.fileId !== fileId));
         if (selectedImage?.fileId === fileId) setSelectedImage(null);

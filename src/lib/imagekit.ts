@@ -41,14 +41,28 @@ export async function uploadToImageKit(file: File | string, fileName?: string): 
   }
   formData.append('fileName', fileName || `upload-${Date.now()}`);
 
-  // We'll use our server-side proxy for authenticated uploads to avoid exposing private key on client
-  // But wait, ImageKit IO React uses the auth endpoint for client-side uploads.
-  // Standard fetch to our internal API is safer if we want to handle it ourselves.
+  const { doc, getDoc } = await import('firebase/firestore');
+  const { db } = await import('./firebase');
   
+  let privateKey = '';
+  let urlEndpoint = '';
+  let publicKey = '';
+  
+  const configDoc = await getDoc(doc(db, 'system', 'config'));
+  if (configDoc.exists()) {
+    const data = configDoc.data();
+    privateKey = data.imageKitPrivateKey || '';
+    urlEndpoint = data.imageKitUrlEndpoint || '';
+    publicKey = data.imageKitPublicKey || '';
+  }
+
   const response = await fetch('/api/imagekit/upload', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
+      'x-imagekit-public-key': publicKey,
+      'x-imagekit-private-key': privateKey,
+      'x-imagekit-url-endpoint': urlEndpoint,
     },
     body: JSON.stringify({
       file: typeof file === 'string' ? file : await fileToBase64(file),
