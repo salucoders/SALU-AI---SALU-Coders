@@ -29,7 +29,7 @@ const steps: Step[] = [
   {
     title: "Welcome to SALU AI",
     description: "Your advanced AI companion designed for the SALU community. Let's take a quick tour of the core features.",
-    icon: <Sparkles className="w-8 h-8 text-brand-500" />,
+    icon: <img src="/assets/logo/salu_logo.png" alt="SALU Logo" className="w-8 h-8 object-contain" />,
     position: 'center'
   },
   {

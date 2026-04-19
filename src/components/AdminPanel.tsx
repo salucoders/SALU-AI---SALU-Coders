@@ -301,8 +301,8 @@ export function AdminPanel({ onClose }: AdminPanelProps) {
         <div className="w-full md:w-64 bg-slate-900 text-white flex flex-col shrink-0">
           <div className="p-6 flex items-center justify-between md:justify-start gap-3 border-b border-slate-800">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-rose-500 rounded-xl flex items-center justify-center">
-                <Shield className="w-6 h-6 text-white" />
+              <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center shadow-lg border border-slate-700 overflow-hidden">
+                <img src="/assets/logo/salu_logo.png" alt="SALU Logo" className="w-7 h-7 object-contain" />
               </div>
               <div>
                 <h2 className="font-bold text-lg leading-tight">Admin Panel</h2>

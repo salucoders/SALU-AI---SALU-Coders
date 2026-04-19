@@ -333,7 +333,7 @@ export function LoginPage() {
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-12">
           <div className="space-y-4 text-center md:text-left">
             <div className="flex items-center justify-center md:justify-start gap-3">
-              <img src="/assets/logo/salu_logo.png" alt="SALU" className="h-6 object-contain grayscale" referrerPolicy="no-referrer" />
+              <img src="/assets/logo/salu_logo.png" alt="SALU" className="h-6 object-contain" referrerPolicy="no-referrer" />
               <span className="text-sm font-black tracking-tighter text-slate-400">SALU CODERS</span>
             </div>
             <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em]">
