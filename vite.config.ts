@@ -28,17 +28,17 @@ export default defineConfig(({mode}) => {
           display: 'standalone',
           icons: [
             {
-              src: '/assets/logo/salu_logo.png',
+              src: 'https://upload.wikimedia.org/wikipedia/en/thumb/a/aa/Shah_Abdul_Latif_University_logo.png/250px-Shah_Abdul_Latif_University_logo.png',
               sizes: '192x192',
               type: 'image/png'
             },
             {
-              src: '/assets/logo/salu_logo.png',
+              src: 'https://upload.wikimedia.org/wikipedia/en/thumb/a/aa/Shah_Abdul_Latif_University_logo.png/250px-Shah_Abdul_Latif_University_logo.png',
               sizes: '512x512',
               type: 'image/png'
             },
             {
-              src: '/assets/logo/salu_logo.png',
+              src: 'https://upload.wikimedia.org/wikipedia/en/thumb/a/aa/Shah_Abdul_Latif_University_logo.png/250px-Shah_Abdul_Latif_University_logo.png',
               sizes: '512x512',
               type: 'image/png',
               purpose: 'any maskable'

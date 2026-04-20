@@ -32,7 +32,7 @@ export const Header = React.memo(({ onNewChat, onOpenSidebar, onOpenSettings, ba
           <div className="flex items-center gap-2.5 group">
             <div className="w-9 h-9 bg-white rounded-xl flex items-center justify-center shadow-lg shadow-slate-200/50 border border-slate-100 group-hover:scale-105 transition-transform duration-500 overflow-hidden">
               <img 
-                src="/assets/logo/salu_logo.png" 
+                src="https://upload.wikimedia.org/wikipedia/en/thumb/a/aa/Shah_Abdul_Latif_University_logo.png/250px-Shah_Abdul_Latif_University_logo.png" 
                 alt="SALU Logo" 
                 className="w-7 h-7 object-contain"
                 referrerPolicy="no-referrer"

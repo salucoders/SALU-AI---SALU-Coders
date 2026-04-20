@@ -1087,7 +1087,7 @@ export const ChatInterface = React.memo(({ messages, onSendMessage, isLoading, m
               transition={{ duration: 3, repeat: Infinity, repeatType: "reverse" }}
               className="absolute top-0 left-1/2 -translate-x-1/2 -z-10 pointer-events-none blur-3xl opacity-20"
             >
-              <img src="/assets/logo/salu_logo.png" alt="SALU Background" className="w-64 h-64 object-contain" />
+              <img src="https://upload.wikimedia.org/wikipedia/en/thumb/a/aa/Shah_Abdul_Latif_University_logo.png/250px-Shah_Abdul_Latif_University_logo.png" alt="SALU Background" className="w-64 h-64 object-contain" />
             </motion.div>
 
             <motion.div
@@ -1096,7 +1096,7 @@ export const ChatInterface = React.memo(({ messages, onSendMessage, isLoading, m
               transition={{ duration: 0.8 }}
               className="w-20 h-20 bg-white rounded-3xl flex items-center justify-center shadow-2xl shadow-slate-200/50 border border-slate-100 mb-8 overflow-hidden"
             >
-              <img src="/assets/logo/salu_logo.png" alt="SALU Logo" className="w-12 h-12 object-contain" />
+              <img src="https://upload.wikimedia.org/wikipedia/en/thumb/a/aa/Shah_Abdul_Latif_University_logo.png/250px-Shah_Abdul_Latif_University_logo.png" alt="SALU Logo" className="w-12 h-12 object-contain" />
             </motion.div>
 
             <motion.h1 
@@ -1153,7 +1153,7 @@ export const ChatInterface = React.memo(({ messages, onSendMessage, isLoading, m
             {message.role !== 'user' && (
               <div className="w-8 h-8 md:w-10 md:h-10 rounded-full flex items-center justify-center shrink-0 mt-1">
                 <img 
-                  src="/assets/logo/salu_logo.png" 
+                  src="https://upload.wikimedia.org/wikipedia/en/thumb/a/aa/Shah_Abdul_Latif_University_logo.png/250px-Shah_Abdul_Latif_University_logo.png" 
                   alt="SALU AI" 
                   className="w-6 h-6 md:w-8 md:h-8 object-contain drop-shadow-sm"
                   referrerPolicy="no-referrer"
@@ -1234,7 +1234,7 @@ export const ChatInterface = React.memo(({ messages, onSendMessage, isLoading, m
           >
             <div className="w-8 h-8 md:w-10 md:h-10 rounded-full flex items-center justify-center shrink-0 mt-1">
               <img 
-                src="/assets/logo/salu_logo.png" 
+                src="https://upload.wikimedia.org/wikipedia/en/thumb/a/aa/Shah_Abdul_Latif_University_logo.png/250px-Shah_Abdul_Latif_University_logo.png" 
                 alt="SALU AI" 
                 className="w-6 h-6 md:w-8 md:h-8 object-contain drop-shadow-sm animate-pulse"
                 referrerPolicy="no-referrer"

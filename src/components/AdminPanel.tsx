@@ -306,7 +306,7 @@ export function AdminPanel({ onClose }: AdminPanelProps) {
           <div className="p-8 flex items-center justify-between md:justify-start gap-4">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 bg-slate-950 rounded-xl flex items-center justify-center shadow-lg transform rotate-3">
-                <img src="/assets/logo/salu_logo.png" alt="SALU Logo" className="w-7 h-7 object-contain" />
+                <img src="https://upload.wikimedia.org/wikipedia/en/thumb/a/aa/Shah_Abdul_Latif_University_logo.png/250px-Shah_Abdul_Latif_University_logo.png" alt="SALU Logo" className="w-7 h-7 object-contain" />
               </div>
               <div>
                 <h2 className="font-black text-lg tracking-tighter text-slate-900 leading-none">ADMIN</h2>

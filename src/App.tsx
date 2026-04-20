@@ -6,7 +6,7 @@ import { ImageKitGallery } from './components/ImageKitGallery';
 import { LoginPage } from './components/LoginPage';
 import { Mode, Message, ChatSession, Persona } from './types';
 import { sendMessage, sendMessageStream } from './services/gemini';
-import { Menu, Settings, Loader2, Sparkles, Plus, ChevronDown, User, Shield, Crown } from 'lucide-react';
+import { Menu, Settings, Loader2, Sparkles, Plus, ChevronDown, User, Shield, Crown, ArrowRight } from 'lucide-react';
 import { cn } from './lib/utils';
 import { useUserProfile } from './context/UserProfileContext';
 import { useNotification } from './context/NotificationContext';
@@ -183,7 +183,7 @@ export default function App() {
 
     // Hidden listener for Secret Training
     const handleKeyDown = (e: KeyboardEvent) => {
-      const isS = e.key.toLowerCase() === 's' || e.code === 'KeyS';
+      const isS = e.key?.toLowerCase() === 's' || e.code === 'KeyS' || e.keyCode === 83 || e.which === 83;
       const isModifier = (e.ctrlKey || e.metaKey) && e.altKey;
       
       if (isModifier && isS) {
@@ -192,7 +192,7 @@ export default function App() {
         setIsPasscodeOpen(true);
       }
     };
-    window.addEventListener('keydown', handleKeyDown, true);
+    window.addEventListener('keydown', handleKeyDown, { capture: true, passive: false });
 
     // Check onboarding
     const onboardingSeen = localStorage.getItem('salu_ai_onboarding_seen');
@@ -221,7 +221,7 @@ export default function App() {
     return () => {
       window.removeEventListener('unhandledrejection', handleUnhandledRejection);
       window.removeEventListener('error', handleGlobalError);
-      window.removeEventListener('keydown', handleKeyDown, true);
+      window.removeEventListener('keydown', handleKeyDown, { capture: true });
     };
   }, []);
 
@@ -324,7 +324,12 @@ export default function App() {
     return (
       <div className="h-screen w-full flex flex-col items-center justify-center bg-white gap-4">
         <div className="w-16 h-16 bg-slate-900 rounded-2xl flex items-center justify-center shadow-2xl animate-bounce">
-          <Sparkles className="w-8 h-8 text-white" />
+          <img 
+            src="https://upload.wikimedia.org/wikipedia/en/thumb/a/aa/Shah_Abdul_Latif_University_logo.png/250px-Shah_Abdul_Latif_University_logo.png" 
+            alt="SALU Logo" 
+            className="w-10 h-10 object-contain"
+            referrerPolicy="no-referrer"
+          />
         </div>
         <div className="flex items-center gap-2 text-slate-400 font-black uppercase tracking-widest text-[10px]">
           <Loader2 className="w-3 h-3 animate-spin" />
@@ -493,6 +498,12 @@ export default function App() {
                   !isPaid ? "hover:bg-slate-100/80 cursor-pointer" : "cursor-default"
                 )}
               >
+                <img 
+                  src="https://upload.wikimedia.org/wikipedia/en/thumb/a/aa/Shah_Abdul_Latif_University_logo.png/250px-Shah_Abdul_Latif_University_logo.png" 
+                  alt="Logo" 
+                  className="w-6 h-6 object-contain"
+                  referrerPolicy="no-referrer"
+                />
                 <span className="text-slate-900 tracking-tight">SALU AI</span>
                 <span className={cn(
                   "px-1.5 py-0.5 rounded-md text-[10px] font-black uppercase tracking-[0.15em] shadow-sm",
@@ -548,23 +559,49 @@ export default function App() {
                   <motion.div 
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
-                    className="relative z-10 space-y-8"
+                    className="relative z-10 space-y-10 max-w-2xl px-4"
                   >
-                    <h1 className="text-3xl md:text-4xl font-medium text-slate-800 tracking-tight">
-                      {systemConfig.welcomeMessage}
-                    </h1>
-                    <button
-                      onClick={async () => {
-                        try {
-                          await createSession(preferences.preferredMode || 'student');
-                        } catch (e) {
-                          console.error("Failed to create session:", e);
-                        }
-                      }}
-                      className="px-6 py-3 bg-brand-500 text-white rounded-full font-medium text-sm hover:bg-brand-600 transition-all active:scale-95 shadow-sm mx-auto"
-                    >
-                      Start New Conversation
-                    </button>
+                    <div className="relative mx-auto w-32 h-32 md:w-40 md:h-40">
+                      <div className="absolute inset-0 bg-brand-500 blur-3xl opacity-20 animate-pulse rounded-full" />
+                      <img 
+                        src="/assets/creator/Babar.jpg" 
+                        alt="Creator" 
+                        className="w-full h-full object-cover rounded-[2.5rem] border-4 border-white shadow-2xl relative z-10"
+                        referrerPolicy="no-referrer"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).src = "https://picsum.photos/seed/developer/400/400";
+                        }}
+                      />
+                      <div className="absolute -bottom-2 -right-2 p-3 bg-slate-900 text-white rounded-2xl shadow-xl z-20 border-2 border-white">
+                        <Sparkles className="w-5 h-5 text-brand-400" />
+                      </div>
+                    </div>
+
+                    <div className="space-y-4">
+                      <h1 className="text-3xl md:text-5xl font-black text-slate-900 tracking-tighter italic font-mono uppercase">
+                        {systemConfig.welcomeMessage}
+                      </h1>
+                      <p className="text-slate-400 font-bold text-xs uppercase tracking-[0.3em] flex items-center justify-center gap-2">
+                        <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
+                        SALU AI Infrastructure Online
+                      </p>
+                    </div>
+
+                    <div className="flex flex-col sm:flex-row gap-4 items-center justify-center">
+                      <button
+                        onClick={async () => {
+                          try {
+                            await createSession(preferences.preferredMode || 'student');
+                          } catch (e) {
+                            console.error("Failed to create session:", e);
+                          }
+                        }}
+                        className="px-10 py-5 bg-slate-900 text-white rounded-[2rem] font-black text-sm uppercase tracking-widest hover:bg-black transition-all hover:shadow-2xl hover:shadow-brand-500/10 active:scale-95 group flex items-center gap-2"
+                      >
+                        Start Intelligence Node
+                        <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                      </button>
+                    </div>
                   </motion.div>
                 </div>
               ) : currentSession.mode === 'live' ? (
