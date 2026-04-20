@@ -29,6 +29,7 @@ export interface UserPreferences {
   creditsTotal?: number;
   creditsUsedToday?: number;
   lastCreditReset?: any;
+  assistantName?: string;
   updatedAt?: any;
   uid?: string;
 }

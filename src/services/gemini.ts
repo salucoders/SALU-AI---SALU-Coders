@@ -71,6 +71,22 @@ export async function getSystemConfig(): Promise<{ apiKey: string, defaultModel:
 }
 
 export async function getHiddenConfig(): Promise<{ assistantName: string, activationResponses: string[], customSystemInstructions: string }> {
+  // 1. Try localStorage first (Client-side Secret)
+  const savedSecretConfig = localStorage.getItem('salu_secret_config');
+  if (savedSecretConfig) {
+    try {
+      const data = JSON.parse(savedSecretConfig);
+      return {
+        assistantName: data.assistantName || 'SALU AI',
+        activationResponses: (data.activationResponses || 'Yes boss, Yes sir, G jan, Ji hukum').split(',').map((s: string) => s.trim()),
+        customSystemInstructions: data.customSystemInstructions || ''
+      };
+    } catch (e) {
+      console.error("Error parsing local secret config", e);
+    }
+  }
+
+  // 2. Fallback to Firestore (Legacy/Global Secret)
   try {
     const configDoc = await getDoc(doc(db, 'system', 'hidden_config'));
     if (configDoc.exists()) {
@@ -111,8 +127,9 @@ function getSystemInstruction(mode: Mode, preferences: UserPreferences, persona:
 
   const CREATOR_INFO = "The owner and creator of SALU Coders is Babar Ali Arain, a student of IT Batch 2026. Only share this information if explicitly asked about the owner, creator, or Babar Ali Arain.";
   const EXTRA_TRAINING = hiddenConfig?.customSystemInstructions ? `\nADDITIONAL TRAINING: ${hiddenConfig.customSystemInstructions}` : "";
+  const assistantName = preferences?.assistantName || hiddenConfig?.assistantName || "SALU AI";
 
-  return `Your name is ${hiddenConfig?.assistantName || "SALU AI"}. ${SYSTEM_INSTRUCTIONS[mode] || ""} ${PERSONA_INSTRUCTIONS[persona] || ""} User Name: ${preferences?.name || "User"}. ${CREATOR_INFO}${EXTRA_TRAINING}`;
+  return `Your name is ${assistantName}. ${SYSTEM_INSTRUCTIONS[mode] || ""} ${PERSONA_INSTRUCTIONS[persona] || ""} User Name: ${preferences?.name || "User"}. ${CREATOR_INFO}${EXTRA_TRAINING}`;
 }
 
 export async function sendMessage(
@@ -150,7 +167,8 @@ export async function sendMessage(
     If the preferred language is Urdu or Sindhi, respond primarily in that language but keep technical terms in English.`;
 
   const hiddenConfig = await getHiddenConfig();
-  const systemInstruction = `You are ${hiddenConfig.assistantName}. ${getSystemInstruction(mode, preferences, persona, hiddenConfig)} ${userContext} 
+  const assistantName = preferences?.assistantName || hiddenConfig?.assistantName || "SALU AI";
+  const systemInstruction = `You are ${assistantName}. ${getSystemInstruction(mode, preferences, persona, hiddenConfig)} ${userContext} 
     Be friendly, to the point, smart, and motivational. Avoid unnecessary repetition. Use clear, structured formatting with headings and bullet points.
     
     IMAGE GENERATION PROTOCOL:
@@ -312,7 +330,8 @@ export async function sendMessageStream(
     If the preferred language is Urdu or Sindhi, respond primarily in that language but keep technical terms in English.`;
 
   const hiddenConfig = await getHiddenConfig();
-  const systemInstruction = `You are ${hiddenConfig.assistantName}. ${getSystemInstruction(mode, (preferences as UserPreferences), persona, hiddenConfig)} ${userContext} 
+  const assistantName = preferences?.assistantName || hiddenConfig?.assistantName || "SALU AI";
+  const systemInstruction = `You are ${assistantName}. ${getSystemInstruction(mode, (preferences as UserPreferences), persona, hiddenConfig)} ${userContext} 
     Be friendly, to the point, smart, and motivational. Avoid unnecessary repetition. Use clear, structured formatting with headings and bullet points.
     
     IMAGE GENERATION PROTOCOL:

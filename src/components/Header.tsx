@@ -39,7 +39,9 @@ export const Header = React.memo(({ onNewChat, onOpenSidebar, onOpenSettings, ba
               />
             </div>
             <div className="flex flex-col">
-              <h1 className="font-black text-slate-900 text-sm tracking-tight leading-none">SALU AI</h1>
+              <h1 className="font-black text-slate-900 text-sm tracking-tight leading-none">
+                {preferences.assistantName || "SALU AI"}
+              </h1>
               <div className="flex items-center gap-1.5 mt-0.5">
                 <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.4)]" />
                 <span className="text-[7px] font-black text-emerald-600 uppercase tracking-widest">Connected</span>

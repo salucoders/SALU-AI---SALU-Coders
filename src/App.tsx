@@ -23,12 +23,14 @@ import { Toolbox } from './components/Toolbox';
 import { UpgradeModal } from './components/UpgradeModal';
 import { InstallPWA } from './components/InstallPWA';
 import { SecretTrainingModal } from './components/SecretTrainingModal';
+import { PasscodeModal } from './components/PasscodeModal';
 
 export default function App() {
   const { preferences, loading: profileLoading, isAdmin, isPaid, updatePreferences } = useUserProfile();
   const { user, loading: authLoading } = useAuth();
   
   const [isSecretOpen, setIsSecretOpen] = useState(false);
+  const [isPasscodeOpen, setIsPasscodeOpen] = useState(false);
   
   const { 
     sessions, 
@@ -181,12 +183,16 @@ export default function App() {
 
     // Hidden listener for Secret Training
     const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.altKey && e.key.toLowerCase() === 's') {
+      const isS = e.key.toLowerCase() === 's' || e.code === 'KeyS';
+      const isModifier = (e.ctrlKey || e.metaKey) && e.altKey;
+      
+      if (isModifier && isS) {
         e.preventDefault();
-        setIsSecretOpen(true);
+        e.stopPropagation();
+        setIsPasscodeOpen(true);
       }
     };
-    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keydown', handleKeyDown, true);
 
     // Check onboarding
     const onboardingSeen = localStorage.getItem('salu_ai_onboarding_seen');
@@ -215,7 +221,7 @@ export default function App() {
     return () => {
       window.removeEventListener('unhandledrejection', handleUnhandledRejection);
       window.removeEventListener('error', handleGlobalError);
-      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keydown', handleKeyDown, true);
     };
   }, []);
 
@@ -597,6 +603,15 @@ export default function App() {
           <SecretTrainingModal isOpen={isSecretOpen} onClose={() => setIsSecretOpen(false)} />
         )}
       </AnimatePresence>
+
+      <PasscodeModal
+        isOpen={isPasscodeOpen}
+        onClose={() => setIsPasscodeOpen(false)}
+        onSuccess={() => {
+          setIsPasscodeOpen(false);
+          setIsSecretOpen(true);
+        }}
+      />
     </div>
   );
 }

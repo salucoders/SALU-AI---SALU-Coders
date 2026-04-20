@@ -447,7 +447,7 @@ CRITICAL RULES:
               <Sparkles className="w-5 h-5 md:w-6 md:h-6 text-rose-500" />
             </div>
             <div>
-              <h2 className="text-lg md:text-xl font-black text-slate-900 tracking-tight">SALU AI Live</h2>
+              <h2 className="text-lg md:text-xl font-black text-slate-900 tracking-tight">{preferences.assistantName || "SALU AI"} Live</h2>
               <div className="flex items-center gap-2">
                 <div className={cn(
                   "w-1.5 h-1.5 md:w-2 md:h-2 rounded-full",
@@ -565,14 +565,14 @@ CRITICAL RULES:
             ) : (
               <div className="space-y-2 md:space-y-3">
                 <h3 className="text-xl md:text-2xl font-black text-slate-900 tracking-tight leading-none">
-                  {isActive ? "I'm Listening..." : isConnecting ? "Connecting..." : "SALU AI Live"}
+                  {isActive ? "I'm Listening..." : isConnecting ? "Connecting..." : `${preferences.assistantName || "SALU AI"} Live`}
                 </h3>
                 <p className="text-sm md:text-base text-slate-500 font-medium leading-relaxed px-4">
                   {isActive 
                     ? "Go ahead, I'm ready to chat. Your voice is being processed in real-time." 
                     : isConnecting 
                     ? "Establishing secure connection..."
-                    : `Talk to SALU AI naturally with a ${preferences.voice} voice.`}
+                    : `Talk to ${preferences.assistantName || "SALU AI"} naturally with a ${preferences.voice} voice.`}
                 </p>
               </div>
             )}
@@ -603,7 +603,7 @@ CRITICAL RULES:
                   <div className="bg-rose-50/80 backdrop-blur-sm p-4 md:p-6 rounded-2xl md:rounded-[2.5rem] border border-rose-100 shadow-inner">
                     <div className="flex items-center gap-2 mb-2 md:mb-3">
                       <div className="w-1.5 h-1.5 bg-rose-500 rounded-full animate-pulse" />
-                      <p className="text-[9px] md:text-[10px] font-black text-slate-500 uppercase tracking-widest">SALU AI Response</p>
+                      <p className="text-[9px] md:text-[10px] font-black text-slate-500 uppercase tracking-widest">{preferences.assistantName || "SALU AI"} Response</p>
                     </div>
                     <p className="text-sm md:text-base text-slate-800 font-bold leading-relaxed">
                       {modelTranscription}

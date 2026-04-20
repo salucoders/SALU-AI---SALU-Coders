@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { X, ShieldAlert, Save, Sparkles, Wand2, Terminal, Info } from 'lucide-react';
+import { X, ShieldAlert, Save, Sparkles, Wand2, Terminal, Info, Lock } from 'lucide-react';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { useNotification } from '../context/NotificationContext';
+import { useUserProfile } from '../context/UserProfileContext';
 
 interface SecretTrainingModalProps {
   isOpen: boolean;
@@ -12,42 +13,45 @@ interface SecretTrainingModalProps {
 
 export function SecretTrainingModal({ isOpen, onClose }: SecretTrainingModalProps) {
   const { notify } = useNotification();
+  const { preferences, updatePreferences } = useUserProfile();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [config, setConfig] = useState({
     assistantName: 'SALU AI',
     activationResponses: 'Yes boss, Yes sir, G jan, Ji hukum',
     customSystemInstructions: '',
-    secretTrainingCode: ''
+    secretPasscode: 'salu786',
   });
 
   useEffect(() => {
     if (!isOpen) return;
     
-    const fetchConfig = async () => {
+    // Load from localStorage for "client-side" secret settings
+    const savedSecretConfig = localStorage.getItem('salu_secret_config');
+    if (savedSecretConfig) {
       try {
-        const configDoc = await getDoc(doc(db, 'system', 'hidden_config'));
-        if (configDoc.exists()) {
-          setConfig(prev => ({ ...prev, ...configDoc.data() }));
-        }
-      } catch (error) {
-        console.error("Error fetching hidden config:", error);
-      } finally {
-        setLoading(false);
+        const parsed = JSON.parse(savedSecretConfig);
+        setConfig(prev => ({ ...prev, ...parsed }));
+      } catch (e) {
+        console.error("Error parsing secret config", e);
       }
-    };
-
-    fetchConfig();
+    }
+    setLoading(false);
   }, [isOpen]);
 
   const handleSave = async () => {
     setSaving(true);
     try {
-      await setDoc(doc(db, 'system', 'hidden_config'), config);
-      notify('Hidden intelligence updated successfully.', 'success', 3000);
+      // Save to localStorage
+      localStorage.setItem('salu_secret_config', JSON.stringify(config));
+      
+      // Also update user preferences for assistant name to ensure it's used in instructions
+      await updatePreferences({ assistantName: config.assistantName });
+      
+      notify('Secret intelligence updated and encrypted locally.', 'success', 3000);
       onClose();
     } catch (error) {
-      notify('Failed to update hidden config.', 'error', 3000);
+      notify('Failed to update secret config.', 'error', 3000);
     } finally {
       setSaving(false);
     }
@@ -56,7 +60,7 @@ export function SecretTrainingModal({ isOpen, onClose }: SecretTrainingModalProp
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md">
+    <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md">
       <motion.div
         initial={{ opacity: 0, scale: 0.9, y: 20 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -97,6 +101,19 @@ export function SecretTrainingModal({ isOpen, onClose }: SecretTrainingModalProp
                     onChange={(e) => setConfig({ ...config, assistantName: e.target.value })}
                     className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none transition-all font-medium"
                     placeholder="e.g. Hania"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-bold text-slate-700 flex items-center gap-2">
+                    <Lock className="w-4 h-4 text-brand-500" /> Secret Key (Passcode)
+                  </label>
+                  <input
+                    type="text"
+                    value={config.secretPasscode}
+                    onChange={(e) => setConfig({ ...config, secretPasscode: e.target.value })}
+                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none transition-all font-medium"
+                    placeholder="salu786"
                   />
                 </div>
 

@@ -1561,7 +1561,7 @@ export const ChatInterface = React.memo(({ messages, onSendMessage, isLoading, m
                         handleSubmit(e);
                         }
                     }}
-                    placeholder={isListening ? "" : "Ask SALU AI..."}
+                    placeholder={isListening ? "" : `Ask ${preferences.assistantName || "SALU AI"}...`}
                     className={cn(
                         "w-full bg-transparent border-none focus:ring-0 resize-none py-3 px-1 min-h-[52px] max-h-[200px] text-slate-800 placeholder-slate-500 no-scrollbar text-[15px] md:text-[16px] font-medium leading-[28px] transition-all self-center mt-0.5",
                         isListening && "blur-[1px] opacity-40"
