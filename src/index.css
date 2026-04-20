@@ -120,15 +120,5 @@
     background-image: radial-gradient(circle at 1px 1px, rgba(0,0,0,0.03) 1px, transparent 0);
     background-size: 32px 32px;
   }
-
-  @keyframes shake {
-    0%, 100% { transform: translateX(0); }
-    25% { transform: translateX(-10px); }
-    75% { transform: translateX(10px); }
-  }
-
-  .animate-shake {
-    animation: shake 0.2s cubic-bezier(.36,.07,.19,.97) both;
-  }
 }
 

@@ -48,7 +48,7 @@ export function InstallPWA() {
           >
             <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center shrink-0 border border-brand-100/50 shadow-sm relative overflow-hidden p-2">
               <img 
-                src="https://upload.wikimedia.org/wikipedia/en/thumb/a/aa/Shah_Abdul_Latif_University_logo.png/250px-Shah_Abdul_Latif_University_logo.png" 
+                src="https://admission.salu.edu.pk/static/media/logo.793ee5b813bb22366372.png" 
                 alt="SALU Logo" 
                 className="w-full h-full object-contain"
                 referrerPolicy="no-referrer"

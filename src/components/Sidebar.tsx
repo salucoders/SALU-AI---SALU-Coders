@@ -199,7 +199,7 @@ export const Sidebar = React.memo(({
             >
               <div className="w-7 h-7 bg-white rounded-full flex items-center justify-center shadow-sm border border-slate-200">
                 <img 
-                  src="https://upload.wikimedia.org/wikipedia/en/thumb/a/aa/Shah_Abdul_Latif_University_logo.png/250px-Shah_Abdul_Latif_University_logo.png" 
+                  src="https://admission.salu.edu.pk/static/media/logo.793ee5b813bb22366372.png" 
                   alt="SALU AI" 
                   className="w-4 h-4 object-contain"
                   referrerPolicy="no-referrer"

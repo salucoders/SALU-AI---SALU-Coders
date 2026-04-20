@@ -27,7 +27,6 @@ const defaultPreferences: UserPreferences = {
   subscription: 'free',
   creditsTotal: 30,
   creditsUsedToday: 0,
-  assistantName: '',
 };
 
 const UserProfileContext = createContext<UserProfileContextType | undefined>(undefined);
@@ -82,22 +81,9 @@ export const UserProfileProvider: React.FC<{ children: React.ReactNode }> = ({ c
     
     const unsubscribe = onSnapshot(userDocRef, (docSnap) => {
       if (docSnap.exists()) {
-        const data = docSnap.data();
-        
-        // Get secret config from localStorage for client-side overrides
-        let secretName = '';
-        try {
-          const savedSecretConfig = localStorage.getItem('salu_secret_config');
-          if (savedSecretConfig) {
-            const parsed = JSON.parse(savedSecretConfig);
-            secretName = parsed.assistantName;
-          }
-        } catch (e) {}
-
         setPreferences({
           ...defaultPreferences,
-          ...data,
-          assistantName: secretName || data.assistantName || '',
+          ...docSnap.data(),
           uid: docSnap.id
         } as UserPreferences);
       }

@@ -1081,24 +1081,6 @@ export const ChatInterface = React.memo(({ messages, onSendMessage, isLoading, m
       <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 md:p-8 space-y-8 md:space-y-12 scroll-smooth relative custom-scrollbar">
         {messages.length === 0 && (
           <div className="min-h-full flex flex-col items-center justify-center max-w-3xl mx-auto py-12 relative z-10">
-            <motion.div
-              initial={{ opacity: 0, scale: 0.8 }}
-              animate={{ opacity: [0, 0.4, 0.1], scale: [0.8, 1, 0.95] }}
-              transition={{ duration: 3, repeat: Infinity, repeatType: "reverse" }}
-              className="absolute top-0 left-1/2 -translate-x-1/2 -z-10 pointer-events-none blur-3xl opacity-20"
-            >
-              <img src="https://upload.wikimedia.org/wikipedia/en/thumb/a/aa/Shah_Abdul_Latif_University_logo.png/250px-Shah_Abdul_Latif_University_logo.png" alt="SALU Background" className="w-64 h-64 object-contain" />
-            </motion.div>
-
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.8 }}
-              className="w-20 h-20 bg-white rounded-3xl flex items-center justify-center shadow-2xl shadow-slate-200/50 border border-slate-100 mb-8 overflow-hidden"
-            >
-              <img src="https://upload.wikimedia.org/wikipedia/en/thumb/a/aa/Shah_Abdul_Latif_University_logo.png/250px-Shah_Abdul_Latif_University_logo.png" alt="SALU Logo" className="w-12 h-12 object-contain" />
-            </motion.div>
-
             <motion.h1 
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
@@ -1153,7 +1135,7 @@ export const ChatInterface = React.memo(({ messages, onSendMessage, isLoading, m
             {message.role !== 'user' && (
               <div className="w-8 h-8 md:w-10 md:h-10 rounded-full flex items-center justify-center shrink-0 mt-1">
                 <img 
-                  src="https://upload.wikimedia.org/wikipedia/en/thumb/a/aa/Shah_Abdul_Latif_University_logo.png/250px-Shah_Abdul_Latif_University_logo.png" 
+                  src="https://admission.salu.edu.pk/static/media/logo.793ee5b813bb22366372.png" 
                   alt="SALU AI" 
                   className="w-6 h-6 md:w-8 md:h-8 object-contain drop-shadow-sm"
                   referrerPolicy="no-referrer"
@@ -1234,7 +1216,7 @@ export const ChatInterface = React.memo(({ messages, onSendMessage, isLoading, m
           >
             <div className="w-8 h-8 md:w-10 md:h-10 rounded-full flex items-center justify-center shrink-0 mt-1">
               <img 
-                src="https://upload.wikimedia.org/wikipedia/en/thumb/a/aa/Shah_Abdul_Latif_University_logo.png/250px-Shah_Abdul_Latif_University_logo.png" 
+                src="https://admission.salu.edu.pk/static/media/logo.793ee5b813bb22366372.png" 
                 alt="SALU AI" 
                 className="w-6 h-6 md:w-8 md:h-8 object-contain drop-shadow-sm animate-pulse"
                 referrerPolicy="no-referrer"
@@ -1561,7 +1543,7 @@ export const ChatInterface = React.memo(({ messages, onSendMessage, isLoading, m
                         handleSubmit(e);
                         }
                     }}
-                    placeholder={isListening ? "" : `Ask ${preferences.assistantName || "SALU AI"}...`}
+                    placeholder={isListening ? "" : "Ask SALU AI..."}
                     className={cn(
                         "w-full bg-transparent border-none focus:ring-0 resize-none py-3 px-1 min-h-[52px] max-h-[200px] text-slate-800 placeholder-slate-500 no-scrollbar text-[15px] md:text-[16px] font-medium leading-[28px] transition-all self-center mt-0.5",
                         isListening && "blur-[1px] opacity-40"
