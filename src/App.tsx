@@ -22,13 +22,10 @@ import { AdminPanel } from './components/AdminPanel';
 import { Toolbox } from './components/Toolbox';
 import { UpgradeModal } from './components/UpgradeModal';
 import { InstallPWA } from './components/InstallPWA';
-import { SecretTrainingModal } from './components/SecretTrainingModal';
 
 export default function App() {
   const { preferences, loading: profileLoading, isAdmin, isPaid, updatePreferences } = useUserProfile();
   const { user, loading: authLoading } = useAuth();
-  
-  const [isSecretOpen, setIsSecretOpen] = useState(false);
   
   const { 
     sessions, 
@@ -179,15 +176,6 @@ export default function App() {
     window.addEventListener('unhandledrejection', handleUnhandledRejection);
     window.addEventListener('error', handleGlobalError);
 
-    // Hidden listener for Secret Training
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.altKey && e.key.toLowerCase() === 's') {
-        e.preventDefault();
-        setIsSecretOpen(true);
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-
     // Check onboarding
     const onboardingSeen = localStorage.getItem('salu_ai_onboarding_seen');
     if (!onboardingSeen) {
@@ -215,7 +203,6 @@ export default function App() {
     return () => {
       window.removeEventListener('unhandledrejection', handleUnhandledRejection);
       window.removeEventListener('error', handleGlobalError);
-      window.removeEventListener('keydown', handleKeyDown);
     };
   }, []);
 
@@ -589,12 +576,6 @@ export default function App() {
       <AnimatePresence>
         {isAdminPanelOpen && (
           <AdminPanel onClose={() => setIsAdminPanelOpen(false)} />
-        )}
-      </AnimatePresence>
-
-      <AnimatePresence>
-        {isSecretOpen && (
-          <SecretTrainingModal isOpen={isSecretOpen} onClose={() => setIsSecretOpen(false)} />
         )}
       </AnimatePresence>
     </div>

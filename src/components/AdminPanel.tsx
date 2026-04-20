@@ -145,6 +145,16 @@ export function AdminPanel({ onClose }: AdminPanelProps) {
     }
   };
 
+  const handleToggleTraining = async (userId: string, enabled: boolean) => {
+    try {
+      await updateDoc(doc(db, 'users', userId), { aiTrainingEnabled: enabled });
+      setUsers(users.map(u => u.id === userId ? { ...u, aiTrainingEnabled: enabled } : u));
+      showMessage('success', `AI Training ${enabled ? 'enabled' : 'disabled'} for user`);
+    } catch (error) {
+      showMessage('error', 'Failed to update AI training status');
+    }
+  };
+
   const handleSubscriptionChange = async (userId: string, tier: 'free' | 'paid') => {
     try {
       const creditsTotal = tier === 'paid' ? 100 : 30;
@@ -475,6 +485,7 @@ export function AdminPanel({ onClose }: AdminPanelProps) {
                             <th className="p-4 font-semibold text-slate-600 text-sm">User</th>
                             <th className="p-4 font-semibold text-slate-600 text-sm">Email</th>
                             <th className="p-4 font-semibold text-slate-600 text-sm">Tier</th>
+                            <th className="p-4 font-semibold text-slate-600 text-sm">AI Training</th>
                             <th className="p-4 font-semibold text-slate-600 text-sm">Role</th>
                             <th className="p-4 font-semibold text-slate-600 text-sm">Actions</th>
                           </tr>
@@ -496,6 +507,17 @@ export function AdminPanel({ onClose }: AdminPanelProps) {
                                 )}>
                                   {u.subscription === 'paid' ? 'Plus' : 'Free'}
                                 </span>
+                              </td>
+                              <td className="p-4">
+                                <button
+                                  onClick={() => handleToggleTraining(u.id, !u.aiTrainingEnabled)}
+                                  className={cn(
+                                    "px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider transition-colors",
+                                    u.aiTrainingEnabled ? "bg-emerald-100 text-emerald-600 hover:bg-emerald-200" : "bg-slate-100 text-slate-500 hover:bg-slate-200"
+                                  )}
+                                >
+                                  {u.aiTrainingEnabled ? 'Enabled' : 'Disabled'}
+                                </button>
                               </td>
                               <td className="p-4">
                                 <span className={cn(

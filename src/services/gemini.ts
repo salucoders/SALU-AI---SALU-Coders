@@ -92,13 +92,15 @@ export async function getHiddenConfig(): Promise<{ assistantName: string, activa
 }
 
 function getSystemInstruction(mode: Mode, preferences: UserPreferences, persona: Persona, hiddenConfig?: any) {
+  const assistantName = preferences?.assistantName || hiddenConfig?.assistantName || "SALU AI";
+  
   const SYSTEM_INSTRUCTIONS: Record<string, string> = {
     student: "You are in STUDENT MODE. Focus on assignment solving, notes generation, summaries, quiz creation, and explaining concepts in simple language for students.",
     developer: "You are in DEVELOPER MODE. Focus on code generation, debugging, line-by-line explanations, project ideas, and best practices/optimization.",
     creator: "You are in CREATOR MODE. Focus on YouTube titles, SEO, descriptions, hashtags, thumbnail ideas, scripts, and social media content.",
     assistant: "You are in ASSISTANT MODE. Focus on formal/informal messaging, email drafting, scheduling, productivity advice, and daily life help.",
     salu: "You are in SALU MODE. Focus on university updates, scholarships, announcements, student guidance, and community support for the SALU community.",
-    live: `You are in LIVE MODE. Focus on real-time voice conversation and quick, smart responses. Your name is ${hiddenConfig?.assistantName || 'SALU AI'}. If the user calls you by name, respond with one of these: ${hiddenConfig?.activationResponses?.join(', ') || 'Yes boss'}.`
+    live: `You are in LIVE MODE. Focus on real-time voice conversation and quick, smart responses. Your name is ${assistantName}. If the user calls you by name, respond with one of these: ${hiddenConfig?.activationResponses?.join(', ') || 'Yes boss'}.`
   };
 
   const PERSONA_INSTRUCTIONS: Record<string, string> = {
@@ -111,8 +113,9 @@ function getSystemInstruction(mode: Mode, preferences: UserPreferences, persona:
 
   const CREATOR_INFO = "The owner and creator of SALU Coders is Babar Ali Arain, a student of IT Batch 2026. Only share this information if explicitly asked about the owner, creator, or Babar Ali Arain.";
   const EXTRA_TRAINING = hiddenConfig?.customSystemInstructions ? `\nADDITIONAL TRAINING: ${hiddenConfig.customSystemInstructions}` : "";
+  const TRAINING_CONSENT = preferences?.aiTrainingEnabled ? "\nAI TRAINING: This user has enabled AI Training. You may use this conversation to improve your context and adaptation to this user." : "";
 
-  return `Your name is ${hiddenConfig?.assistantName || "SALU AI"}. ${SYSTEM_INSTRUCTIONS[mode] || ""} ${PERSONA_INSTRUCTIONS[persona] || ""} User Name: ${preferences?.name || "User"}. ${CREATOR_INFO}${EXTRA_TRAINING}`;
+  return `Your name is ${assistantName}. ${SYSTEM_INSTRUCTIONS[mode] || ""} ${PERSONA_INSTRUCTIONS[persona] || ""} User Name: ${preferences?.name || "User"}. ${CREATOR_INFO}${EXTRA_TRAINING}${TRAINING_CONSENT}`;
 }
 
 export async function sendMessage(
@@ -150,7 +153,8 @@ export async function sendMessage(
     If the preferred language is Urdu or Sindhi, respond primarily in that language but keep technical terms in English.`;
 
   const hiddenConfig = await getHiddenConfig();
-  const systemInstruction = `You are ${hiddenConfig.assistantName}. ${getSystemInstruction(mode, preferences, persona, hiddenConfig)} ${userContext} 
+  const assistantName = preferences?.assistantName || hiddenConfig.assistantName || "SALU AI";
+  const systemInstruction = `You are ${assistantName}. ${getSystemInstruction(mode, preferences, persona, hiddenConfig)} ${userContext} 
     Be friendly, to the point, smart, and motivational. Avoid unnecessary repetition. Use clear, structured formatting with headings and bullet points.
     
     IMAGE GENERATION PROTOCOL:
@@ -312,7 +316,8 @@ export async function sendMessageStream(
     If the preferred language is Urdu or Sindhi, respond primarily in that language but keep technical terms in English.`;
 
   const hiddenConfig = await getHiddenConfig();
-  const systemInstruction = `You are ${hiddenConfig.assistantName}. ${getSystemInstruction(mode, (preferences as UserPreferences), persona, hiddenConfig)} ${userContext} 
+  const assistantName = preferences?.assistantName || hiddenConfig.assistantName || "SALU AI";
+  const systemInstruction = `You are ${assistantName}. ${getSystemInstruction(mode, (preferences as UserPreferences), persona, hiddenConfig)} ${userContext} 
     Be friendly, to the point, smart, and motivational. Avoid unnecessary repetition. Use clear, structured formatting with headings and bullet points.
     
     IMAGE GENERATION PROTOCOL:

@@ -31,6 +31,8 @@ export interface UserPreferences {
   lastCreditReset?: any;
   updatedAt?: any;
   uid?: string;
+  assistantName?: string;
+  aiTrainingEnabled?: boolean;
 }
 
 export interface ChatSession {

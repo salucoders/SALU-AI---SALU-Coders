@@ -27,6 +27,8 @@ const defaultPreferences: UserPreferences = {
   subscription: 'free',
   creditsTotal: 30,
   creditsUsedToday: 0,
+  assistantName: 'SALU AI',
+  aiTrainingEnabled: false,
 };
 
 const UserProfileContext = createContext<UserProfileContextType | undefined>(undefined);
