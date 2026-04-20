@@ -1,7 +1,8 @@
 import { GraduationCap, Code, Video, School, User, Mic } from 'lucide-react';
 import { Mode } from './types';
 
-export const LOGO_URL = 'https://admission.salu.edu.pk/static/media/logo.793ee5b813bb22366372.png';
+export const LOGO_URL = '/assets/logo/salu_logo.png';
+export const CREATOR_IMAGE_URL = '/assets/creator/Babar.jpg';
 export const APP_NAME = 'SALU AI';
 
 export const MODES: { id: Mode; label: string; icon: any; color: string; description: string }[] = [

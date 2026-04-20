@@ -12,8 +12,7 @@ export const auth = getAuth(app);
 // Initialize Firestore with settings for restrictive environments
 export const db = initializeFirestore(app, {
   experimentalForceLongPolling: true,
-  host: "firestore.googleapis.com",
-  ssl: true,
+  useFetchStreams: false, // Prevents persistent connection hanging in certain environments
 }, firebaseConfig.firestoreDatabaseId || '(default)');
 
 // Diagnostic helper to help troubleshoot connectivity

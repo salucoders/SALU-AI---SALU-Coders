@@ -351,17 +351,18 @@ export const Sidebar = React.memo(({
                       
                         <div className={cn(
                           "absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1 transition-all duration-300",
-                          (activeMenuId === session.id || currentSessionId === session.id || (typeof window !== 'undefined' && window.innerWidth < 1024)) 
+                          activeMenuId === session.id 
                             ? "opacity-100 translate-x-0" 
                             : "opacity-0 translate-x-2 pointer-events-none group-hover/item:opacity-100 group-hover/item:translate-x-0 group-hover/item:pointer-events-auto"
                         )}>
                           <button
                             onClick={(e) => {
+                              e.preventDefault();
                               e.stopPropagation();
                               setActiveMenuId(activeMenuId === session.id ? null : session.id);
                             }}
                             className={cn(
-                              "p-1.5 rounded-lg transition-all border shadow-sm backdrop-blur-md",
+                              "p-1.5 rounded-lg transition-all border shadow-sm backdrop-blur-md relative z-20",
                               currentSessionId === session.id 
                                 ? "bg-white/10 text-white hover:bg-white/20 border-white/20" 
                                 : "bg-white border-slate-100 text-slate-400 hover:text-slate-900 border-slate-200"
@@ -370,58 +371,73 @@ export const Sidebar = React.memo(({
                             <MoreVertical className="w-3.5 h-3.5" />
                           </button>
 
-                        <AnimatePresence>
-                          {activeMenuId === session.id && (
-                            <>
-                              <div 
-                                className="fixed inset-0 z-[70]" 
-                                onClick={() => setActiveMenuId(null)}
-                              />
-                              <motion.div
-                                initial={{ opacity: 0, scale: 0.9, x: 10 }}
-                                animate={{ opacity: 1, scale: 1, x: 0 }}
-                                exit={{ opacity: 0, scale: 0.9, x: 10 }}
-                                className="absolute right-full top-0 mr-2 w-44 bg-white border border-slate-200 rounded-2xl shadow-2xl z-[80] overflow-hidden py-2"
-                              >
-                                <button
+                          <AnimatePresence>
+                            {activeMenuId === session.id && (
+                              <>
+                                <motion.div 
+                                  initial={{ opacity: 0 }}
+                                  animate={{ opacity: 1 }}
+                                  exit={{ opacity: 0 }}
+                                  className="fixed inset-0 z-40 bg-black/5" 
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    startEditing(session);
                                     setActiveMenuId(null);
                                   }}
-                                  className="w-full h-10 flex items-center gap-3 px-4 text-xs font-bold text-slate-700 hover:bg-slate-50 transition-colors"
+                                />
+                                <motion.div
+                                  initial={{ opacity: 0, scale: 0.9, x: 10 }}
+                                  animate={{ opacity: 1, scale: 1, x: 0 }}
+                                  exit={{ opacity: 0, scale: 0.9, x: 10 }}
+                                  className="absolute right-full top-0 mr-2 w-48 bg-white border border-slate-200 rounded-2xl shadow-2xl z-[60] overflow-hidden py-1.5"
                                 >
-                                  <Edit2 className="w-4 h-4" />
-                                  Rename
-                                </button>
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    onArchiveSession(session.id);
-                                    setActiveMenuId(null);
-                                  }}
-                                  className="w-full h-10 flex items-center gap-3 px-4 text-xs font-bold text-slate-700 hover:bg-slate-50 transition-colors"
-                                >
-                                  {session.isArchived ? <ArchiveRestore className="w-4 h-4" /> : <Archive className="w-4 h-4" />}
-                                  {session.isArchived ? 'Activate' : 'Archive'}
-                                </button>
-                                <div className="h-px bg-slate-100 mx-2 my-1" />
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setSessionToDelete(session.id);
-                                    setActiveMenuId(null);
-                                  }}
-                                  className="w-full h-10 flex items-center gap-3 px-4 text-xs font-bold text-rose-600 hover:bg-rose-50 transition-colors"
-                                >
-                                  <Trash2 className="w-4 h-4 text-rose-500" />
-                                  Delete 
-                                </button>
-                              </motion.div>
-                            </>
-                          )}
-                        </AnimatePresence>
-                      </div>
+                                  <button
+                                    onClick={(e) => {
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                      startEditing(session);
+                                      setActiveMenuId(null);
+                                    }}
+                                    className="w-full flex items-center gap-3 px-4 py-2.5 text-[11px] font-bold text-slate-700 hover:bg-slate-50 transition-colors"
+                                  >
+                                    <div className="w-6 h-6 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
+                                      <Edit2 className="w-3.5 h-3.5" />
+                                    </div>
+                                    Rename Chat
+                                  </button>
+                                  <button
+                                    onClick={(e) => {
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                      onArchiveSession(session.id);
+                                      setActiveMenuId(null);
+                                    }}
+                                    className="w-full flex items-center gap-3 px-4 py-2.5 text-[11px] font-bold text-slate-700 hover:bg-slate-50 transition-colors"
+                                  >
+                                    <div className="w-6 h-6 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center">
+                                      {session.isArchived ? <ArchiveRestore className="w-3.5 h-3.5" /> : <Archive className="w-3.5 h-3.5" />}
+                                    </div>
+                                    {session.isArchived ? 'Activate Chat' : 'Archive Chat'}
+                                  </button>
+                                  <div className="h-px bg-slate-100 mx-2 my-1" />
+                                  <button
+                                    onClick={(e) => {
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                      setSessionToDelete(session.id);
+                                      setActiveMenuId(null);
+                                    }}
+                                    className="w-full flex items-center gap-3 px-4 py-2.5 text-[11px] font-bold text-rose-600 hover:bg-rose-50 transition-colors"
+                                  >
+                                    <div className="w-6 h-6 rounded-lg bg-rose-50 text-rose-600 flex items-center justify-center">
+                                      <Trash2 className="w-3.5 h-3.5" />
+                                    </div>
+                                    Delete Chat
+                                  </button>
+                                </motion.div>
+                              </>
+                            )}
+                          </AnimatePresence>
+                        </div>
                     </div>
                   )}
                 </div>

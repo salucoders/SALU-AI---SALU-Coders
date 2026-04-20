@@ -7,7 +7,7 @@ import { LoginPage } from './components/LoginPage';
 import { Mode, Message, ChatSession, Persona } from './types';
 import { sendMessage, sendMessageStream } from './services/gemini';
 import { Menu, Settings, Loader2, Plus, ChevronDown, User, Shield, Crown, PanelLeftOpen, Check, Lock } from 'lucide-react';
-import { LOGO_URL, APP_NAME, MODES } from './constants';
+import { LOGO_URL, APP_NAME, MODES, CREATOR_IMAGE_URL } from './constants';
 import { cn } from './lib/utils';
 import { useUserProfile } from './context/UserProfileContext';
 import { useNotification } from './context/NotificationContext';
@@ -475,25 +475,25 @@ export default function App() {
                   <PanelLeftOpen className="w-5 h-5 group-hover:scale-110 transition-transform" />
                 </button>
               )}
-              <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-xl font-medium text-lg lg:text-xl">
-                <div className="w-7 h-7 flex items-center justify-center">
+              <div className="hidden sm:flex items-center gap-2.5 px-3 py-1.5 flex-shrink-0">
+                <div className="w-8 h-8 flex items-center justify-center bg-white rounded-lg shadow-sm border border-slate-100">
                   <img 
                     src={LOGO_URL} 
                     alt="Logo" 
-                    className="w-full h-full object-contain"
+                    className="w-6 h-6 object-contain"
                     referrerPolicy="no-referrer"
                   />
                 </div>
-                <span className="text-slate-900 font-black tracking-tighter">{APP_NAME}</span>
+                <span className="text-slate-900 font-black tracking-tighter text-base lg:text-lg">{APP_NAME}</span>
               </div>
             </div>
 
-            {/* Centered Mode Selector */}
-            <div className="flex-1 flex items-center justify-center max-w-[400px] pointer-events-auto">
-              <div className="relative w-full px-4">
+            {/* Centered Mode Selector - Premium Compact Pill */}
+            <div className="flex-1 flex items-center justify-center max-w-[240px] pointer-events-auto">
+              <div className="relative w-full px-2">
                 <button
                   onClick={() => setIsModeOpen(!isModeOpen)}
-                  className="w-full flex items-center justify-between px-4 py-2 bg-white/80 backdrop-blur-md border border-slate-200/50 rounded-2xl shadow-soft hover:bg-white hover:border-slate-300 transition-all active:scale-[0.98] group"
+                  className="w-full flex items-center justify-between pl-1.5 pr-4 py-1.5 bg-white/90 backdrop-blur-xl border border-slate-200/60 rounded-full shadow-lg shadow-slate-200/50 hover:border-brand-200 transition-all active:scale-[0.98] group ring-1 ring-black/5"
                 >
                   {(() => {
                     const currentModeId = currentSession?.mode || preferences.preferredMode || 'student';
@@ -501,16 +501,19 @@ export default function App() {
                     const Icon = activeMode.icon;
                     return (
                       <>
-                        <div className="flex items-center gap-3">
-                          <div className={cn("p-1.5 rounded-lg", activeMode.color)}>
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div className={cn("p-2 rounded-full shrink-0 shadow-sm transition-transform group-hover:rotate-12", activeMode.color)}>
                             <Icon className="w-4 h-4" />
                           </div>
-                          <div className="flex flex-col items-start leading-tight">
-                            <span className="text-[13px] font-bold text-slate-900">{activeMode.label}</span>
-                            <span className="text-[10px] text-slate-500 font-medium truncate max-w-[150px]">{activeMode.description}</span>
+                          <div className="flex flex-col items-start leading-none overflow-hidden">
+                            <span className="text-[12px] font-black text-slate-900 truncate uppercase tracking-tighter">{activeMode.label}</span>
+                            <span className="text-[9px] text-slate-400 font-bold uppercase tracking-widest truncate">AI Node</span>
                           </div>
                         </div>
-                        <ChevronDown className={cn("w-4 h-4 text-slate-400 transition-transform duration-300", isModeOpen && "rotate-180")} />
+                        <div className="flex items-center gap-1 ml-2">
+                          <div className="w-[1px] h-4 bg-slate-200 mx-1" />
+                          <ChevronDown className={cn("w-4 h-4 text-slate-400 transition-transform duration-300", isModeOpen && "rotate-180")} />
+                        </div>
                       </>
                     );
                   })()}
@@ -608,47 +611,102 @@ export default function App() {
                   <Shield className="w-5 h-5" />
                 </button>
               )}
-              <button
+              <button 
                 onClick={() => setIsSettingsOpen(true)}
-                className="p-2 text-slate-600 hover:bg-slate-100 rounded-full transition-colors"
-                title="Settings"
+                className="w-11 h-11 rounded-2xl bg-white/90 backdrop-blur-xl flex items-center justify-center overflow-hidden border border-slate-200 shadow-lg shadow-slate-200/50 hover:border-brand-300 transition-all active:scale-95 group relative ring-1 ring-black/5"
+                title="Account Settings"
               >
-                <Settings className="w-5 h-5" />
-              </button>
-              <button className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center overflow-hidden border border-slate-200">
-                {preferences.profilePicture ? (
-                  <img src={preferences.profilePicture} alt="Profile" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                {preferences.profilePicture || user?.photoURL ? (
+                  <img src={preferences.profilePicture || user?.photoURL || ""} alt="Profile" className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" referrerPolicy="no-referrer" />
                 ) : (
-                  <User className="w-5 h-5 text-slate-500" />
+                  <User className="w-5 h-5 text-slate-400 group-hover:text-brand-500 transition-colors" />
                 )}
+                <div className="absolute inset-0 ring-1 ring-inset ring-black/5 rounded-2xl pointer-events-none" />
               </button>
             </div>
           </div>
           
-          <div className="flex-1 flex flex-col h-full overflow-hidden pt-14">
+          <div className="flex-1 flex flex-col h-full overflow-hidden pt-20">
             <div className="flex-1 overflow-hidden">
               {!currentSession ? (
                 <div className="h-full flex flex-col items-center justify-center p-8 text-center relative overflow-hidden bg-white">
+                  {/* Decorative Background Elements */}
+                  <div className="absolute top-0 left-0 w-full h-full pointer-events-none opacity-[0.03]">
+                    <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-brand-500 rounded-full blur-[120px]" />
+                    <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-blue-500 rounded-full blur-[120px]" />
+                  </div>
+
                   <motion.div 
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
-                    className="relative z-10 space-y-8"
+                    className="relative z-10 space-y-10 max-w-2xl"
                   >
-                    <h1 className="text-3xl md:text-4xl font-medium text-slate-800 tracking-tight">
-                      {systemConfig.welcomeMessage}
-                    </h1>
-                    <button
-                      onClick={async () => {
-                        try {
-                          await createSession(preferences.preferredMode || 'student');
-                        } catch (e) {
-                          console.error("Failed to create session:", e);
-                        }
-                      }}
-                      className="px-6 py-3 bg-brand-500 text-white rounded-full font-medium text-sm hover:bg-brand-600 transition-all active:scale-95 shadow-sm mx-auto"
+                    <div className="space-y-4">
+                      <div className="w-24 h-24 mx-auto relative group">
+                        <div className="absolute inset-0 bg-brand-500 rounded-[2.5rem] blur-2xl opacity-20 group-hover:opacity-40 transition-opacity" />
+                        <div className="relative w-full h-full bg-white border-2 border-slate-100 rounded-[2.5rem] flex items-center justify-center p-4 shadow-2xl transition-transform hover:scale-105">
+                          <img 
+                            src={LOGO_URL} 
+                            alt="Logo" 
+                            className="w-full h-full object-contain"
+                            referrerPolicy="no-referrer"
+                          />
+                        </div>
+                      </div>
+                      <h1 className="text-4xl md:text-5xl font-black text-slate-900 tracking-tight">
+                        {systemConfig.welcomeMessage}
+                      </h1>
+                      <p className="text-slate-500 font-medium max-w-md mx-auto">
+                        Your intelligent companion for the SALU community. Start a conversation to explore insights and knowledge.
+                      </p>
+                    </div>
+
+                    <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+                      <button
+                        onClick={async () => {
+                          try {
+                            await createSession(preferences.preferredMode || 'student');
+                          } catch (e) {
+                            console.error("Failed to create session:", e);
+                          }
+                        }}
+                        className="px-8 py-4 bg-slate-900 text-white rounded-2xl font-bold text-sm hover:bg-black transition-all active:scale-95 shadow-xl shadow-slate-200 flex items-center gap-2 group"
+                      >
+                        <Plus className="w-4 h-4 group-hover:rotate-90 transition-transform" />
+                        New Chat
+                      </button>
+                      <button
+                        onClick={() => setIsSettingsOpen(true)}
+                        className="px-8 py-4 bg-white text-slate-700 border border-slate-200 rounded-2xl font-bold text-sm hover:bg-slate-50 transition-all active:scale-95 flex items-center gap-2"
+                      >
+                        <Settings className="w-4 h-4" />
+                        Configure AI
+                      </button>
+                    </div>
+
+                    {/* Creator Spotlight */}
+                    <motion.div 
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      transition={{ delay: 0.5 }}
+                      className="pt-12 flex flex-col items-center gap-4"
                     >
-                      Start New Conversation
-                    </button>
+                      <div className="h-px w-12 bg-slate-200" />
+                      <div className="flex items-center gap-4 px-5 py-3 bg-slate-50/50 backdrop-blur-sm rounded-2xl border border-slate-100">
+                        <div className="w-10 h-10 rounded-xl overflow-hidden border border-white shadow-sm ring-2 ring-brand-100">
+                          <img 
+                            src={CREATOR_IMAGE_URL} 
+                            alt="Creator" 
+                            className="w-full h-full object-cover"
+                            referrerPolicy="no-referrer"
+                          />
+                        </div>
+                        <div className="text-left">
+                          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Crafted with ❤️ by</p>
+                          <p className="text-xs font-black text-slate-900 tracking-tight underline decoration-brand-500 decoration-2 underline-offset-2">Babar Ali (Salu Coders)</p>
+                        </div>
+                      </div>
+                    </motion.div>
                   </motion.div>
                 </div>
               ) : currentSession.mode === 'live' ? (
