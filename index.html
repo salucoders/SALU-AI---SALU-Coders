@@ -4,7 +4,15 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>SALU AI - Coders Edition</title>
-    <link rel="icon" type="image/png" href="/salu-logo.png" />
+    <link rel="icon" type="image/png" href="/assets/logo/salu_logo.png" />
+    <script>
+      // Capture the event as early as possible
+      window.deferredPWAEvents = [];
+      window.addEventListener('beforeinstallprompt', (e) => {
+        e.preventDefault();
+        window.deferredPWAEvent = e;
+      });
+    </script>
   </head>
   <body>
     <div id="root"></div>

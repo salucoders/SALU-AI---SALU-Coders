@@ -29,13 +29,13 @@ export default defineConfig(({mode}) => {
           display: 'standalone',
           icons: [
             {
-              src: '/salu-logo.png',
-              sizes: '250x250',
+              src: '/assets/logo/salu_logo.png',
+              sizes: '192x192 512x512',
               type: 'image/png'
             },
             {
-              src: '/salu-logo.png',
-              sizes: '250x250',
+              src: '/assets/logo/salu_logo.png',
+              sizes: '192x192 512x512',
               type: 'image/png',
               purpose: 'any maskable'
             }

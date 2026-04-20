@@ -23,10 +23,15 @@ export function PWAProvider({ children }: { children: React.ReactNode }) {
     };
 
     checkInstalled();
+    
+    if ((window as any).deferredPWAEvent) {
+      setDeferredPrompt((window as any).deferredPWAEvent);
+    }
 
     const handler = (e: Event) => {
       e.preventDefault();
       setDeferredPrompt(e);
+      (window as any).deferredPWAEvent = e;
     };
 
     const appInstalledHandler = () => {
