@@ -16,12 +16,14 @@ import * as XLSX from 'xlsx';
 import mammoth from 'mammoth';
 import { Message, Mode, UserPreferences } from '../types';
 import { cn } from '../lib/utils';
+import { LOGO_URL } from '../constants';
 import { CameraModal } from './CameraModal';
 import { useNotification } from '../context/NotificationContext';
 import { useUserProfile } from '../context/UserProfileContext';
 import { generateImageWithSALU } from '../services/gemini';
 import { uploadToImageKit } from '../lib/imagekit';
 import { Toolbox } from './Toolbox';
+import { MagicImageModal } from './MagicImageModal';
 
 // Voice Visualizer Component
 const VoiceVisualizer = ({ isListening }: { isListening: boolean }) => {
@@ -360,6 +362,11 @@ const ImageResult = ({ prompt }: { prompt: string }) => {
       } catch (e: any) {
         console.warn("SALU generation failed, trying Together AI fallback...", e);
         
+        let saluError = e.message || "";
+        if (saluError.includes("403") || saluError.includes("PERMISSION_DENIED")) {
+          saluError = "SALU AI Engine (Gemini) denied permission. This often happens if the API key is restricted, the model is not enabled for your region, or it's a free-tier limitation.";
+        }
+
         // 2. Try Together AI (Secondary)
         const togetherResponse = await fetch('/api/generate-together-image', {
           method: 'POST',
@@ -396,7 +403,17 @@ const ImageResult = ({ prompt }: { prompt: string }) => {
   }, [generateImage]);
 
   const handleRetry = () => {
+    generationStarted.current = false;
     setSeed(Math.floor(Math.random() * 1000000));
+  };
+
+  const handleCopyPrompt = () => {
+    if (!prompt) return;
+    navigator.clipboard.writeText(prompt);
+    // Dispatched custom event for notification to reach context
+    window.dispatchEvent(new CustomEvent('salu_notification', {
+      detail: { message: 'Prompt copied to clipboard!', type: 'success' }
+    }));
   };
 
   const handleDownload = async () => {
@@ -527,19 +544,30 @@ const ImageResult = ({ prompt }: { prompt: string }) => {
               whileInView={{ y: 0, opacity: 1 }}
               onClick={handleDownload}
               className="p-4 bg-white text-slate-900 rounded-3xl hover:scale-110 active:scale-95 transition-all shadow-2xl font-black flex items-center gap-3 text-xs uppercase tracking-widest"
+              title="Save Art"
             >
-              <Download className="w-5 h-5" /> Save Art
+              <Download className="w-5 h-5" /> Save
+            </motion.button>
+            <motion.button 
+              initial={{ y: 20, opacity: 0 }}
+              whileInView={{ y: 0, opacity: 1 }}
+              transition={{ delay: 0.1 }}
+              onClick={handleCopyPrompt}
+              className="p-4 bg-white text-slate-900 rounded-3xl hover:scale-110 active:scale-95 transition-all shadow-2xl font-black flex items-center gap-3 text-xs uppercase tracking-widest"
+              title="Copy Prompt"
+            >
+              <Copy className="w-5 h-5" /> Copy
             </motion.button>
             <motion.a 
               initial={{ y: 20, opacity: 0 }}
               whileInView={{ y: 0, opacity: 1 }}
-              transition={{ delay: 0.1 }}
+              transition={{ delay: 0.2 }}
               href={imageUrl} 
               target="_blank" 
               rel="noreferrer"
               className="p-4 bg-white/20 backdrop-blur-xl text-white border border-white/30 rounded-3xl hover:scale-110 active:scale-95 transition-all shadow-2xl font-black flex items-center gap-3 text-xs uppercase tracking-widest"
             >
-              <Maximize2 className="w-5 h-5" /> View Full
+              <Maximize2 className="w-5 h-5" /> Full
             </motion.a>
           </div>
         )}
@@ -571,6 +599,13 @@ const ImageResult = ({ prompt }: { prompt: string }) => {
           <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Generation Prompt</p>
           <p className="text-xs text-slate-700 italic font-medium line-clamp-1">"{prompt}"</p>
         </div>
+        <button 
+          onClick={handleCopyPrompt}
+          className="p-2 hover:bg-slate-100 rounded-xl transition-colors text-slate-400 hover:text-brand-500"
+          title="Copy Prompt"
+        >
+          <Copy className="w-4 h-4" />
+        </button>
         {!loading && imageUrl && (
           <div className="flex flex-col items-end shrink-0">
             <span className={cn(
@@ -670,6 +705,7 @@ export const ChatInterface = React.memo(({ messages, onSendMessage, isLoading, m
   const [isUploading, setIsUploading] = useState(false);
   const [isCameraOpen, setIsCameraOpen] = useState(false);
   const [isToolboxOpen, setIsToolboxOpen] = useState(false);
+  const [isMagicImageModalOpen, setIsMagicImageModalOpen] = useState(false);
   const [fileError, setFileError] = useState<string | null>(null);
   const [showAttachmentMenu, setShowAttachmentMenu] = useState(false);
   const [showScrollButton, setShowScrollButton] = useState(false);
@@ -695,13 +731,21 @@ export const ChatInterface = React.memo(({ messages, onSendMessage, isLoading, m
     try {
       if (data.includes('base64,')) {
         const parts = data.split('base64,');
-        const mime = parts[0].split(':')[1].split(';')[0];
+        const mimeLine = parts[0];
+        const mimeMatch = mimeLine.match(/:(.*?);/);
+        const mime = mimeMatch ? mimeMatch[1] : '';
+        const base64 = parts[1];
         
-        // Only preview text-like contents
-        if (mime === 'text/plain' || mime === 'text/csv') {
-          const base64 = parts[1];
+        // Handle text-like content previews
+        if (mime.startsWith('text/') || mime === 'application/json' || mime === 'application/javascript') {
           const decoded = decodeURIComponent(escape(atob(base64)));
-          return decoded.trim().slice(0, 150) + (decoded.length > 150 ? '...' : '');
+          return decoded.trim().slice(0, 300) + (decoded.length > 300 ? '...' : '');
+        }
+
+        // Special handling for Excel/CSV name based labels in data URL
+        if (mimeLine.includes('name=') && (mimeLine.includes('.csv') || mimeLine.includes('.txt'))) {
+          const decoded = decodeURIComponent(escape(atob(base64)));
+          return decoded.trim().slice(0, 300) + (decoded.length > 300 ? '...' : '');
         }
       }
     } catch (e) {
@@ -853,6 +897,14 @@ export const ChatInterface = React.memo(({ messages, onSendMessage, isLoading, m
     console.log("Submitting message:", { input, attachmentCount: attachments.length });
     
     try {
+      let finalInput = input;
+      if (input.trim().startsWith('/image ')) {
+        const prompt = input.trim().slice(7).trim();
+        if (prompt) {
+          finalInput = `Respond EXCLUSIVELY with the image generation tag for: ${prompt}`;
+        }
+      }
+
       // Logic to save images to ImageKit before sending
       const processedAttachments = await Promise.all(attachments.map(async (att, idx) => {
         if (att.startsWith('data:image/')) {
@@ -868,7 +920,7 @@ export const ChatInterface = React.memo(({ messages, onSendMessage, isLoading, m
         return att;
       }));
 
-      await onSendMessage(input, processedAttachments);
+      await onSendMessage(finalInput, processedAttachments);
       setInput('');
       setAttachments([]);
       if (textareaRef.current) {
@@ -892,21 +944,21 @@ export const ChatInterface = React.memo(({ messages, onSendMessage, isLoading, m
     const fileList = Array.from(files);
 
     try {
-      for (const file of fileList) {
+      await Promise.all(fileList.map(async (file) => {
         if (file.size > MAX_FILE_SIZE) {
           setFileError(`"${file.name}" is too large. Max size is 10MB.`);
-          continue;
+          return;
         }
 
-        // Handle special office formats by parsing them to text/csv
+        // Handle Office formats (DOCX, XLSX)
         if (file.name.endsWith('.docx') || file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
           try {
             const arrayBuffer = await file.arrayBuffer();
             const result = await mammoth.extractRawText({ arrayBuffer });
             const text = result.value;
             const base64 = btoa(unescape(encodeURIComponent(text)));
-            newAttachments.push(`data:text/plain;name=${file.name};base64,${base64}`);
-            continue;
+            newAttachments.push(`data:text/plain;name=${encodeURIComponent(file.name)};base64,${base64}`);
+            return;
           } catch (err) {
             console.error("Error parsing DOCX:", err);
           }
@@ -920,39 +972,47 @@ export const ChatInterface = React.memo(({ messages, onSendMessage, isLoading, m
             const worksheet = workbook.Sheets[firstSheetName];
             const csv = XLSX.utils.sheet_to_csv(worksheet);
             const base64 = btoa(unescape(encodeURIComponent(csv)));
-            newAttachments.push(`data:text/csv;name=${file.name};base64,${base64}`);
-            continue;
+            newAttachments.push(`data:text/csv;name=${encodeURIComponent(file.name)};base64,${base64}`);
+            return;
           } catch (err) {
             console.error("Error parsing Excel:", err);
           }
         }
 
-        if (file.name.endsWith('.csv') || file.type === 'text/csv') {
-          try {
-            const text = await file.text();
-            const base64 = btoa(unescape(encodeURIComponent(text)));
-            newAttachments.push(`data:text/csv;name=${file.name};base64,${base64}`);
-            continue;
-          } catch (err) {
-            console.error("Error reading CSV:", err);
-          }
+        // Handle text files (TXT, CSV, JSON, etc.)
+        if (file.type.startsWith('text/') || file.name.endsWith('.txt') || file.name.endsWith('.csv') || file.name.endsWith('.json') || file.name.endsWith('.md')) {
+            try {
+                const text = await file.text();
+                const base64 = btoa(unescape(encodeURIComponent(text)));
+                const mimeType = file.type || (file.name.endsWith('.csv') ? 'text/csv' : 'text/plain');
+                newAttachments.push(`data:${mimeType};name=${encodeURIComponent(file.name)};base64,${base64}`);
+                return;
+            } catch (err) {
+                console.error("Error reading text file:", err);
+            }
         }
 
-        const reader = new FileReader();
-        const promise = new Promise<string>((resolve, reject) => {
-          reader.onloadend = () => resolve(reader.result as string);
-          reader.onerror = reject;
+        // Default to Data URL (for images, pdfs, and others supported natively by Gemini)
+        return new Promise<void>((resolve) => {
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                if (reader.result) {
+                    newAttachments.push(reader.result as string);
+                }
+                resolve();
+            };
+            reader.onerror = () => {
+                console.error("Error reading file:", file.name);
+                resolve();
+            };
+            reader.readAsDataURL(file);
         });
-
-        reader.readAsDataURL(file);
-        const result = await promise;
-        newAttachments.push(result);
-      }
+      }));
 
       setAttachments(prev => [...prev, ...newAttachments]);
     } catch (err) {
       console.error("Error reading file:", err);
-      setFileError("Failed to read one or more files.");
+      setFileError("Could not process one or more files.");
     } finally {
       setIsUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
@@ -1077,6 +1137,14 @@ export const ChatInterface = React.memo(({ messages, onSendMessage, isLoading, m
         isOpen={isToolboxOpen} 
         onClose={() => setIsToolboxOpen(false)} 
       />
+
+      <MagicImageModal
+        isOpen={isMagicImageModalOpen}
+        onClose={() => setIsMagicImageModalOpen(false)}
+        onGenerate={(prompt) => {
+          onSendMessage(`Respond EXCLUSIVELY with the image generation tag for: ${prompt}`, []);
+        }}
+      />
       
       <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 md:p-8 space-y-8 md:space-y-12 scroll-smooth relative custom-scrollbar">
         {messages.length === 0 && (
@@ -1135,8 +1203,8 @@ export const ChatInterface = React.memo(({ messages, onSendMessage, isLoading, m
             {message.role !== 'user' && (
               <div className="w-8 h-8 md:w-10 md:h-10 rounded-full flex items-center justify-center shrink-0 mt-1">
                 <img 
-                  src="https://admission.salu.edu.pk/static/media/logo.793ee5b813bb22366372.png" 
-                  alt="SALU AI" 
+                  src={LOGO_URL} 
+                  alt="AI Avatar" 
                   className="w-6 h-6 md:w-8 md:h-8 object-contain drop-shadow-sm"
                   referrerPolicy="no-referrer"
                 />
@@ -1216,8 +1284,8 @@ export const ChatInterface = React.memo(({ messages, onSendMessage, isLoading, m
           >
             <div className="w-8 h-8 md:w-10 md:h-10 rounded-full flex items-center justify-center shrink-0 mt-1">
               <img 
-                src="https://admission.salu.edu.pk/static/media/logo.793ee5b813bb22366372.png" 
-                alt="SALU AI" 
+                src={LOGO_URL} 
+                alt="Logo" 
                 className="w-6 h-6 md:w-8 md:h-8 object-contain drop-shadow-sm animate-pulse"
                 referrerPolicy="no-referrer"
               />
@@ -1348,15 +1416,26 @@ export const ChatInterface = React.memo(({ messages, onSendMessage, isLoading, m
                             </div>
                             
                             {/* Document Content Preview Snippet */}
-                            <div className="flex-1 bg-slate-50/50 rounded-lg p-1.5 overflow-hidden">
+                            <div className="flex-1 bg-slate-50/50 rounded-lg p-2 overflow-hidden border border-slate-100 group-hover/att:bg-white transition-colors">
                                 {getFilePreviewSnippet(att) ? (
-                                    <p className="text-[9px] text-slate-500 leading-tight line-clamp-3 md:line-clamp-2 font-medium font-mono">
-                                        {getFilePreviewSnippet(att)}
-                                    </p>
+                                    <div className="h-full">
+                                        <p className="text-[9px] text-slate-500 leading-tight line-clamp-4 font-mono select-none">
+                                            {getFilePreviewSnippet(att)}
+                                        </p>
+                                    </div>
                                 ) : (
-                                    <div className="h-full flex flex-col items-center justify-center gap-1 opacity-20">
-                                        <FileText className="w-5 h-5 text-slate-400" />
-                                        <span className="text-[7px] font-black uppercase tracking-[0.2em] text-slate-400">Locked</span>
+                                    <div className="h-full flex flex-col items-center justify-center gap-1.5 opacity-30">
+                                        {att.startsWith('data:application/pdf') ? (
+                                            <>
+                                                <FileText className="w-5 h-5 text-red-500" />
+                                                <span className="text-[8px] font-black uppercase tracking-widest text-slate-600">Portable Doc</span>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <FileText className="w-5 h-5 text-slate-400" />
+                                                <span className="text-[8px] font-black uppercase tracking-widest text-slate-400">Analysis Ready</span>
+                                            </>
+                                        )}
                                     </div>
                                 )}
                             </div>
@@ -1449,7 +1528,7 @@ export const ChatInterface = React.memo(({ messages, onSendMessage, isLoading, m
                             type="button"
                             onClick={(e) => {
                               e.stopPropagation();
-                              setInput("Draw a masterpiece of: ");
+                              setIsMagicImageModalOpen(true);
                               setShowAttachmentMenu(false);
                             }}
                             className="w-full flex items-center gap-4 p-4 hover:bg-emerald-50/50 rounded-2xl transition-all text-left group border border-transparent hover:border-emerald-100"

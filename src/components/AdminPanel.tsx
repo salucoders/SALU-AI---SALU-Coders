@@ -8,6 +8,8 @@ import { useUserProfile } from '../context/UserProfileContext';
 import { uploadToImageKit } from '../lib/imagekit';
 import { cn } from '../lib/utils';
 
+import { LOGO_URL, APP_NAME } from '../constants';
+
 interface AdminPanelProps {
   onClose: () => void;
 }
@@ -311,12 +313,12 @@ export function AdminPanel({ onClose }: AdminPanelProps) {
         <div className="w-full md:w-64 bg-slate-900 text-white flex flex-col shrink-0">
           <div className="p-6 flex items-center justify-between md:justify-start gap-3 border-b border-slate-800">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-rose-500 rounded-xl flex items-center justify-center">
-                <Shield className="w-6 h-6 text-white" />
+              <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center p-2">
+                <img src={LOGO_URL} alt="Logo" className="w-full h-full object-contain" referrerPolicy="no-referrer" />
               </div>
               <div>
-                <h2 className="font-bold text-lg leading-tight">Admin Panel</h2>
-                <p className="text-xs text-slate-400">System Management</p>
+                <h2 className="font-bold text-lg leading-tight">Admin Terminal</h2>
+                <p className="text-xs text-slate-400">{APP_NAME} Control</p>
               </div>
             </div>
             <button onClick={onClose} className="md:hidden p-2 text-slate-400 hover:text-white">

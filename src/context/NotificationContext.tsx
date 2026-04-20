@@ -36,6 +36,15 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     setNotifications((prev) => prev.filter((n) => n.id !== id));
   };
 
+  React.useEffect(() => {
+    const handleCustomNotify = (e: any) => {
+      const { message, type, duration } = e.detail;
+      notify(message, type, duration);
+    };
+    window.addEventListener('salu_notification', handleCustomNotify);
+    return () => window.removeEventListener('salu_notification', handleCustomNotify);
+  }, [notify]);
+
   return (
     <NotificationContext.Provider value={{ notify }}>
       {children}

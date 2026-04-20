@@ -6,7 +6,7 @@ import { db } from "../lib/firebase";
 export async function getSystemConfig(): Promise<{ apiKey: string, defaultModel: string, imageGenApiKey?: string }> {
   let apiKey = "";
   let imageGenApiKey = "";
-  let defaultModel = "gemini-3-flash-preview";
+  let defaultModel = "gemini-2.0-flash";
   let keySource = "";
 
   // 1. Try fetching from Firestore (Most reliable for Admin Panel saves on Static Sites)
@@ -118,6 +118,52 @@ function getSystemInstruction(mode: Mode, preferences: UserPreferences, persona:
   return `Your name is ${assistantName}. ${SYSTEM_INSTRUCTIONS[mode] || ""} ${PERSONA_INSTRUCTIONS[persona] || ""} User Name: ${preferences?.name || "User"}. ${CREATOR_INFO}${EXTRA_TRAINING}${TRAINING_CONSENT}`;
 }
 
+async function prepareParts(content: string, attachments?: string[]): Promise<any[]> {
+  const parts: any[] = [{ text: content || " " }];
+  
+  if (attachments && attachments.length > 0) {
+    for (const data of attachments) {
+      if (!data) continue;
+      
+      if (data.startsWith('http')) {
+        try {
+          // Handle ImageKit or other URLs by fetching and converting to base64
+          // Note: Frontend fetches might fail due to CORS if not configured on ImageKit
+          // Fallback: If fetch fails, we skip it or use a placeholder
+          const response = await fetch(data);
+          const blob = await response.blob();
+          const mimeType = blob.type;
+          
+          const reader = new FileReader();
+          const base64Promise = new Promise<string>((resolve, reject) => {
+            reader.onloadend = () => resolve((reader.result as string).split(',')[1]);
+            reader.onerror = reject;
+          });
+          reader.readAsDataURL(blob);
+          const base64 = await base64Promise;
+          
+          parts.push({ inlineData: { data: base64, mimeType } });
+        } catch (e) {
+          console.warn("Failed to fetch remote attachment for AI analysis:", data, e);
+          // Don't break the whole message if one attachment fails
+        }
+      } else if (data.includes('base64,')) {
+        const [header, base64] = data.split('base64,');
+        if (base64) {
+          const mimeTypeMatch = header.match(/:(.*?);/);
+          let mimeType = mimeTypeMatch ? mimeTypeMatch[1] : 'image/jpeg';
+          if (mimeType.includes(';')) {
+            mimeType = mimeType.split(';')[0];
+          }
+          parts.push({ inlineData: { data: base64, mimeType } });
+        }
+      }
+    }
+  }
+  
+  return parts;
+}
+
 export async function sendMessage(
   mode: Mode,
   history: Message[],
@@ -158,54 +204,23 @@ export async function sendMessage(
     Be friendly, to the point, smart, and motivational. Avoid unnecessary repetition. Use clear, structured formatting with headings and bullet points.
     
     IMAGE GENERATION PROTOCOL:
-    If the user requests an image, painting, or picture:
+    If the user requests an image, painting, or picture, or uses the "/image" command, or if specifically asked to "Respond EXCLUSIVELY with the image generation tag":
     1. EXCLUSIVELY output the tag: [IMAGE_GEN: expanded_artistic_prompt]
     2. Expand the user's simple request into a 50-80 word cinematic-grade masterpiece prompt.
     3. Include lighting, texture, camera angle, and artistic style (e.g., hyper-realistic, photorealistic, 8k resolution).
     4. You MUST include the square brackets and the "IMAGE_GEN:" prefix exactly.
-    5. Provide NO OTHER TEXT besides the tag for image generation.
+    5. Provide NO OTHER TEXT besides the tag when asked for image generation.
     6. Be bold and highly descriptive. Use terms like 'cinematic lighting', 'hyper-detailed', 'unreal engine 5'.`;
 
-  const recentHistory = history.slice(-10);
-  const contents: any[] = recentHistory.map((msg: any) => {
-    const parts: any[] = [{ text: msg.content || " " }];
-    if (msg.attachments && msg.attachments.length > 0) {
-      msg.attachments.forEach((data: string) => {
-        const [header, base64] = data.split(',');
-        if (base64) {
-          const mimeTypeMatch = header.match(/:(.*?);/);
-          let mimeType = mimeTypeMatch ? mimeTypeMatch[1] : 'image/jpeg';
-          // Clean MIME type (remove ;name=...)
-          if (mimeType.includes(';')) {
-            mimeType = mimeType.split(';')[0];
-          }
-          parts.push({ inlineData: { data: base64, mimeType } });
-        }
-      });
-    }
-    return { role: msg.role === 'user' ? 'user' : 'model', parts };
-  });
+  // Filter history to avoid duplicates if the new message is already in there
+  const recentHistory = history.filter(m => m.content !== message).slice(-8);
+  
+  const contents: any[] = await Promise.all(recentHistory.map(async (msg: any) => ({
+    role: msg.role === 'user' ? 'user' : 'model',
+    parts: await prepareParts(msg.content, msg.attachments)
+  })));
 
-  const currentParts: any[] = [];
-  if (attachments && attachments.length > 0) {
-    attachments.forEach((data: string) => {
-      const [header, base64] = data.split(',');
-      if (base64) {
-        const mimeTypeMatch = header.match(/:(.*?);/);
-        let mimeType = mimeTypeMatch ? mimeTypeMatch[1] : 'image/jpeg';
-        // Clean MIME type (remove ;name=...)
-        if (mimeType.includes(';')) {
-          mimeType = mimeType.split(';')[0];
-        }
-        currentParts.push({ inlineData: { data: base64, mimeType } });
-      }
-    });
-  }
-
-  if (message.trim() || currentParts.length === 0) {
-    currentParts.push({ text: message || "Analyze this attachment" });
-  }
-
+  const currentParts = await prepareParts(message, attachments);
   contents.push({ role: 'user', parts: currentParts });
 
   let apiKeyForDebug = "";
@@ -321,52 +336,23 @@ export async function sendMessageStream(
     Be friendly, to the point, smart, and motivational. Avoid unnecessary repetition. Use clear, structured formatting with headings and bullet points.
     
     IMAGE GENERATION PROTOCOL:
-    If the user requests an image, painting, or picture:
+    If the user requests an image, painting, or picture, or uses the "/image" command, or if specifically asked to "Respond EXCLUSIVELY with the image generation tag":
     1. EXCLUSIVELY output the tag: [IMAGE_GEN: expanded_artistic_prompt]
     2. Expand the user's simple request into a 50-80 word cinematic-grade masterpiece prompt.
     3. Include lighting, texture, camera angle, and artistic style (e.g., hyper-realistic, photorealistic, 8k resolution).
     4. You MUST include the square brackets and the "IMAGE_GEN:" prefix exactly.
-    5. Provide NO OTHER TEXT besides the tag for image generation.
+    5. Provide NO OTHER TEXT besides the tag when asked for image generation.
     6. Be bold and highly descriptive. Use terms like 'cinematic lighting', 'hyper-detailed', 'unreal engine 5'.`;
 
-  const recentHistory = history.slice(-10);
-  const contents: any[] = recentHistory.map((msg: any) => {
-    const parts: any[] = [{ text: msg.content || " " }];
-    if (msg.attachments && msg.attachments.length > 0) {
-      msg.attachments.forEach((data: string) => {
-        const [header, base64] = data.split(',');
-        if (base64) {
-          const mimeTypeMatch = header.match(/:(.*?);/);
-          let mimeType = mimeTypeMatch ? mimeTypeMatch[1] : 'image/jpeg';
-          if (mimeType.includes(';')) {
-            mimeType = mimeType.split(';')[0];
-          }
-          parts.push({ inlineData: { data: base64, mimeType } });
-        }
-      });
-    }
-    return { role: msg.role === 'user' ? 'user' : 'model', parts };
-  });
+  // Filter history to avoid duplicates and slice for performance
+  const recentHistory = history.filter(m => m.content !== message).slice(-8);
+  
+  const contents: any[] = await Promise.all(recentHistory.map(async (msg: any) => ({
+    role: msg.role === 'user' ? 'user' : 'model',
+    parts: await prepareParts(msg.content, msg.attachments)
+  })));
 
-  const currentParts: any[] = [];
-  if (attachments && attachments.length > 0) {
-    attachments.forEach((data: string) => {
-      const [header, base64] = data.split(',');
-      if (base64) {
-        const mimeTypeMatch = header.match(/:(.*?);/);
-        let mimeType = mimeTypeMatch ? mimeTypeMatch[1] : 'image/jpeg';
-        if (mimeType.includes(';')) {
-          mimeType = mimeType.split(';')[0];
-        }
-        currentParts.push({ inlineData: { data: base64, mimeType } });
-      }
-    });
-  }
-
-  if (message.trim() || currentParts.length === 0) {
-    currentParts.push({ text: message || "Analyze this attachment" });
-  }
-
+  const currentParts = await prepareParts(message, attachments);
   contents.push({ role: 'user', parts: currentParts });
 
   let apiKeyForDebug = "";
@@ -447,7 +433,7 @@ export async function generateImageWithSALU(prompt: string): Promise<string> {
 
     const ai = new GoogleGenAI({ apiKey: activeKey });
     
-    // Using gemini-2.5-flash-image for reliable image generation
+    // Using gemini-2.5-flash-image for standard free-tier availability
     const response = await ai.models.generateContent({
       model: 'gemini-2.5-flash-image',
       contents: {
@@ -491,7 +477,7 @@ export async function performWebSearch(query: string): Promise<string> {
 
     const ai = new GoogleGenAI({ apiKey: config.apiKey });
     const response = await ai.models.generateContent({
-      model: config.defaultModel && config.defaultModel.includes('flash') ? config.defaultModel : 'gemini-3.1-pro-preview', // prioritize system preference but default to pro for search ability
+      model: config.defaultModel && config.defaultModel.includes('flash') ? config.defaultModel : 'gemini-2.0-flash', 
       contents: query,
       config: {
         systemInstruction: "You are an expert web search researcher. Provide a highly organized, beautifully formatted Markdown response based on your search results. Use markdown H3 (###) for main sections, bullet points, and always provide clickable markdown links [Source Name](URL) for your references at the end.",

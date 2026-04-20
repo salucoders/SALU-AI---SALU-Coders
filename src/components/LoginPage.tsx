@@ -7,7 +7,6 @@ import {
   GraduationCap, 
   Code, 
   PenTool, 
-  Sparkles, 
   Video, 
   ArrowRight,
   Check,
@@ -16,6 +15,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { cn } from '../lib/utils';
+import { LOGO_URL, APP_NAME } from '../constants';
 
 export function LoginPage() {
   const { loginWithGoogle, isAuthenticating } = useAuth();
@@ -68,15 +68,15 @@ export function LoginPage() {
       {/* Navigation */}
       <nav className="fixed top-0 left-0 right-0 z-[100] px-6 py-4 md:px-12 flex items-center justify-between bg-white/70 backdrop-blur-xl border-b border-slate-100">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-slate-950 rounded-xl flex items-center justify-center shadow-lg">
+          <div className="w-11 h-11 bg-white border border-slate-100 rounded-xl flex items-center justify-center shadow-lg">
             <img 
-              src="https://admission.salu.edu.pk/static/media/logo.793ee5b813bb22366372.png" 
-              alt="SALU Logo" 
-              className="w-7 h-7 object-contain"
+              src={LOGO_URL} 
+              alt={APP_NAME} 
+              className="w-8 h-8 object-contain"
               referrerPolicy="no-referrer"
             />
           </div>
-          <span className="text-xl font-black text-slate-900 tracking-tighter">SALU AI</span>
+          <span className="text-xl font-black text-slate-900 tracking-tighter">{APP_NAME}</span>
         </div>
         <button 
           onClick={handleLogin}
@@ -110,7 +110,9 @@ export function LoginPage() {
               animate={{ opacity: 1, y: 0 }}
               className="inline-flex items-center gap-2 px-4 py-1.5 bg-brand-50 border border-brand-100 rounded-full text-[10px] font-black text-brand-600 uppercase tracking-widest"
             >
-              <Sparkles className="w-3.5 h-3.5" />
+              <div className="w-3.5 h-3.5 flex items-center justify-center">
+                <img src={LOGO_URL} alt="SALU" className="w-full h-full object-contain" referrerPolicy="no-referrer" />
+              </div>
               Intelligence Reimagined for SALU
             </motion.div>
             
@@ -333,11 +335,11 @@ export function LoginPage() {
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-12">
           <div className="space-y-4 text-center md:text-left">
             <div className="flex items-center justify-center md:justify-start gap-3">
-              <img src="https://admission.salu.edu.pk/static/media/logo.793ee5b813bb22366372.png" alt="SALU" className="h-6 object-contain grayscale" referrerPolicy="no-referrer" />
-              <span className="text-sm font-black tracking-tighter text-slate-400">SALU CODERS</span>
+              <img src={LOGO_URL} alt="SALU" className="h-6 object-contain grayscale" referrerPolicy="no-referrer" />
+              <span className="text-sm font-black tracking-tighter text-slate-400 uppercase">SALU CODERS</span>
             </div>
             <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em]">
-              © 2026 OFFICIAL SALU AI NETWORK
+              © 2026 OFFICIAL {APP_NAME} NETWORK
             </p>
           </div>
           

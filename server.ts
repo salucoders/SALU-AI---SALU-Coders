@@ -131,7 +131,10 @@ async function startServer() {
       const apiKey = config.togetherApiKey?.trim();
 
       if (!apiKey) {
-        return res.status(400).json({ error: "Together AI API key is not configured." });
+        console.error(`[${requestId}] Together AI API key is missing from config or environment.`);
+        return res.status(401).json({ 
+          error: "Together AI API key is not configured. Please add TOGETHER_API_KEY to your environment or Admin Panel." 
+        });
       }
 
       console.log(`[${requestId}] Generating image with Together AI for prompt:`, prompt.slice(0, 50) + "...");

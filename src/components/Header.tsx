@@ -4,6 +4,8 @@ import { motion } from 'motion/react';
 import { cn } from '../lib/utils';
 import { useUserProfile } from '../context/UserProfileContext';
 
+import { LOGO_URL, APP_NAME } from '../constants';
+
 interface HeaderProps {
   onNewChat: () => void;
   onOpenSidebar: () => void;
@@ -32,14 +34,14 @@ export const Header = React.memo(({ onNewChat, onOpenSidebar, onOpenSettings, ba
           <div className="flex items-center gap-2.5 group">
             <div className="w-9 h-9 bg-white rounded-xl flex items-center justify-center shadow-lg shadow-slate-200/50 border border-slate-100 group-hover:scale-105 transition-transform duration-500 overflow-hidden">
               <img 
-                src="https://admission.salu.edu.pk/static/media/logo.793ee5b813bb22366372.png" 
-                alt="SALU Logo" 
+                src={LOGO_URL} 
+                alt={APP_NAME} 
                 className="w-7 h-7 object-contain"
                 referrerPolicy="no-referrer"
               />
             </div>
             <div className="flex flex-col">
-              <h1 className="font-black text-slate-900 text-sm tracking-tight leading-none">SALU AI</h1>
+              <h1 className="font-black text-slate-900 text-sm tracking-tighter leading-none">{APP_NAME}</h1>
               <div className="flex items-center gap-1.5 mt-0.5">
                 <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.4)]" />
                 <span className="text-[7px] font-black text-emerald-600 uppercase tracking-widest">Connected</span>

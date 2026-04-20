@@ -6,7 +6,8 @@ import { ImageKitGallery } from './components/ImageKitGallery';
 import { LoginPage } from './components/LoginPage';
 import { Mode, Message, ChatSession, Persona } from './types';
 import { sendMessage, sendMessageStream } from './services/gemini';
-import { Menu, Settings, Loader2, Sparkles, Plus, ChevronDown, User, Shield, Crown } from 'lucide-react';
+import { Menu, Settings, Loader2, Plus, ChevronDown, User, Shield, Crown, PanelLeftOpen, Check, Lock } from 'lucide-react';
+import { LOGO_URL, APP_NAME, MODES } from './constants';
 import { cn } from './lib/utils';
 import { useUserProfile } from './context/UserProfileContext';
 import { useNotification } from './context/NotificationContext';
@@ -100,6 +101,7 @@ export default function App() {
   const [isToolboxOpen, setIsToolboxOpen] = useState(false);
   const [isUpgradeOpen, setIsUpgradeOpen] = useState(false);
   const [isAdminPanelOpen, setIsAdminPanelOpen] = useState(false);
+  const [isModeOpen, setIsModeOpen] = useState(false);
   const [battery, setBattery] = useState<{ level: number; charging: boolean } | null>(null);
   const [showOnboarding, setShowOnboarding] = useState(false);
   
@@ -262,6 +264,10 @@ export default function App() {
         }
       );
 
+      // Reset stream before adding message to avoid double render of ImageResult
+      setStreamedText("");
+      setIsStreaming(false);
+
       // Add finalized model response to Firestore
       await addMessage(currentSession.id, 'model', aiResponse);
 
@@ -304,12 +310,17 @@ export default function App() {
   if (authLoading || profileLoading) {
     return (
       <div className="h-screen w-full flex flex-col items-center justify-center bg-white gap-4">
-        <div className="w-16 h-16 bg-slate-900 rounded-2xl flex items-center justify-center shadow-2xl animate-bounce">
-          <Sparkles className="w-8 h-8 text-white" />
+        <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center shadow-2xl animate-bounce border border-slate-100">
+          <img 
+            src={LOGO_URL} 
+            alt={APP_NAME} 
+            className="w-10 h-10 object-contain"
+            referrerPolicy="no-referrer"
+          />
         </div>
         <div className="flex items-center gap-2 text-slate-400 font-black uppercase tracking-widest text-[10px]">
           <Loader2 className="w-3 h-3 animate-spin" />
-          Initializing SALU AI...
+          Initializing {APP_NAME}...
         </div>
       </div>
     );
@@ -390,6 +401,7 @@ export default function App() {
           }
         }}
         isOpen={isSidebarOpen}
+        onToggle={() => setIsSidebarOpen(!isSidebarOpen)}
         onClose={() => setIsSidebarOpen(false)}
         onOpenSettings={() => setIsSettingsOpen(true)}
         onOpenVault={() => setIsVaultOpen(true)}
@@ -451,38 +463,129 @@ export default function App() {
       
       <main className="flex-1 flex flex-col min-w-0 h-full relative bg-white overflow-hidden">
         <div className="flex-1 flex flex-col h-full overflow-hidden relative z-10">
-          {/* Floating Top Bar (ChatGPT style) */}
-          <div className="absolute top-0 left-0 right-0 z-40 p-3 flex items-center justify-between pointer-events-none">
-            <div className="flex items-center gap-2 pointer-events-auto">
+          {/* Floating Top Bar (Copilot style) */}
+          <div className="absolute top-0 left-0 right-0 z-40 p-4 pt-5 flex items-center justify-between pointer-events-none">
+            <div className="flex items-center gap-3 pointer-events-auto">
               {!isSidebarOpen && (
                 <button
                   onClick={() => setIsSidebarOpen(true)}
-                  className="p-2 text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+                  className="p-2.5 text-slate-500 hover:text-slate-900 hover:bg-white hover:border-slate-300 rounded-xl transition-all shadow-soft border border-slate-200/50 bg-white/80 backdrop-blur-md group active:scale-95"
                   title="Open sidebar"
                 >
-                  <Menu className="w-5 h-5" />
+                  <PanelLeftOpen className="w-5 h-5 group-hover:scale-110 transition-transform" />
                 </button>
               )}
-              <button 
-                onClick={() => {
-                  if (!isPaid) {
-                    setIsUpgradeOpen(true);
-                  }
-                }}
-                className={cn(
-                  "flex items-center gap-1.5 px-3 py-1.5 rounded-xl transition-all font-medium text-lg group/modes active:scale-95",
-                  !isPaid ? "hover:bg-slate-100/80 cursor-pointer" : "cursor-default"
-                )}
-              >
-                <span className="text-slate-900 tracking-tight">SALU AI</span>
-                <span className={cn(
-                  "px-1.5 py-0.5 rounded-md text-[10px] font-black uppercase tracking-[0.15em] shadow-sm",
-                  isPaid ? "bg-brand-500 text-white shadow-brand-500/20" : "bg-slate-200 text-slate-500 shadow-slate-200/50"
-                )}>
-                  {isPaid ? "Plus" : "Free"}
-                </span>
-                {!isPaid && <ChevronDown className="w-4 h-4 text-slate-400 group-hover/modes:text-slate-600 transition-colors ml-0.5" />}
-              </button>
+              <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-xl font-medium text-lg lg:text-xl">
+                <div className="w-7 h-7 flex items-center justify-center">
+                  <img 
+                    src={LOGO_URL} 
+                    alt="Logo" 
+                    className="w-full h-full object-contain"
+                    referrerPolicy="no-referrer"
+                  />
+                </div>
+                <span className="text-slate-900 font-black tracking-tighter">{APP_NAME}</span>
+              </div>
+            </div>
+
+            {/* Centered Mode Selector */}
+            <div className="flex-1 flex items-center justify-center max-w-[400px] pointer-events-auto">
+              <div className="relative w-full px-4">
+                <button
+                  onClick={() => setIsModeOpen(!isModeOpen)}
+                  className="w-full flex items-center justify-between px-4 py-2 bg-white/80 backdrop-blur-md border border-slate-200/50 rounded-2xl shadow-soft hover:bg-white hover:border-slate-300 transition-all active:scale-[0.98] group"
+                >
+                  {(() => {
+                    const currentModeId = currentSession?.mode || preferences.preferredMode || 'student';
+                    const activeMode = MODES.find(m => m.id === currentModeId) || MODES[0];
+                    const Icon = activeMode.icon;
+                    return (
+                      <>
+                        <div className="flex items-center gap-3">
+                          <div className={cn("p-1.5 rounded-lg", activeMode.color)}>
+                            <Icon className="w-4 h-4" />
+                          </div>
+                          <div className="flex flex-col items-start leading-tight">
+                            <span className="text-[13px] font-bold text-slate-900">{activeMode.label}</span>
+                            <span className="text-[10px] text-slate-500 font-medium truncate max-w-[150px]">{activeMode.description}</span>
+                          </div>
+                        </div>
+                        <ChevronDown className={cn("w-4 h-4 text-slate-400 transition-transform duration-300", isModeOpen && "rotate-180")} />
+                      </>
+                    );
+                  })()}
+                </button>
+
+                <AnimatePresence>
+                  {isModeOpen && (
+                    <>
+                      <motion.div 
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="fixed inset-0 z-40" 
+                        onClick={() => setIsModeOpen(false)} 
+                      />
+                      <motion.div
+                        initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                        className="absolute top-full left-4 right-4 mt-2 bg-white/95 backdrop-blur-xl border border-slate-200 rounded-3xl shadow-2xl overflow-hidden py-3 z-50 ring-1 ring-black/5"
+                      >
+                        <div className="px-5 py-2 mb-2 border-b border-slate-100">
+                          <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Global AI Network</span>
+                        </div>
+                        <div className="max-h-[400px] overflow-y-auto custom-scrollbar px-2 space-y-1">
+                          {MODES.filter(m => m.id !== 'live' || systemConfig.liveAiMode).map((mode) => {
+                            const Icon = mode.icon;
+                            const currentModeId = currentSession?.mode || preferences.preferredMode || 'student';
+                            const isActive = currentModeId === mode.id;
+                            const isLocked = !isPaid && ['live', 'assistant'].includes(mode.id);
+                            
+                            return (
+                              <button
+                                key={mode.id}
+                                onClick={async () => {
+                                  if (isLocked) {
+                                    setIsUpgradeOpen(true);
+                                    setIsModeOpen(false);
+                                    return;
+                                  }
+                                  await handleModeChange(mode.id);
+                                  setIsModeOpen(false);
+                                }}
+                                className={cn(
+                                  "w-full flex items-center gap-4 px-4 py-3 text-sm transition-all text-left relative overflow-hidden rounded-2xl group",
+                                  isActive 
+                                    ? "bg-slate-900 text-white shadow-xl shadow-slate-200" 
+                                    : "hover:bg-slate-50 text-slate-600"
+                                )}
+                              >
+                                <div className={cn(
+                                  "p-2 rounded-xl transition-colors",
+                                  isActive ? "bg-white/10" : mode.color
+                                )}>
+                                  <Icon className="w-4 h-4" />
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <div className="font-bold flex items-center gap-2">
+                                    {mode.label}
+                                    {isLocked && <Lock className="w-3 h-3 opacity-50" />}
+                                  </div>
+                                  <p className={cn("text-[10px] truncate", isActive ? "text-slate-400" : "text-slate-500")}>
+                                    {mode.description}
+                                  </p>
+                                </div>
+                                {isActive && <Check className="w-4 h-4 text-emerald-400" />}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </motion.div>
+                    </>
+                  )}
+                </AnimatePresence>
+              </div>
             </div>
             
             <div className="flex items-center gap-2 pointer-events-auto">

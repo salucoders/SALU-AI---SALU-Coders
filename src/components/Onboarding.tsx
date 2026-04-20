@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
-  Sparkles, 
   ChevronRight, 
   ChevronLeft, 
   X, 
@@ -13,9 +12,11 @@ import {
   MessageSquare,
   Plus,
   Settings,
-  Mic
+  Mic,
+  Crown
 } from 'lucide-react';
 import { cn } from '../lib/utils';
+import { LOGO_URL, APP_NAME } from '../constants';
 
 interface Step {
   title: string;
@@ -27,9 +28,9 @@ interface Step {
 
 const steps: Step[] = [
   {
-    title: "Welcome to SALU AI",
-    description: "Your advanced AI companion designed for the SALU community. Let's take a quick tour of the core features.",
-    icon: <Sparkles className="w-8 h-8 text-brand-500" />,
+    title: `Welcome to ${APP_NAME}`,
+    description: `Your advanced AI companion designed for the SALU community. Let's take a quick tour of the core features.`,
+    icon: <img src={LOGO_URL} alt="Logo" className="w-8 h-8 object-contain" referrerPolicy="no-referrer" />,
     position: 'center'
   },
   {
@@ -62,8 +63,8 @@ const steps: Step[] = [
   },
   {
     title: "Choose Your Plan",
-    description: "Start with the Free plan to explore, or grab SALU AI Plus with JazzCash for 100 daily credits and exclusive Study Toolbox features.",
-    icon: <Sparkles className="w-8 h-8 text-amber-500" />,
+    description: `Start with the Free plan to explore, or grab ${APP_NAME} Plus with JazzCash for 100 daily credits and exclusive Study Toolbox features.`,
+    icon: <Crown className="w-8 h-8 text-amber-500" />,
     position: 'center'
   }
 ];

@@ -167,7 +167,7 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
       const sessionUpdate: any = { updatedAt: serverTimestamp() };
       
       if (role === 'user' && messages.length === 0) {
-        sessionUpdate.title = content.slice(0, 40) + (content.length > 40 ? '...' : '');
+        sessionUpdate.title = (content || (finalAttachments.length > 0 ? "Attachment analysis" : "New Conversation")).slice(0, 40) + ((content && content.length > 40) ? '...' : '');
       }
       
       batch.update(sessionRef, sessionUpdate);
