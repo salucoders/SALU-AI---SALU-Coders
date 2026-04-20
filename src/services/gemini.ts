@@ -106,7 +106,7 @@ export async function getHiddenConfig(): Promise<{ assistantName: string, activa
 }
 
 function getSystemInstruction(mode: Mode, preferences: UserPreferences, persona: Persona, hiddenConfig?: any) {
-  const assistantName = preferences?.assistantName || hiddenConfig?.assistantName || "SALU AI";
+  const assistantName = "SALU AI";
   
   const SYSTEM_INSTRUCTIONS: Record<string, string> = {
     student: "You are in STUDENT MODE. Focus on assignment solving, notes generation, summaries, quiz creation, and explaining concepts in simple language for students.",
@@ -309,7 +309,7 @@ export async function sendMessage(
     If the preferred language is Urdu or Sindhi, respond primarily in that language but keep technical terms in English.`;
 
   const hiddenConfig = await getHiddenConfig();
-  const assistantName = preferences?.assistantName || hiddenConfig.assistantName || "SALU AI";
+  const assistantName = "SALU AI";
   const systemInstruction = `You are ${assistantName}. ${getSystemInstruction(mode, preferences, persona, hiddenConfig)} ${userContext} 
     Be friendly, to the point, smart, and motivational. Avoid unnecessary repetition. Use clear, structured formatting with headings and bullet points.
     
@@ -454,7 +454,7 @@ export async function sendMessageStream(
     If the preferred language is Urdu or Sindhi, respond primarily in that language but keep technical terms in English.`;
 
   const hiddenConfig = await getHiddenConfig();
-  const assistantName = preferences?.assistantName || hiddenConfig.assistantName || "SALU AI";
+  const assistantName = "SALU AI";
   const systemInstruction = `You are ${assistantName}. ${getSystemInstruction(mode, (preferences as UserPreferences), persona, hiddenConfig)} ${userContext} 
     Be friendly, to the point, smart, and motivational. Avoid unnecessary repetition. Use clear, structured formatting with headings and bullet points.
     

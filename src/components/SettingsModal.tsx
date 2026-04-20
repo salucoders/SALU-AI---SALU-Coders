@@ -221,20 +221,6 @@ export function SettingsModal({ isOpen, onClose }: { isOpen: boolean; onClose: (
               <section className="space-y-4">
                 <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider px-1">AI Personality</h3>
                 <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm space-y-4">
-                  <div>
-                    <label className="text-xs font-medium text-slate-600 block mb-1.5 flex items-center gap-1.5">
-                      <Sparkles className="w-3.5 h-3.5 text-brand-500" /> Assistant Name
-                    </label>
-                    <input
-                      type="text"
-                      value={localPrefs.assistantName || 'SALU AI'}
-                      onChange={(e) => setLocalPrefs(prev => ({ ...prev, assistantName: e.target.value }))}
-                      placeholder="e.g. SALU AI"
-                      className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-all outline-none text-slate-800 text-sm"
-                    />
-                    <p className="mt-1 text-[10px] text-slate-400 font-medium italic">What the AI will call itself when addressing you.</p>
-                  </div>
-
                   <div className="space-y-2">
                     {personas.map((persona) => {
                       const Icon = persona.icon;
