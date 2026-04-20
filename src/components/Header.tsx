@@ -37,7 +37,6 @@ export const Header = React.memo(({ onNewChat, onOpenSidebar, onOpenSettings, ba
                 src={LOGO_URL} 
                 alt={APP_NAME} 
                 className="w-7 h-7 object-contain"
-                referrerPolicy="no-referrer"
               />
             </div>
             <div className="flex flex-col">

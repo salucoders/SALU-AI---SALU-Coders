@@ -315,7 +315,6 @@ export default function App() {
             src={LOGO_URL} 
             alt={APP_NAME} 
             className="w-10 h-10 object-contain"
-            referrerPolicy="no-referrer"
           />
         </div>
         <div className="flex items-center gap-2 text-slate-400 font-black uppercase tracking-widest text-[10px]">
@@ -481,7 +480,6 @@ export default function App() {
                     src={LOGO_URL} 
                     alt="Logo" 
                     className="w-6 h-6 object-contain"
-                    referrerPolicy="no-referrer"
                   />
                 </div>
                 <span className="text-slate-900 font-black tracking-tighter text-base lg:text-lg">{APP_NAME}</span>
@@ -649,7 +647,6 @@ export default function App() {
                             src={LOGO_URL} 
                             alt="Logo" 
                             className="w-full h-full object-contain"
-                            referrerPolicy="no-referrer"
                           />
                         </div>
                       </div>
@@ -698,7 +695,6 @@ export default function App() {
                             src={CREATOR_IMAGE_URL} 
                             alt="Creator" 
                             className="w-full h-full object-cover"
-                            referrerPolicy="no-referrer"
                           />
                         </div>
                         <div className="text-left">

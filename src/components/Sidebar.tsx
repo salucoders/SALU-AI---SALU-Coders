@@ -191,7 +191,6 @@ export const Sidebar = React.memo(({
                   src={LOGO_URL} 
                   alt={APP_NAME} 
                   className="w-6 h-6 object-contain"
-                  referrerPolicy="no-referrer"
                 />
               </div>
               <div className="flex flex-col -space-y-0.5">

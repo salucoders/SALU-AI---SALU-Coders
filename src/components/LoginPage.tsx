@@ -15,7 +15,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { cn } from '../lib/utils';
-import { LOGO_URL, APP_NAME } from '../constants';
+import { LOGO_URL, APP_NAME, CREATOR_IMAGE_URL } from '../constants';
 
 export function LoginPage() {
   const { loginWithGoogle, isAuthenticating } = useAuth();
@@ -73,7 +73,6 @@ export function LoginPage() {
               src={LOGO_URL} 
               alt={APP_NAME} 
               className="w-8 h-8 object-contain"
-              referrerPolicy="no-referrer"
             />
           </div>
           <span className="text-xl font-black text-slate-900 tracking-tighter">{APP_NAME}</span>
@@ -111,7 +110,7 @@ export function LoginPage() {
               className="inline-flex items-center gap-2 px-4 py-1.5 bg-brand-50 border border-brand-100 rounded-full text-[10px] font-black text-brand-600 uppercase tracking-widest"
             >
               <div className="w-3.5 h-3.5 flex items-center justify-center">
-                <img src={LOGO_URL} alt="SALU" className="w-full h-full object-contain" referrerPolicy="no-referrer" />
+                <img src={LOGO_URL} alt="SALU" className="w-full h-full object-contain" />
               </div>
               Intelligence Reimagined for SALU
             </motion.div>
@@ -301,10 +300,9 @@ export function LoginPage() {
             <div className="relative z-10 w-48 h-48 md:w-64 md:h-64 shrink-0">
               <div className="absolute inset-0 bg-brand-500 blur-3xl opacity-20 animate-pulse rounded-full" />
               <img 
-                src="/assets/creator/Babar.jpg" 
+                src={CREATOR_IMAGE_URL} 
                 alt="Babar Ali Arain" 
                 className="w-full h-full object-cover rounded-[2rem] border-2 border-white/10 relative z-10 grayscale hover:grayscale-0 transition-all duration-700"
-                referrerPolicy="no-referrer"
                 onError={(e) => {
                   (e.target as HTMLImageElement).src = "https://picsum.photos/seed/developer/400/400";
                 }}
@@ -335,7 +333,7 @@ export function LoginPage() {
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-12">
           <div className="space-y-4 text-center md:text-left">
             <div className="flex items-center justify-center md:justify-start gap-3">
-              <img src={LOGO_URL} alt="SALU" className="h-6 object-contain" referrerPolicy="no-referrer" />
+              <img src={LOGO_URL} alt="SALU" className="h-6 object-contain" />
               <span className="text-sm font-black tracking-tighter text-slate-400 uppercase">SALU CODERS</span>
             </div>
             <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em]">

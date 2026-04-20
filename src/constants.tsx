@@ -1,8 +1,10 @@
 import { GraduationCap, Code, Video, School, User, Mic } from 'lucide-react';
 import { Mode } from './types';
+import logo from './assets/logo/salu_logo.png';
+import creator from './assets/creator/Babar.jpg';
 
-export const LOGO_URL = '/assets/logo/salu_logo.png';
-export const CREATOR_IMAGE_URL = '/assets/creator/Babar.jpg';
+export const LOGO_URL = logo;
+export const CREATOR_IMAGE_URL = creator;
 export const APP_NAME = 'SALU AI';
 
 export const MODES: { id: Mode; label: string; icon: any; color: string; description: string }[] = [
