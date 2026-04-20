@@ -1,0 +1,11 @@
+src/context/AuthContext.tsx:12:  logout: () => Promise<void>;
+src/context/AuthContext.tsx:114:  const logout = async () => {
+src/context/AuthContext.tsx:124:    <AuthContext.Provider value={{ user, loading, isAuthenticating, loginWithGoogle, logout }}>
+src/components/ChatInterface.tsx:90:  creator: [
+src/components/Sidebar.tsx:57:  const { user, loginWithGoogle, logout, isAuthenticating } = useAuth();
+src/components/Sidebar.tsx:104:      await logout();
+src/constants.tsx:4:export const LOGO_URL = 'https://upload.wikimedia.org/wikipedia/en/thumb/a/aa/Shah_Abdul_Latif_University_logo.png/250px-Shah_Abdul_Latif_University_logo.png';
+src/constants.tsx:11:  { id: 'creator', label: 'Creator', icon: Video, color: 'text-purple-500 bg-purple-50', description: 'YouTube, SEO, AI Art' },
+src/types.ts:3:export type Mode = 'student' | 'developer' | 'creator' | 'assistant' | 'salu' | 'live';
+src/services/gemini.ts:114:    creator: "You are in CREATOR MODE. Focus on YouTube titles, SEO, descriptions, hashtags, thumbnail ideas, scripts, and social media content.",
+src/services/gemini.ts:128:  const CREATOR_INFO = "The owner and creator of SALU Coders is Babar Ali Arain, a student of IT Batch 2026. Only share this information if explicitly asked about the owner, creator, or Babar Ali Arain.";

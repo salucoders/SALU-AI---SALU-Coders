@@ -17,7 +17,7 @@ interface AdminPanelProps {
 export function AdminPanel({ onClose }: AdminPanelProps) {
   const { user } = useAuth();
   const { preferences } = useUserProfile();
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'users' | 'members' | 'broadcast' | 'settings' | 'data'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'users' | 'members' | 'broadcast' | 'settings' | 'data' | 'api-keys'>('dashboard');
   const [users, setUsers] = useState<any[]>([]);
   const [stats, setStats] = useState({ users: 0, sessions: 0, messages: 0 });
   const [loading, setLoading] = useState(true);
@@ -26,6 +26,11 @@ export function AdminPanel({ onClose }: AdminPanelProps) {
     publicRegistration: true,
     liveAiMode: true,
     geminiApiKey: '',
+    geminiApiKey2: '',
+    geminiApiKey3: '',
+    geminiApiKey4: '',
+    geminiApiKey5: '',
+    groqApiKey: '',
     geminiImageGenApiKey: '',
     togetherApiKey: '',
     imageKitPublicKey: '',
@@ -114,6 +119,11 @@ export function AdminPanel({ onClose }: AdminPanelProps) {
           appName: d.appName ?? prev.appName,
           welcomeMessage: d.welcomeMessage ?? prev.welcomeMessage,
           geminiApiKey: d.geminiApiKey ?? prev.geminiApiKey,
+          geminiApiKey2: d.geminiApiKey2 ?? prev.geminiApiKey2,
+          geminiApiKey3: d.geminiApiKey3 ?? prev.geminiApiKey3,
+          geminiApiKey4: d.geminiApiKey4 ?? prev.geminiApiKey4,
+          geminiApiKey5: d.geminiApiKey5 ?? prev.geminiApiKey5,
+          groqApiKey: d.groqApiKey ?? prev.groqApiKey,
           geminiImageGenApiKey: d.geminiImageGenApiKey ?? prev.geminiImageGenApiKey,
           togetherApiKey: d.togetherApiKey ?? prev.togetherApiKey,
           imageKitPublicKey: d.imageKitPublicKey ?? prev.imageKitPublicKey,
@@ -202,6 +212,11 @@ export function AdminPanel({ onClose }: AdminPanelProps) {
           },
           body: JSON.stringify({ 
             geminiApiKey: systemConfig.geminiApiKey,
+            geminiApiKey2: systemConfig.geminiApiKey2,
+            geminiApiKey3: systemConfig.geminiApiKey3,
+            geminiApiKey4: systemConfig.geminiApiKey4,
+            geminiApiKey5: systemConfig.geminiApiKey5,
+            groqApiKey: systemConfig.groqApiKey,
             geminiImageGenApiKey: systemConfig.geminiImageGenApiKey,
             togetherApiKey: systemConfig.togetherApiKey,
             imageKitPublicKey: systemConfig.imageKitPublicKey,
@@ -222,6 +237,11 @@ export function AdminPanel({ onClose }: AdminPanelProps) {
         appName: systemConfig.appName,
         welcomeMessage: systemConfig.welcomeMessage,
         geminiApiKey: systemConfig.geminiApiKey,
+        geminiApiKey2: systemConfig.geminiApiKey2,
+        geminiApiKey3: systemConfig.geminiApiKey3,
+        geminiApiKey4: systemConfig.geminiApiKey4,
+        geminiApiKey5: systemConfig.geminiApiKey5,
+        groqApiKey: systemConfig.groqApiKey,
         geminiImageGenApiKey: systemConfig.geminiImageGenApiKey,
         togetherApiKey: systemConfig.togetherApiKey,
         imageKitPublicKey: systemConfig.imageKitPublicKey,
@@ -386,6 +406,16 @@ export function AdminPanel({ onClose }: AdminPanelProps) {
             >
               <Settings className="w-5 h-5" />
               <span className="font-medium">System Settings</span>
+            </button>
+            <button
+              onClick={() => setActiveTab('api-keys')}
+              className={cn(
+                "flex items-center gap-3 px-4 py-3 rounded-xl transition-all whitespace-nowrap",
+                activeTab === 'api-keys' ? "bg-rose-500 text-white" : "text-slate-400 hover:bg-slate-800 hover:text-white"
+              )}
+            >
+              <Key className="w-5 h-5" />
+              <span className="font-medium">API Configuration</span>
             </button>
           </div>
           
@@ -734,6 +764,18 @@ export function AdminPanel({ onClose }: AdminPanelProps) {
                 )}
 
                 {/* Settings Tab */}
+                {activeTab === 'api-keys' && (
+                  <div className="max-w-4xl mx-auto space-y-6">
+                    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 md:p-8 space-y-6">
+                      <div className="flex items-center gap-3 pb-4 border-b border-slate-100">
+                        <Cpu className="w-5 h-5 text-rose-500" />
+                        <h3 className="text-lg font-bold text-slate-800">Advanced API Configuration</h3>
+                      </div>
+                      <p className="text-sm text-slate-500 mb-4">Please use the System Settings tab to configure API Keys.</p>
+                      <button onClick={() => setActiveTab('settings')} className="px-6 py-3 bg-brand-500 text-white rounded-xl">Go to System Settings</button>
+                    </div>
+                  </div>
+                )}
                 {activeTab === 'settings' && (
                   <div className="max-w-2xl space-y-6">
                     <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 md:p-8 space-y-6">
@@ -832,7 +874,7 @@ export function AdminPanel({ onClose }: AdminPanelProps) {
                       
                       <div className="space-y-4">
                         <div>
-                          <label className="block text-sm font-medium text-slate-700 mb-1">Gemini API Key</label>
+                          <label className="block text-sm font-medium text-slate-700 mb-1">Gemini API Key 1 (Primary)</label>
                           <div className="relative">
                             <input 
                               type={showApiKey ? "text" : "password"} 
@@ -849,7 +891,74 @@ export function AdminPanel({ onClose }: AdminPanelProps) {
                               {showApiKey ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                             </button>
                           </div>
-                          <p className="mt-2 text-xs text-slate-500">Get a free key from <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noreferrer" className="text-rose-500 hover:underline">Google AI Studio</a>.</p>
+                        </div>
+
+                        <div>
+                          <label className="block text-sm font-medium text-slate-700 mb-1">Gemini API Key 2 (Backup)</label>
+                          <div className="relative">
+                            <input 
+                              type={showApiKey ? "text" : "password"} 
+                              value={systemConfig.geminiApiKey2}
+                              onChange={(e) => setSystemConfig({...systemConfig, geminiApiKey2: e.target.value})}
+                              placeholder="AIzaSy..."
+                              className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 transition-all pr-12"
+                            />
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className="block text-sm font-medium text-slate-700 mb-1">Gemini API Key 3 (Backup)</label>
+                          <div className="relative">
+                            <input 
+                              type={showApiKey ? "text" : "password"} 
+                              value={systemConfig.geminiApiKey3}
+                              onChange={(e) => setSystemConfig({...systemConfig, geminiApiKey3: e.target.value})}
+                              placeholder="AIzaSy..."
+                              className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 transition-all pr-12"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-1">Gemini API Key 4</label>
+                            <div className="relative">
+                              <input 
+                                type={showApiKey ? "text" : "password"} 
+                                value={systemConfig.geminiApiKey4}
+                                onChange={(e) => setSystemConfig({...systemConfig, geminiApiKey4: e.target.value})}
+                                placeholder="AIzaSy..."
+                                className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 transition-all"
+                              />
+                            </div>
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-1">Gemini API Key 5</label>
+                            <div className="relative">
+                              <input 
+                                type={showApiKey ? "text" : "password"} 
+                                value={systemConfig.geminiApiKey5}
+                                onChange={(e) => setSystemConfig({...systemConfig, geminiApiKey5: e.target.value})}
+                                placeholder="AIzaSy..."
+                                className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 transition-all"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                        <p className="mt-2 text-xs text-slate-500">The system automatically rotates through keys 1-5 if a Quota Exceeded error occurs.</p>
+
+                        <div className="pt-4 border-t border-slate-100">
+                          <label className="block text-sm font-medium text-slate-700 mb-1">Groq API Key (Final Fallback)</label>
+                          <div className="relative">
+                            <input 
+                              type={showApiKey ? "text" : "password"} 
+                              value={systemConfig.groqApiKey}
+                              onChange={(e) => setSystemConfig({...systemConfig, groqApiKey: e.target.value})}
+                              placeholder="gsk_..."
+                              className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 transition-all pr-12"
+                            />
+                          </div>
+                          <p className="mt-2 text-xs text-slate-500">If all Gemini keys fail, requests fallback to Groq's high-speed API.</p>
                         </div>
 
                         <div>

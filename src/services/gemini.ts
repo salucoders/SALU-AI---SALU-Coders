@@ -3,8 +3,15 @@ import { GoogleGenAI } from "@google/genai";
 import { doc, getDoc } from "firebase/firestore";
 import { db } from "../lib/firebase";
 
-export async function getSystemConfig(): Promise<{ apiKey: string, defaultModel: string, imageGenApiKey?: string }> {
-  let apiKey = "";
+export async function getSystemConfig(): Promise<{ 
+  apiKey: string, 
+  apiKeys: string[],
+  groqApiKey: string,
+  defaultModel: string, 
+  imageGenApiKey?: string 
+}> {
+  let apiKeys: string[] = [];
+  let groqApiKey = "";
   let imageGenApiKey = "";
   let defaultModel = "gemini-2.0-flash";
   let keySource = "";
@@ -14,13 +21,21 @@ export async function getSystemConfig(): Promise<{ apiKey: string, defaultModel:
     const configDoc = await getDoc(doc(db, 'system', 'config'));
     if (configDoc.exists()) {
       const data = configDoc.data();
-      if (data.geminiApiKey) {
-        apiKey = data.geminiApiKey;
+      const keys = [
+        data.geminiApiKey,
+        data.geminiApiKey2,
+        data.geminiApiKey3,
+        data.geminiApiKey4,
+        data.geminiApiKey5
+      ].filter(k => k && typeof k === 'string' && k.trim() !== '');
+      
+      if (keys.length > 0) {
+        apiKeys = keys;
         keySource = "Firestore Config";
       }
-      if (data.geminiImageGenApiKey) {
-        imageGenApiKey = data.geminiImageGenApiKey;
-      }
+      
+      if (data.groqApiKey) groqApiKey = data.groqApiKey;
+      if (data.geminiImageGenApiKey) imageGenApiKey = data.geminiImageGenApiKey;
       if (data.defaultModel) defaultModel = data.defaultModel;
     }
   } catch (e) {
@@ -28,14 +43,14 @@ export async function getSystemConfig(): Promise<{ apiKey: string, defaultModel:
   }
 
   // 2. Fallback to Express backend `/api/config` (if running as Web Service)
-  if (!apiKey || !imageGenApiKey) {
+  if (apiKeys.length === 0 || !imageGenApiKey) {
     try {
       const res = await fetch(`/api/config?t=${new Date().getTime()}`);
       const contentType = res.headers.get("content-type");
       if (res.ok && contentType && contentType.includes("application/json")) {
         const data = await res.json();
-        if (data.geminiApiKey && !apiKey) {
-          apiKey = data.geminiApiKey;
+        if (data.geminiApiKey && apiKeys.length === 0) {
+          apiKeys = [data.geminiApiKey];
           keySource = "Backend API";
         }
         if (data.geminiImageGenApiKey && !imageGenApiKey) {
@@ -49,25 +64,24 @@ export async function getSystemConfig(): Promise<{ apiKey: string, defaultModel:
   }
 
   // 3. Fallback to Vite/Node Environment Variables
-  if (!apiKey) {
+  if (apiKeys.length === 0) {
     if (import.meta.env && import.meta.env.VITE_GEMINI_API_KEY) {
-      apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+      apiKeys = [import.meta.env.VITE_GEMINI_API_KEY];
       keySource = "Vite Environment Variable";
     } else if (typeof process !== 'undefined' && process.env && process.env.GEMINI_API_KEY) {
-      apiKey = process.env.GEMINI_API_KEY;
+      apiKeys = [process.env.GEMINI_API_KEY];
       keySource = "Node Environment Variable";
     }
   }
 
-  // Removed overzealous key blocking to prevent interference with valid keys
-  if (apiKey === "") {
+  if (apiKeys.length === 0) {
     keySource = "Blocked/Empty";
   }
 
   // Attach the source for debugging purposes on error
   (window as any)._geminiKeySource = keySource;
 
-  return { apiKey, defaultModel, imageGenApiKey };
+  return { apiKey: apiKeys[0] || "", apiKeys, groqApiKey, defaultModel, imageGenApiKey };
 }
 
 export async function getHiddenConfig(): Promise<{ assistantName: string, activationResponses: string[], customSystemInstructions: string }> {
@@ -164,6 +178,102 @@ async function prepareParts(content: string, attachments?: string[]): Promise<an
   return parts;
 }
 
+async function callGroqAPI(apiKey: string, contents: any[], systemInstruction: string): Promise<string> {
+  const messages = [];
+  if (systemInstruction) {
+    messages.push({ role: 'system', content: systemInstruction });
+  }
+  
+  for (const c of contents) {
+    let textStr = "";
+    for (const p of c.parts) {
+      if (p.text) textStr += p.text + "\n";
+    }
+    if (textStr.trim()) {
+      messages.push({ role: c.role === 'model' ? 'assistant' : 'user', content: textStr.trim() });
+    }
+  }
+
+  const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      model: 'llama-3.1-70b-versatile',
+      messages
+    })
+  });
+
+  if (!response.ok) {
+    const err = await response.json().catch(()=>({}));
+    throw new Error(err.error?.message || "Groq request failed");
+  }
+
+  const data = await response.json();
+  return data.choices[0]?.message?.content || "";
+}
+
+async function callGroqAPIStream(apiKey: string, contents: any[], systemInstruction: string, onChunk?: (text: string) => void): Promise<string> {
+  const messages = [];
+  if (systemInstruction) {
+    messages.push({ role: 'system', content: systemInstruction });
+  }
+  
+  for (const c of contents) {
+    let textStr = "";
+    for (const p of c.parts) {
+      if (p.text) textStr += p.text + "\n";
+    }
+    if (textStr.trim()) {
+      messages.push({ role: c.role === 'model' ? 'assistant' : 'user', content: textStr.trim() });
+    }
+  }
+
+  const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      model: 'llama-3.1-70b-versatile',
+      messages,
+      stream: true
+    })
+  });
+
+  if (!response.ok) {
+    const err = await response.json().catch(()=>({}));
+    throw new Error(err.error?.message || "Groq request failed");
+  }
+
+  const reader = response.body?.getReader();
+  const decoder = new TextDecoder();
+  let fullText = "";
+
+  if (reader) {
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      const chunkStr = decoder.decode(value, { stream: true });
+      const lines = chunkStr.split('\n');
+      for (const line of lines) {
+        if (line.startsWith('data: ') && line.trim() !== 'data: [DONE]') {
+          try {
+            const parsed = JSON.parse(line.slice(6));
+            const delta = parsed.choices?.[0]?.delta?.content || "";
+            fullText += delta;
+            if (onChunk) onChunk(fullText);
+          } catch(e) {}
+        }
+      }
+    }
+  }
+  return fullText;
+}
+
 export async function sendMessage(
   mode: Mode,
   history: Message[],
@@ -223,76 +333,89 @@ export async function sendMessage(
   const currentParts = await prepareParts(message, attachments);
   contents.push({ role: 'user', parts: currentParts });
 
-  let apiKeyForDebug = "";
-  try {
-    const config = await getSystemConfig();
-    apiKeyForDebug = config.apiKey || "";
-    
-    if (!config.apiKey) {
-      throw new Error("SALU AI Engine key is missing");
-    }
+  const config = await getSystemConfig();
+  const apiKeys = config.apiKeys;
+  const groqApiKey = config.groqApiKey;
+  let lastError: any = null;
 
-    const ai = new GoogleGenAI({ apiKey: config.apiKey });
-    const response = await ai.models.generateContent({
-      model: config.defaultModel,
-      contents,
-      config: {
-        systemInstruction: systemInstruction
-      }
-    });
+  if (apiKeys.length === 0 && !groqApiKey) {
+    return "System Error: SALU AI Engine key is missing. Please configure it in the Admin Panel.";
+  }
 
-    const text = response.text;
-    
-    if (!text) {
-      throw new Error("Empty response from AI");
-    }
-
-    return text;
-  } catch (error: any) {
-    console.error("AI Service Error Details:", {
-      message: error.message,
-      stack: error.stack,
-      error: error
-    });
-    
-    const keySource = (window as any)._geminiKeySource || "Unknown";
-    
-    if (error.message?.includes("API key not valid")) {
-      return `System Error: The API key provided is invalid. (Loaded from: ${keySource}). Please check your API key in Google AI Studio.`;
-    }
-    if (error.message?.includes("PERMISSION_DENIED")) {
-      return `System Error: Access denied. Your API key might be blocked or restricted. (Loaded from: ${keySource}).`;
-    }
-    let fallbackModelName = "Unknown";
+  // Try each Gemini key
+  for (let i = 0; i < apiKeys.length; i++) {
+    const key = apiKeys[i];
     try {
-       const c = await getSystemConfig();
-       fallbackModelName = c.defaultModel;
-    } catch(e) {}
-    
-    if (error.message?.includes("404") || error.message?.includes("not found")) {
-      return `System Error: The requested AI model '${fallbackModelName}' was deprecated or not found. Please try switching to SALU AI Lite in the Admin Panel.`;
+      const ai = new GoogleGenAI({ apiKey: key });
+      const response = await ai.models.generateContent({
+        model: config.defaultModel,
+        contents,
+        config: {
+          systemInstruction: systemInstruction
+        }
+      });
+
+      const text = response.text;
+      if (!text) throw new Error("Empty response from AI");
+      return text;
+
+    } catch (e: any) {
+      lastError = e;
+      console.warn(`Gemini key ${i + 1} failed:`, e.message);
+      // Wait a moment before trying the next key
+      if (i < apiKeys.length - 1) {
+        await new Promise(r => setTimeout(r, 1000));
+      }
     }
-    if (error.message?.includes("429") || error.message?.includes("RESOURCE_EXHAUSTED") || error.message?.includes("quota")) {
-      return `System Error: Google's API returned "Quota Exceeded/Rate Limited" for this key. 
+  }
+
+  // If we reach here, all Gemini keys failed or there were none. Let's try Groq if configured!
+  if (groqApiKey) {
+    try {
+      console.info("All Gemini keys failed or none found. Falling back to Groq API.");
+      const groqText = await callGroqAPI(groqApiKey, contents, systemInstruction);
+      if (groqText) return groqText;
+    } catch (e: any) {
+      lastError = e;
+      console.warn("Groq fallback failed:", e.message);
+    }
+  }
+
+  // If everything failed, format the last error
+  const error = lastError;
+  const keySource = (window as any)._geminiKeySource || "Unknown";
+  
+  if (error?.message?.includes("API key not valid")) {
+    return `System Error: The API key provided is invalid. (Loaded from: ${keySource}). Please check your API key in Google AI Studio.`;
+  }
+  if (error?.message?.includes("PERMISSION_DENIED")) {
+    return `System Error: Access denied. Your API key might be blocked or restricted. (Loaded from: ${keySource}).`;
+  }
+  let fallbackModelName = config.defaultModel || "Unknown";
+  
+  if (error?.message?.includes("404") || error?.message?.includes("not found")) {
+    return `System Error: The requested AI model '${fallbackModelName}' was deprecated or not found. Please try switching to SALU AI Lite in the Admin Panel.`;
+  }
+  if (error?.message?.includes("429") || error?.message?.includes("RESOURCE_EXHAUSTED") || error?.message?.includes("quota")) {
+    return `System Error: Google's API returned "Quota Exceeded/Rate Limited" on all provided keys. 
 If this is a completely new key, Google may have restricted the free-tier quota for your Google Cloud project or region (this is a common Google security measure). 
 To fix this: Go to console.cloud.google.com, ensure your project has an active Billing Account linked, or wait a few hours if you've simply hit the free requests limit. 
-[Key: ${apiKeyForDebug.substring(0, 10)}...] [Source: ${keySource}]`;
-    }
-    
-    // Try to parse JSON errors if they are returned as a string
-    try {
-      if (error.message && error.message.startsWith('{')) {
-        const parsed = JSON.parse(error.message);
-        if (parsed.error && parsed.error.message) {
-          return `System Error: ${parsed.error.message} [Key: ${apiKeyForDebug.substring(0, 10)}]`;
-        }
-      }
-    } catch (e) {
-      // Ignore parsing errors
-    }
-
-    return `System Error: ${error.message || "I encountered an unexpected issue."} [Key: ${apiKeyForDebug.substring(0, 10)}] [Source: ${keySource}]`;
+[Source: ${keySource}]`;
   }
+  
+  // Try to parse JSON errors if they are returned as a string
+  try {
+    if (error?.message && error.message.startsWith('{')) {
+      const parsed = JSON.parse(error.message);
+      if (parsed.error && parsed.error.message) {
+        return `System Error: ${parsed.error.message}`;
+      }
+    }
+  } catch (e) {
+    // Ignore parsing errors
+  }
+
+  return `System Error: ${error?.message || "I encountered an unexpected issue."} [Source: ${keySource}]`;
 }
 
 export async function sendMessageStream(
@@ -355,71 +478,85 @@ export async function sendMessageStream(
   const currentParts = await prepareParts(message, attachments);
   contents.push({ role: 'user', parts: currentParts });
 
-  let apiKeyForDebug = "";
-  try {
-    const config = await getSystemConfig();
-    apiKeyForDebug = config.apiKey || "";
-    
-    if (!config.apiKey) {
-      throw new Error("SALU AI Engine key is missing");
-    }
+  const config = await getSystemConfig();
+  const apiKeys = config.apiKeys;
+  const groqApiKey = config.groqApiKey;
+  let lastError: any = null;
 
-    const ai = new GoogleGenAI({ apiKey: config.apiKey });
-    const responseStream = await ai.models.generateContentStream({
-      model: config.defaultModel,
-      contents,
-      config: {
-        systemInstruction: systemInstruction
-      }
-    });
+  if (apiKeys.length === 0 && !groqApiKey) {
+    return "System Error: SALU AI Engine key is missing. Please configure it in the Admin Panel.";
+  }
 
-    let fullText = "";
-    for await (const chunk of responseStream) {
-      if (chunk.text) {
-        fullText += chunk.text;
-        if (onChunk) {
-          onChunk(fullText);
+  // Try each Gemini key
+  for (let i = 0; i < apiKeys.length; i++) {
+    const key = apiKeys[i];
+    try {
+      const ai = new GoogleGenAI({ apiKey: key });
+      const responseStream = await ai.models.generateContentStream({
+        model: config.defaultModel,
+        contents,
+        config: {
+          systemInstruction: systemInstruction
+        }
+      });
+
+      let fullText = "";
+      for await (const chunk of responseStream) {
+        if (chunk.text) {
+          fullText += chunk.text;
+          if (onChunk) {
+            onChunk(fullText);
+          }
         }
       }
-    }
-    
-    if (!fullText) {
-      throw new Error("Empty response from AI");
-    }
-
-    return fullText;
-  } catch (error: any) {
-    console.error("AI Service Error Details:", {
-      message: error.message,
-      stack: error.stack,
-      error: error
-    });
-    
-    const keySource = (window as any)._geminiKeySource || "Unknown";
-    let errorMessage = "";
-    
-    if (error.message?.includes("API key not valid")) {
-      errorMessage = `System Error: The API key provided is invalid. (Loaded from: ${keySource}). Please check your API key in Google AI Studio.`;
-    } else if (error.message?.includes("PERMISSION_DENIED")) {
-      errorMessage = `System Error: Access denied. Your API key might be blocked or restricted. (Loaded from: ${keySource}).`;
-    } else {
-      let fallbackModelName = "Unknown";
-      try {
-         const c = await getSystemConfig();
-         fallbackModelName = c.defaultModel;
-      } catch(e) {}
       
-      if (error.message?.includes("404") || error.message?.includes("not found")) {
-        errorMessage = `System Error: The requested AI model '${fallbackModelName}' was deprecated or not found. Please try switching to SALU AI Lite in the Admin Panel.`;
-      } else if (error.message?.includes("429") || error.message?.includes("RESOURCE_EXHAUSTED") || error.message?.includes("quota")) {
-        errorMessage = `System Error: Google's API returned "Quota Exceeded/Rate Limited" for this key. \nIf this is a completely new key, Google may have restricted the free-tier quota for your Google Cloud project or region (this is a common Google security measure). \nTo fix this: Go to console.cloud.google.com, ensure your project has an active Billing Account linked, or wait a few hours if you've simply hit the free requests limit. \n[Key: ${apiKeyForDebug.substring(0, 10)}...] [Source: ${keySource}]`;
-      } else {
-        errorMessage = `System Error: ${error.message || "I encountered an unexpected issue."} [Key: ${apiKeyForDebug.substring(0, 10)}] [Source: ${keySource}]`;
+      if (!fullText) throw new Error("Empty response from AI");
+      return fullText;
+
+    } catch (e: any) {
+      lastError = e;
+      console.warn(`Gemini key ${i + 1} stream failed:`, e.message);
+      // Wait a moment before trying the next key
+      if (i < apiKeys.length - 1) {
+        await new Promise(r => setTimeout(r, 1000));
       }
     }
-    
-    return errorMessage;
   }
+
+  // If we reach here, all Gemini keys failed or there were none. Let's try Groq if configured!
+  if (groqApiKey) {
+    try {
+      console.info("All Gemini keys failed or none found. Falling back to Groq API Stream.");
+      const groqText = await callGroqAPIStream(groqApiKey, contents, systemInstruction, onChunk);
+      if (groqText) return groqText;
+    } catch (e: any) {
+      lastError = e;
+      console.warn("Groq fallback stream failed:", e.message);
+    }
+  }
+
+  // If everything failed, format the last error
+  const error = lastError;
+  const keySource = (window as any)._geminiKeySource || "Unknown";
+  let errorMessage = "";
+  
+  if (error?.message?.includes("API key not valid")) {
+    errorMessage = `System Error: The API key provided is invalid. (Loaded from: ${keySource}). Please check your API key in Google AI Studio.`;
+  } else if (error?.message?.includes("PERMISSION_DENIED")) {
+    errorMessage = `System Error: Access denied. Your API key might be blocked or restricted. (Loaded from: ${keySource}).`;
+  } else {
+    let fallbackModelName = config.defaultModel || "Unknown";
+    
+    if (error?.message?.includes("404") || error?.message?.includes("not found")) {
+      errorMessage = `System Error: The requested AI model '${fallbackModelName}' was deprecated or not found. Please try switching to SALU AI Lite in the Admin Panel.`;
+    } else if (error?.message?.includes("429") || error?.message?.includes("RESOURCE_EXHAUSTED") || error?.message?.includes("quota")) {
+      errorMessage = `System Error: Google's API returned "Quota Exceeded/Rate Limited" on all provided keys. \nIf this is a completely new key, Google may have restricted the free-tier quota for your Google Cloud project or region (this is a common Google security measure). \nTo fix this: Go to console.cloud.google.com, ensure your project has an active Billing Account linked, or wait a few hours if you've simply hit the free requests limit. \n[Source: ${keySource}]`;
+    } else {
+      errorMessage = `System Error: ${error?.message || "I encountered an unexpected issue."} [Source: ${keySource}]`;
+    }
+  }
+  
+  return errorMessage;
 }
 
 export async function generateImageWithSALU(prompt: string): Promise<string> {

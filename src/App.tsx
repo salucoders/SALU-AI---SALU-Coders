@@ -315,6 +315,7 @@ export default function App() {
             src={LOGO_URL} 
             alt={APP_NAME} 
             className="w-10 h-10 object-contain"
+            referrerPolicy="no-referrer"
           />
         </div>
         <div className="flex items-center gap-2 text-slate-400 font-black uppercase tracking-widest text-[10px]">
@@ -480,6 +481,7 @@ export default function App() {
                     src={LOGO_URL} 
                     alt="Logo" 
                     className="w-6 h-6 object-contain"
+                    referrerPolicy="no-referrer"
                   />
                 </div>
                 <span className="text-slate-900 font-black tracking-tighter text-base lg:text-lg">{APP_NAME}</span>
@@ -531,7 +533,7 @@ export default function App() {
                         initial={{ opacity: 0, y: 10, scale: 0.95 }}
                         animate={{ opacity: 1, y: 0, scale: 1 }}
                         exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                        className="absolute top-full left-4 right-4 mt-2 bg-white/95 backdrop-blur-xl border border-slate-200 rounded-3xl shadow-2xl overflow-hidden py-3 z-50 ring-1 ring-black/5"
+                        className="absolute top-full left-1/2 -translate-x-1/2 w-[280px] mt-2 bg-white/95 backdrop-blur-xl border border-slate-200 rounded-3xl shadow-2xl overflow-hidden py-3 z-50 ring-1 ring-black/5"
                       >
                         <div className="px-5 py-2 mb-2 border-b border-slate-100">
                           <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Global AI Network</span>
@@ -647,6 +649,7 @@ export default function App() {
                             src={LOGO_URL} 
                             alt="Logo" 
                             className="w-full h-full object-contain"
+                            referrerPolicy="no-referrer"
                           />
                         </div>
                       </div>
@@ -695,6 +698,7 @@ export default function App() {
                             src={CREATOR_IMAGE_URL} 
                             alt="Creator" 
                             className="w-full h-full object-cover"
+                            referrerPolicy="no-referrer"
                           />
                         </div>
                         <div className="text-left">

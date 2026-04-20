@@ -1,10 +1,8 @@
 import { GraduationCap, Code, Video, School, User, Mic } from 'lucide-react';
 import { Mode } from './types';
-import logo from './assets/logo/salu_logo.png';
-import creator from './assets/creator/Babar.jpg';
 
-export const LOGO_URL = logo;
-export const CREATOR_IMAGE_URL = creator;
+export const LOGO_URL = 'https://upload.wikimedia.org/wikipedia/en/thumb/a/aa/Shah_Abdul_Latif_University_logo.png/250px-Shah_Abdul_Latif_University_logo.png';
+export const CREATOR_IMAGE_URL = 'https://ik.imagekit.io/saluai/chat-upload-1776679564148-0_tLyZhIpaG.png?updatedAt=1776679566642';
 export const APP_NAME = 'SALU AI';
 
 export const MODES: { id: Mode; label: string; icon: any; color: string; description: string }[] = [

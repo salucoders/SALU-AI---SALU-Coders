@@ -1292,8 +1292,15 @@ export const ChatInterface = React.memo(({ messages, onSendMessage, isLoading, m
             </div>
             {isStreaming && streamedText ? (
               <div className="flex flex-col gap-2 max-w-[88%] md:max-w-[80%] items-start">
-                <div className="relative pt-1 transition-all duration-300 text-slate-800 bg-transparent">
-                  <MessageContent content={streamedText} role="model" preferences={preferences} />
+                <div className="relative pt-1 transition-all duration-300 text-slate-800 bg-transparent w-full">
+                  <div className="flex flex-col">
+                    <MessageContent content={streamedText} role="model" preferences={preferences} />
+                    <motion.div 
+                      className="w-2 h-4 bg-brand-500 mt-2 rounded-[1px]"
+                      animate={{ opacity: [1, 0, 1] }}
+                      transition={{ duration: 0.8, repeat: Infinity }}
+                    />
+                  </div>
                 </div>
               </div>
             ) : (
