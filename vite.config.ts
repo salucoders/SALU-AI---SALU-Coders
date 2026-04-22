@@ -29,13 +29,13 @@ export default defineConfig(({mode}) => {
           display: 'standalone',
           icons: [
             {
-              src: '/assets/logo/Shah_Abdul_Latif_University_logo.png',
-              sizes: '192x192 512x512',
+              src: 'https://upload.wikimedia.org/wikipedia/en/thumb/a/aa/Shah_Abdul_Latif_University_logo.png/250px-Shah_Abdul_Latif_University_logo.png',
+              sizes: '250x250',
               type: 'image/png'
             },
             {
-              src: '/assets/logo/Shah_Abdul_Latif_University_logo.png',
-              sizes: '192x192 512x512',
+              src: 'https://upload.wikimedia.org/wikipedia/en/thumb/a/aa/Shah_Abdul_Latif_University_logo.png/250px-Shah_Abdul_Latif_University_logo.png',
+              sizes: '250x250',
               type: 'image/png',
               purpose: 'any maskable'
             }
