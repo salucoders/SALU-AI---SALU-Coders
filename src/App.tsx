@@ -26,6 +26,11 @@ import { InstallPWA } from './components/InstallPWA';
 
 export default function App() {
   const { preferences, loading: profileLoading, isAdmin, isPaid, updatePreferences } = useUserProfile();
+  
+  useEffect(() => {
+    document.documentElement.style.setProperty('--brand-color', preferences.accentColor || '#0ea5e9');
+  }, [preferences.accentColor]);
+  
   const { user, loading: authLoading } = useAuth();
   
   const { 
@@ -356,7 +361,7 @@ export default function App() {
     <div className={cn(
       "flex h-screen font-sans overflow-hidden relative",
       preferences.theme === 'dark' ? "dark bg-slate-950" : "bg-slate-50"
-    )}>
+    )} style={{ '--brand-color': preferences.accentColor || '#0ea5e9' } as React.CSSProperties}>
       <Sidebar 
         sessions={sessions}
         currentSessionId={currentSessionId}

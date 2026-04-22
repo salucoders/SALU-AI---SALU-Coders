@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { motion } from 'motion/react';
 import { 
   ShieldCheck, 
@@ -11,14 +11,20 @@ import {
   ArrowRight,
   Check,
   Crown,
-  Heart
+  Heart,
+  MessageCircle,
+  Share2
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { cn } from '../lib/utils';
 import { LOGO_URL, APP_NAME, CREATOR_IMAGE_URL } from '../constants';
+import { Modal } from './Modal';
+import { AICamera } from './AICamera';
 
 export function LoginPage() {
   const { loginWithGoogle, isAuthenticating } = useAuth();
+  const [activeModal, setActiveModal] = useState<null | 'privacy' | 'terms'>(null);
+
 
   const handleLogin = async () => {
     try {
@@ -64,128 +70,108 @@ export function LoginPage() {
   ];
 
   return (
-    <div className="min-h-screen bg-white font-sans selection:bg-brand-100 selection:text-brand-900 overflow-x-hidden">
+    <div className="min-h-screen bg-[#0A0A0A] text-white font-sans selection:bg-brand-500/30 selection:text-white overflow-x-hidden">
       {/* Navigation */}
-      <nav className="fixed top-0 left-0 right-0 z-[100] px-6 py-4 md:px-12 flex items-center justify-between bg-white/70 backdrop-blur-xl border-b border-slate-100">
+      <nav className="fixed top-0 left-0 right-0 z-[100] px-6 py-6 flex items-center justify-between bg-[#0A0A0A]/50 backdrop-blur-2xl border-b border-white/10">
         <div className="flex items-center gap-3">
-          <div className="w-11 h-11 bg-white border border-slate-100 rounded-xl flex items-center justify-center shadow-lg">
+          <div className="w-10 h-10 bg-white/5 border border-white/10 rounded-xl flex items-center justify-center">
             <img 
               src={LOGO_URL} 
               alt={APP_NAME} 
-              className="w-8 h-8 object-contain"
+              className="w-6 h-6 object-contain"
               referrerPolicy="no-referrer"
             />
           </div>
-          <span className="text-xl font-black text-slate-900 tracking-tighter">{APP_NAME}</span>
+          <span className="text-xl font-bold tracking-tighter text-white">{APP_NAME}</span>
         </div>
         <button 
           onClick={handleLogin}
           disabled={isAuthenticating}
-          className="px-6 py-2.5 bg-slate-900 text-white rounded-full font-bold text-sm hover:bg-black transition-all active:scale-95 shadow-xl shadow-slate-950/20 disabled:opacity-50"
+          className="px-6 py-2 bg-white text-black rounded-full font-bold text-sm hover:bg-slate-200 transition-all active:scale-95 disabled:opacity-50"
         >
-          {isAuthenticating ? "Accessing..." : "Get Started"}
+          {isAuthenticating ? "Accessing..." : "Launch App"}
         </button>
       </nav>
 
       {/* Hero Section */}
-      <section className="relative pt-32 pb-20 px-6 md:px-12 lg:pt-48 lg:pb-32 overflow-hidden">
-        {/* Animated Background Elements */}
-        <div className="absolute inset-0 pointer-events-none overflow-hidden">
-          <motion.div 
-            animate={{ scale: [1, 1.2, 1], opacity: [0.1, 0.2, 0.1] }}
-            transition={{ duration: 15, repeat: Infinity }}
-            className="absolute -top-[20%] -right-[10%] w-[60%] h-[60%] bg-brand-400 rounded-full blur-[140px]" 
-          />
-          <motion.div 
-            animate={{ scale: [1.2, 1, 1.2], opacity: [0.1, 0.2, 0.1] }}
-            transition={{ duration: 12, repeat: Infinity }}
-            className="absolute -bottom-[10%] -left-[5%] w-[50%] h-[50%] bg-indigo-400 rounded-full blur-[120px]" 
-          />
-        </div>
+      <section className="relative pt-40 pb-32 px-6 flex flex-col items-center justify-center text-center">
+        <div
+          className="absolute inset-0 z-0 bg-cover bg-center bg-no-repeat"
+          style={{ 
+            backgroundImage: 'url("https://images.unsplash.com/photo-1677442136019-21780ecad995?auto=format&fit=crop&q=80&w=2000")',
+            backgroundBlendMode: 'overlay'
+          }}
+        />
+        <div className="absolute inset-0 z-0 bg-black/70" />
+        <motion.h1 
+          initial={{ opacity: 0, y: 30 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.8, ease: "easeOut" }}
+          className="relative z-10 text-5xl md:text-7xl lg:text-9xl font-black text-white tracking-tighter leading-[0.9] mb-8"
+        >
+          THE FUTURE OF <br />
+          <span className="text-transparent bg-clip-text bg-gradient-to-r from-brand-400 to-indigo-500">ACADEMIC AI.</span>
+        </motion.h1>
 
-        <div className="max-w-7xl mx-auto relative z-10">
-          <div className="text-center space-y-8">
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="inline-flex items-center gap-2 px-4 py-1.5 bg-brand-50 border border-brand-100 rounded-full text-[10px] font-black text-brand-600 uppercase tracking-widest"
-            >
-              <div className="w-3.5 h-3.5 flex items-center justify-center">
-                <img src={LOGO_URL} alt="SALU" className="w-full h-full object-contain" referrerPolicy="no-referrer" />
-              </div>
-              Intelligence Reimagined for SALU
-            </motion.div>
-            
-            <motion.h1 
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ delay: 0.1, duration: 0.8 }}
-              className="text-6xl md:text-8xl lg:text-[10rem] font-black text-slate-900 leading-[0.85] tracking-tighter"
-            >
-              INFINITE <br />
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-brand-600 via-indigo-600 to-purple-600">POSSIBILITIES.</span>
-            </motion.h1>
+        <motion.p 
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.3 }}
+          className="relative z-10 text-lg text-slate-300 max-w-xl mx-auto mb-6 font-medium"
+        >
+          An infinite, intelligent workspace designed specifically for the students and developers of Shah Abdul Latif University. Experience personalized mentorship, real-time code generation, and advanced research tools.
+        </motion.p>
+        
+        <motion.p 
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.4 }}
+          className="relative z-10 text-xl font-bold text-white max-w-xl mx-auto mb-12"
+        >
+          Transform your potential today.
+        </motion.p>
 
-            <motion.p 
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 0.4 }}
-              className="text-lg md:text-xl text-slate-500 font-medium max-w-2xl mx-auto leading-relaxed"
-            >
-              The most advanced AI workspace ever built for Shah Abdul Latif University. Elevate your learning, coding, and creative potential with custom-tuned LLMs.
-            </motion.p>
-
-            <motion.div 
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.6 }}
-              className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-8"
-            >
-              <button 
-                onClick={handleLogin}
-                className="w-full sm:w-auto px-10 py-5 bg-slate-900 text-white rounded-[2rem] font-black text-lg hover:bg-black transition-all hover:shadow-2xl hover:shadow-brand-500/20 flex items-center justify-center gap-3 group active:scale-95"
-              >
-                Launch SALU AI <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
-              </button>
-              <div className="flex items-center gap-3 px-6 py-4 bg-slate-50 rounded-[2rem] border border-slate-100 text-slate-600 text-sm font-bold">
-                <ShieldCheck className="w-5 h-5 text-emerald-500" />
-                Verified Student Network
-              </div>
-            </motion.div>
-          </div>
-        </div>
+        <motion.button 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.5 }}
+          onClick={handleLogin}
+          className="relative z-10 px-12 py-5 bg-brand-500 text-white rounded-full font-black text-lg hover:shadow-[0_0_40px_-5px_rgba(59,130,246,0.5)] transition-all flex items-center gap-3 active:scale-95"
+        >
+          Launch Workspace <ArrowRight className="w-5 h-5" />
+        </motion.button>
       </section>
 
-      {/* Modes Grid */}
-      <section className="py-24 px-6 md:px-12 bg-slate-50 relative overflow-hidden">
-        <div className="max-w-7xl mx-auto space-y-16">
-          <div className="text-center space-y-4">
-            <h2 className="text-4xl md:text-5xl font-black text-slate-900 tracking-tight">Specialized Intelligence.</h2>
-            <p className="text-slate-500 font-medium text-lg">Four distinct modes tailored to your specific workflow.</p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      {/* Bento Grid Features - Enhanced */}
+      <section className="py-24 px-6 bg-white text-slate-900">
+        <div className="max-w-7xl mx-auto text-center mb-16">
+          <h2 className="text-4xl md:text-6xl font-black mb-6 tracking-tight">Everything You Need.</h2>
+          <p className="text-xl text-slate-500 font-medium max-w-2xl mx-auto">From complex coding to creative writing, SALU AI empowers you with cutting-edge LLM capabilities, optimized for your success.</p>
+        </div>
+        <div className="max-w-7xl mx-auto">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             {modes.map((mode, i) => (
               <motion.div
                 key={i}
-                initial={{ opacity: 0, y: 30 }}
+                initial={{ opacity: 0, y: 50 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
                 transition={{ delay: i * 0.1 }}
                 className={cn(
-                  "group p-8 bg-white border border-slate-200 rounded-[2.5rem] space-y-6 transition-all duration-500 hover:shadow-2xl hover:-translate-y-2",
-                  mode.accent
+                  "p-8 rounded-[2rem] border border-slate-100 bg-slate-50 relative overflow-hidden transition-all hover:border-brand-200 hover:shadow-xl",
+                  i === 0 ? "md:col-span-2" : "",
+                  i === 3 ? "md:col-span-2 lg:col-span-1" : ""
                 )}
               >
-                <div className={cn("w-14 h-14 rounded-2xl flex items-center justify-center border transition-transform group-hover:scale-110 duration-500", mode.color)}>
-                  {mode.icon}
+                <div className="relative z-10">
+                  <div className={cn("w-12 h-12 rounded-xl flex items-center justify-center mb-6", mode.color)}>
+                    {mode.icon}
+                  </div>
+                  <h3 className="text-2xl font-bold mb-2">{mode.title}</h3>
+                  <p className="text-slate-500 leading-relaxed font-medium">{mode.desc}</p>
                 </div>
-                <div className="space-y-3">
-                  <h3 className="text-xl font-black text-slate-900">{mode.title}</h3>
-                  <p className="text-sm text-slate-500 font-medium leading-relaxed">{mode.desc}</p>
-                </div>
-                <div className="pt-4 flex items-center gap-2 text-xs font-black uppercase tracking-widest text-slate-400 group-hover:text-slate-900 transition-colors">
-                  Explore Features <ArrowRight className="w-3.5 h-3.5" />
+                <div className="absolute top-4 right-4 text-brand-500/10">
+                  <ArrowRight className="w-20 h-20 rotate-[-45deg]" />
                 </div>
               </motion.div>
             ))}
@@ -193,8 +179,8 @@ export function LoginPage() {
         </div>
       </section>
 
-      {/* Pricing Section */}
-      <section className="py-32 px-6 md:px-12 bg-slate-50 relative">
+      {/* Pricing and Footer follow similar logic to original... */}
+      <section className="py-32 px-6 md:px-12 bg-white relative">
         <div className="absolute inset-0 opacity-[0.4] pointer-events-none" style={{ backgroundImage: 'radial-gradient(circle at 2px 2px, #e2e8f0 1px, transparent 0)', backgroundSize: '40px 40px' }} />
         
         <div className="max-w-7xl mx-auto relative z-10">
@@ -320,12 +306,37 @@ export function LoginPage() {
               <p className="text-slate-300 text-lg leading-relaxed font-medium">
                 "I built SALU AI to bridge the gap between academic theory and practical intelligence. This isn't just a tool; it's a personalized mentor for every student of our university."
               </p>
-              <div className="flex items-center justify-center md:justify-start gap-6 pt-4">
-                <a href="#" className="p-3 bg-white/5 hover:bg-white/10 rounded-full transition-colors border border-white/5"><Code className="w-5 h-5 text-slate-400" /></a>
-                <a href="#" className="p-3 bg-white/5 hover:bg-white/10 rounded-full transition-colors border border-white/5"><Globe className="w-5 h-5 text-slate-400" /></a>
-                <a href="#" className="p-3 bg-white/5 hover:bg-white/10 rounded-full transition-colors border border-white/5"><Globe className="w-5 h-5 text-slate-400" /></a>
-              </div>
+              <div className="flex items-center justify-center md:justify-start gap-4 pt-4">
+                  <a href="https://wa.me/923242571748" target="_blank" rel="noopener noreferrer" className="px-6 py-3 bg-white/5 hover:bg-green-500/20 text-white rounded-xl transition-all border border-white/10 flex items-center gap-2 font-bold group">
+                    <MessageCircle className="w-5 h-5" /> WhatsApp
+                  </a>
+                  <a href="https://www.facebook.com/share/1BAhDS2JWE/" target="_blank" rel="noopener noreferrer" className="px-6 py-3 bg-white/5 hover:bg-blue-500/20 text-white rounded-xl transition-all border border-white/10 flex items-center gap-2 font-bold group">
+                    <Share2 className="w-5 h-5" /> Facebook
+                  </a>
+                  <a href="https://babar-ali-arain.netlify.app/" target="_blank" rel="noopener noreferrer" className="px-6 py-3 bg-white/5 hover:bg-indigo-500/20 text-white rounded-xl transition-all border border-white/10 flex items-center gap-2 font-bold group">
+                    <Globe className="w-5 h-5" /> Portfolio
+                  </a>
+                </div>
             </div>
+          </motion.div>
+        </div>
+      </section>
+
+      {/* Live AI Camera Section */}
+      <section className="py-20 px-6">
+        <div className="max-w-7xl mx-auto">
+          <motion.div
+            initial={{ opacity: 0, y: 30 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8 }}
+            viewport={{ once: true }}
+            className="space-y-8"
+          >
+            <div className="text-center space-y-2">
+              <h2 className="text-4xl md:text-5xl font-black text-white tracking-tighter">Experience Live AI</h2>
+              <p className="text-slate-400 text-lg">Use your camera for real-time interaction with SALU Coders AI.</p>
+            </div>
+            <AICamera />
           </motion.div>
         </div>
       </section>
@@ -347,22 +358,44 @@ export function LoginPage() {
             <div className="space-y-4">
               <h4 className="text-[10px] font-black text-slate-900 uppercase tracking-widest">Platform</h4>
               <ul className="space-y-2 text-sm font-medium text-slate-500">
-                <li className="hover:text-brand-500 cursor-pointer transition-colors">Privacy Policy</li>
-                <li className="hover:text-brand-500 cursor-pointer transition-colors">Terms of Service</li>
-                <li className="hover:text-brand-500 cursor-pointer transition-colors">Security Code</li>
+                <li className="hover:text-brand-500 cursor-pointer transition-colors" onClick={() => setActiveModal('privacy')}>Privacy Policy</li>
+                <li className="hover:text-brand-500 cursor-pointer transition-colors" onClick={() => setActiveModal('terms')}>Terms of Service</li>
               </ul>
             </div>
             <div className="space-y-4">
               <h4 className="text-[10px] font-black text-slate-900 uppercase tracking-widest">Connect</h4>
               <ul className="space-y-2 text-sm font-medium text-slate-500">
-                <li className="hover:text-brand-500 cursor-pointer transition-colors">Community Forum</li>
-                <li className="hover:text-brand-500 cursor-pointer transition-colors">Help Center</li>
-                <li className="hover:text-brand-500 cursor-pointer transition-colors">Support</li>
+                <li className="hover:text-brand-500 cursor-pointer transition-colors">
+                  <a href="https://wa.me/923242571748" target="_blank" rel="noopener noreferrer">WhatsApp</a>
+                </li>
+                <li className="hover:text-brand-500 cursor-pointer transition-colors">
+                  <a href="https://www.facebook.com/share/1BAhDS2JWE/" target="_blank" rel="noopener noreferrer">Facebook</a>
+                </li>
+                <li className="hover:text-brand-500 cursor-pointer transition-colors">
+                  <a href="https://babar-ali-arain.netlify.app/" target="_blank" rel="noopener noreferrer">Portfolio</a>
+                </li>
               </ul>
             </div>
           </div>
         </div>
       </footer>
+      <Modal
+        isOpen={activeModal !== null}
+        onClose={() => setActiveModal(null)}
+        title={activeModal === 'privacy' ? 'Privacy Policy' : 'Terms of Service'}
+      >
+        {activeModal === 'privacy' ? (
+          <div className="space-y-4">
+            <p>Your privacy is paramount. At SALU Coders AI, we ensure that your academic and development data is processed securely and with complete transparency.</p>
+            <p>We do not share your personal information with third parties without your explicit consent.</p>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <p>By using SALU Coders AI, you agree to use the platform for academic and professional development purposes only.</p>
+            <p>Any misuse of the AI-powered tools, including prohibited content generation or security bypassing, will result in immediate termination of your access.</p>
+          </div>
+        )}
+      </Modal>
     </div>
   );
 }

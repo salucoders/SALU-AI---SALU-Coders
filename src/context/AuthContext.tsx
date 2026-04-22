@@ -86,7 +86,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     provider.setCustomParameters({ prompt: 'select_account' });
     
     try {
-      await auth.authStateReady();
       await signInWithPopup(auth, provider);
       notify?.('Successfully logged in', 'success', 3000);
     } catch (error: any) {

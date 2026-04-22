@@ -214,29 +214,42 @@ const TypingIndicator = () => {
   }, []);
 
   return (
-    <div className="flex items-center gap-3 ml-2">
-      <motion.div 
-        className="flex gap-1.5"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-      >
-        {[0, 1, 2].map((i) => (
-          <motion.div
-            key={i}
-            animate={{ 
-              scale: [0.8, 1.2, 0.8],
-              opacity: [0.4, 1, 0.4],
-            }}
-            transition={{
-              duration: 1.2,
-              repeat: Infinity,
-              delay: i * 0.2,
-              ease: "easeInOut"
-            }}
-            className="w-2 h-2 rounded-full bg-gradient-to-tr from-brand-500 via-purple-500 to-rose-400"
-          />
-        ))}
-      </motion.div>
+    <div className="flex items-center gap-3 ml-2 my-2">
+      <div className="relative flex items-center justify-center p-2 rounded-xl bg-slate-50 border border-slate-100 shadow-sm">
+        <motion.div 
+          className="flex gap-1"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+        >
+          {[0, 1, 2].map((i) => (
+            <motion.div
+              key={i}
+              animate={{ 
+                y: [0, -6, 0],
+                opacity: [0.3, 1, 0.3],
+              }}
+              transition={{
+                duration: 0.8,
+                repeat: Infinity,
+                delay: i * 0.15,
+                ease: "easeInOut"
+              }}
+              className="w-1.5 h-1.5 rounded-full bg-slate-400"
+            />
+          ))}
+        </motion.div>
+      </div>
+      <AnimatePresence mode="wait">
+        <motion.p
+          key={text}
+          initial={{ opacity: 0, x: -5 }}
+          animate={{ opacity: 1, x: 0 }}
+          exit={{ opacity: 0, x: 5 }}
+          className="text-xs font-black text-brand-500 uppercase tracking-widest"
+        >
+          {text}{dots}
+        </motion.p>
+      </AnimatePresence>
     </div>
   );
 };
@@ -1218,8 +1231,8 @@ export const ChatInterface = React.memo(({ messages, onSendMessage, isLoading, m
               <div className={cn(
                 "relative group/bubble transition-all duration-300",
                 message.role === 'user' 
-                  ? "bg-[#f0f4f9] text-slate-800 px-5 py-3.5 rounded-3xl rounded-tr-lg hover:bg-[#e4ebf2] transition-colors" 
-                  : "bg-transparent text-slate-800 pt-1 hover:bg-slate-50 hover:px-2 hover:-ml-2 hover:rounded-xl transition-all" 
+                  ? "bg-[#f0f4f9] text-slate-800 px-5 py-3.5 rounded-3xl rounded-tr-lg" 
+                  : "bg-white text-slate-800 px-5 py-3.5 rounded-3xl rounded-tl-lg shadow-sm border border-slate-100"
               )}>
                 {/* Message Actions (Copy) - User Only */}
                 {message.role === 'user' && (
@@ -1619,7 +1632,11 @@ export const ChatInterface = React.memo(({ messages, onSendMessage, isLoading, m
                   <textarea
                     ref={textareaRef}
                     value={input}
-                    onChange={(e) => setInput(e.target.value)}
+                    onChange={(e) => {
+                      setInput(e.target.value);
+                      e.target.style.height = 'inherit';
+                      e.target.style.height = `${Math.min(e.target.scrollHeight, 200)}px`;
+                    }}
                     onPaste={handlePaste}
                     onFocus={() => setIsTyping(true)}
                     onBlur={() => setIsTyping(false)}
@@ -1627,9 +1644,15 @@ export const ChatInterface = React.memo(({ messages, onSendMessage, isLoading, m
                         if (e.key === 'Enter' && !e.shiftKey && !isMobile()) {
                         e.preventDefault();
                         handleSubmit(e);
+                        textareaRef.current!.style.height = '52px';
                         }
                     }}
-                    placeholder={isListening ? "" : "Ask SALU AI..."}
+                    placeholder={isListening 
+                      ? "" 
+                      : MODE_QUICK_ACTIONS[mode] 
+                        ? `Try: "${MODE_QUICK_ACTIONS[mode][0].label}" or "${MODE_QUICK_ACTIONS[mode][1].label}"...`
+                        : "Ask SALU AI..."
+                    }
                     className={cn(
                         "w-full bg-transparent border-none focus:ring-0 resize-none py-3 px-1 min-h-[52px] max-h-[200px] text-slate-800 placeholder-slate-500 no-scrollbar text-[15px] md:text-[16px] font-medium leading-[28px] transition-all self-center mt-0.5",
                         isListening && "blur-[1px] opacity-40"
@@ -1650,6 +1673,17 @@ export const ChatInterface = React.memo(({ messages, onSendMessage, isLoading, m
                       </motion.div>
                     )}
                   </AnimatePresence>
+
+                  {/* Clear Attachments Button */}
+                  {attachments.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setAttachments([])}
+                      className="absolute -top-10 right-0 flex items-center gap-1 text-[10px] bg-slate-100 px-3 py-1 rounded-full font-bold uppercase tracking-widest text-slate-600 hover:bg-red-50 hover:text-red-600 transition-colors"
+                    >
+                      <X className="w-3 h-3" /> Clear All
+                    </button>
+                  )}
                 </div>
                 
                 {/* Right Actions: Mic & Send */}
