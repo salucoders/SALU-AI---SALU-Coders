@@ -60,6 +60,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 role: isAdmin ? 'admin' : 'user',
                 updatedAt: serverTimestamp()
               });
+              localStorage.setItem('salu_ai_new_user_install', 'true');
             } catch (setErr) {
               console.warn("Could not create user profile in Firestore (Offline?):", setErr);
             }

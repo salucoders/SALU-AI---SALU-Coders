@@ -11,10 +11,17 @@ export function InstallPWA() {
   const { canInstall, installed, install } = usePWA();
 
   useEffect(() => {
+    const isNewUser = localStorage.getItem('salu_ai_new_user_install') === 'true';
+
     if (canInstall && !installed) {
-      // Delay to avoid overwhelming
-      const timer = setTimeout(() => setShow(true), 5000);
-      return () => clearTimeout(timer);
+      if (isNewUser) {
+        setShow(true);
+        localStorage.removeItem('salu_ai_new_user_install');
+      } else {
+        // Delay to avoid overwhelming
+        const timer = setTimeout(() => setShow(true), 5000);
+        return () => clearTimeout(timer);
+      }
     } else {
       setShow(false);
     }
