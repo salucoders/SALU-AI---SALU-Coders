@@ -131,7 +131,7 @@ async function startServer() {
   app.post("/api/generate-together-image", async (req, res) => {
     const requestId = Math.random().toString(36).substring(7);
     try {
-      const { prompt, saveToImageKit = false } = req.body;
+      const { prompt, saveToImageKit = false, userId = "anonymous" } = req.body;
       const config = getSystemConfig();
       const apiKey = config.togetherApiKey?.trim();
 
@@ -190,7 +190,8 @@ async function startServer() {
           const uploadResponse = await ik.upload({
             file: imageContent,
             fileName: `ai-gen-${Date.now()}.png`,
-            folder: "/salu-ai-generated"
+            folder: `/salu-ai-generated/${userId}`,
+            tags: [userId]
           });
           
           return res.json({ image: uploadResponse.url, imageKitId: uploadResponse.fileId });
@@ -252,10 +253,18 @@ async function startServer() {
         return res.status(503).json({ error: "ImageKit not configured" });
       }
 
-      const files = await imagekit.listFiles({
+      const { userId } = req.query;
+
+      const options: any = {
         sort: "DESC_CREATED",
         limit: 100
-      });
+      };
+
+      if (userId && typeof userId === 'string') {
+        options.tags = [userId];
+      }
+
+      const files = await imagekit.listFiles(options);
 
       res.json(files);
     } catch (error: any) {

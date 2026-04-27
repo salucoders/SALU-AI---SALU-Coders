@@ -1,16 +1,18 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Mic, MicOff, Volume2, VolumeX, X, Loader2, Sparkles, AlertCircle, User, UserCircle, Camera, CameraOff } from 'lucide-react';
-import { GoogleGenAI, Modality, LiveServerMessage } from "@google/genai";
+import { GoogleGenAI, Modality, LiveServerMessage, Type } from "@google/genai";
 import { cn } from '../lib/utils';
 import { useUserProfile } from '../context/UserProfileContext';
 import { getSystemConfig, getHiddenConfig } from '../services/gemini';
 
 interface LiveChatInterfaceProps {
   onClose: () => void;
+  onSendMessage?: (text: string) => void;
+  onGenerateImage?: (prompt: string) => void;
 }
 
-export function LiveChatInterface({ onClose }: LiveChatInterfaceProps) {
+export function LiveChatInterface({ onClose, onSendMessage, onGenerateImage }: LiveChatInterfaceProps) {
   const { preferences, updatePreferences } = useUserProfile();
   const [isActive, setIsActive] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
@@ -19,6 +21,7 @@ export function LiveChatInterface({ onClose }: LiveChatInterfaceProps) {
   const [transcription, setTranscription] = useState<string>('');
   const [modelTranscription, setModelTranscription] = useState<string>('');
   const [isVideoEnabled, setIsVideoEnabled] = useState(false);
+  const [activeTool, setActiveTool] = useState<string | null>(null);
 
   const sessionRef = useRef<any>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
@@ -240,11 +243,40 @@ CRITICAL RULES:
 4. YOUR EYES (VISION): You are a multimodal AI with EYES. You receive a continuous stream of video frames at 2 frames per second. You MUST constantly observe what is being shown.
 5. VISION ACTIVATION: When the user asks "what do you see?", "what am I holding?", "is this correct?", or any question involving visual context, look at the most recent frames in your memory and give a precise, intelligent, and detailed response. You are an expert at identifying objects, people, surroundings, text on screens/paper, and math equations.
 6. DESCRIBE AUTOMATICALLY: If the user says "Look at this" or "Look here", don't wait for a follow-up question—analyze the frame immediately and tell them what you see. relate your personality (${personaDescriptions[preferences.persona || 'friendly']}) to your visual observations (e.g., if you see a beautiful sunset, describe it warmly).
-7. NEVER mention being an LLM or third-party provider. Your identity is SALU AI, created by Babar Ali Arain (IT Batch 2026). Emphasize your ability to see and hear the user simultaneously.
-8. Be extremely concise in speech. 1-2 powerful sentences only. Keep the conversation snappy and natural.
-9. ${extraTraining}`,
+7. DYNAMIC ACTIONS: You can generate images or add messages to the user's permanent chat. When a user says "Draw a picture of...", "Make an image of...", or "Save this info to chat", use the provided tools immediately.
+8. NEVER mention being an LLM or third-party provider. Your identity is SALU AI, created by Babar Ali Arain (IT Batch 2026). Emphasize your ability to see and hear the user simultaneously.
+9. Be extremely concise in speech. 1-2 powerful sentences only. Keep the conversation snappy and natural.
+10. ${extraTraining}`,
           inputAudioTranscription: {},
           outputAudioTranscription: {},
+          tools: [
+            {
+              functionDeclarations: [
+                {
+                  name: "generate_image",
+                  description: "Generates an image/art based on a detailed prompt.",
+                  parameters: {
+                    type: Type.OBJECT,
+                    properties: {
+                      prompt: { type: Type.STRING, description: "A detailed description of the image to generate." }
+                    },
+                    required: ["prompt"]
+                  }
+                },
+                {
+                  name: "add_to_chat",
+                  description: "Adds a message or data to the user's chat history for permanent saving.",
+                  parameters: {
+                    type: Type.OBJECT,
+                    properties: {
+                      text: { type: Type.STRING, description: "The content to save to the chat." }
+                    },
+                    required: ["text"]
+                  }
+                }
+              ]
+            }
+          ]
         },
         callbacks: {
           onopen: () => {
@@ -306,8 +338,43 @@ CRITICAL RULES:
               stopLiveSession();
             }
           },
-          onmessage: (message: LiveServerMessage) => {
+          onmessage: async (message: LiveServerMessage) => {
             try {
+              // Handle tool calls
+              const toolCalls = message.serverContent?.modelTurn?.parts?.filter(p => !!p.functionCall);
+              if (toolCalls && toolCalls.length > 0 && sessionRef.current) {
+                const responses = [];
+                for (const call of toolCalls) {
+                  const { name, args, id } = call.functionCall!;
+                  console.log("Tool call received:", name, args);
+                  setActiveTool(name);
+                  
+                  let result: any = { success: true };
+                  if (name === "generate_image") {
+                    if (onGenerateImage) onGenerateImage(args.prompt as string);
+                    result = { success: true, message: "Image generation started" };
+                  } else if (name === "add_to_chat") {
+                    if (onSendMessage) onSendMessage(args.text as string);
+                    result = { success: true, message: "Added to chat history" };
+                  }
+                  
+                  responses.push({
+                    name,
+                    response: result,
+                    id
+                  });
+
+                  // Reset active tool after a delay or after response
+                  setTimeout(() => setActiveTool(null), 3000);
+                }
+                
+                try {
+                  sessionRef.current.sendToolResponse({ functionResponses: responses });
+                } catch (err) {
+                  console.error("Failed to send tool response:", err);
+                }
+              }
+
               // Handle audio output
               const base64Audio = message.serverContent?.modelTurn?.parts?.[0]?.inlineData?.data;
               if (base64Audio) {
@@ -580,6 +647,20 @@ CRITICAL RULES:
 
           {/* Transcription Preview */}
           <AnimatePresence>
+            {activeTool && (
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0 }}
+                className="flex items-center gap-3 px-6 py-3 bg-emerald-50 text-emerald-600 rounded-full border border-emerald-100 shadow-sm mb-4"
+              >
+                <Loader2 className="w-4 h-4 animate-spin" />
+                <span className="text-xs font-black uppercase tracking-widest">
+                  AI Trigger: {activeTool.replace('_', ' ')}
+                </span>
+              </motion.div>
+            )}
+            
             {isActive && (transcription || modelTranscription) && (
               <motion.div 
                 initial={{ opacity: 0, y: 20 }}

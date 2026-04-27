@@ -31,7 +31,7 @@ export interface ImageKitFile {
   filePath: string;
 }
 
-export async function uploadToImageKit(file: File | string, fileName?: string): Promise<ImageKitFile> {
+export async function uploadToImageKit(file: File | string, fileName?: string, tags?: string[]): Promise<ImageKitFile> {
   const formData = new FormData();
   if (typeof file === 'string') {
     // base64
@@ -67,6 +67,7 @@ export async function uploadToImageKit(file: File | string, fileName?: string): 
     body: JSON.stringify({
       file: typeof file === 'string' ? file : await fileToBase64(file),
       fileName: fileName || (file instanceof File ? file.name : `image-${Date.now()}`),
+      tags: tags
     }),
   });
 

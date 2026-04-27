@@ -33,6 +33,7 @@ export interface UserPreferences {
   uid?: string;
   assistantName?: string;
   aiTrainingEnabled?: boolean;
+  lastActiveAt?: any;
 }
 
 export interface ChatSession {

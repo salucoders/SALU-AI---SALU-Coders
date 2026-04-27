@@ -6,6 +6,7 @@ import { IKContext, IKImage } from 'imagekitio-react';
 import { imageKitConfig, ImageKitFile, isImageKitConfigured } from '../lib/imagekit';
 import { useNotification } from '../context/NotificationContext';
 import { useUserProfile } from '../context/UserProfileContext';
+import { useAuth } from '../context/AuthContext';
 import { cn } from '../lib/utils';
 
 interface ImageKitGalleryProps {
@@ -21,6 +22,7 @@ export const ImageKitGallery: React.FC<ImageKitGalleryProps> = ({ isOpen, onClos
   const [systemConfig, setSystemConfig] = useState<{ imageKitUrlEndpoint?: string } | null>(null);
   const { notify } = useNotification();
   const { isPaid } = useUserProfile();
+  const { user } = useAuth();
 
   const fetchImages = async () => {
     if (!isPaid) return;
@@ -64,7 +66,8 @@ export const ImageKitGallery: React.FC<ImageKitGalleryProps> = ({ isOpen, onClos
       }
 
       // Then grab the files passing the required credentials safely to our backend
-      const res = await fetch('/api/imagekit/files', {
+      const fetchUrl = user ? `/api/imagekit/files?userId=${user.uid}` : '/api/imagekit/files';
+      const res = await fetch(fetchUrl, {
         headers: {
           'x-imagekit-public-key': imageKitCredentials.publicKey,
           'x-imagekit-private-key': imageKitCredentials.privateKey,
@@ -75,7 +78,9 @@ export const ImageKitGallery: React.FC<ImageKitGalleryProps> = ({ isOpen, onClos
       const contentType = res.headers.get("content-type");
       if (res.ok && contentType && contentType.indexOf("application/json") !== -1) {
         const data = await res.json();
-        setImages(data);
+        // Client-side filtering as an extra safety measure to ensure only user's pictures are shown
+        const filteredData = user ? data.filter((img: ImageKitFile) => img.tags?.includes(user.uid)) : data;
+        setImages(filteredData);
       } else {
         console.warn("Could not fetch images from server, returned invalid format.");
         if (!res.ok) {

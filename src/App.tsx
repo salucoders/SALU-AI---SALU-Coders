@@ -5,7 +5,7 @@ import { SettingsModal } from './components/SettingsModal';
 import { ImageKitGallery } from './components/ImageKitGallery';
 import { LoginPage } from './components/LoginPage';
 import { Mode, Message, ChatSession, Persona } from './types';
-import { sendMessage, sendMessageStream } from './services/gemini';
+import { sendMessage, sendMessageStream, generateImageWithSALU } from './services/gemini';
 import { Menu, Settings, Loader2, Plus, ChevronDown, User, Shield, Crown, PanelLeftOpen, Check, Lock } from 'lucide-react';
 import { LOGO_URL, APP_NAME, MODES, CREATOR_IMAGE_URL } from './constants';
 import { cn } from './lib/utils';
@@ -15,7 +15,7 @@ import { useAuth } from './context/AuthContext';
 import { useSessions } from './context/SessionContext';
 import { motion, AnimatePresence } from 'motion/react';
 import { onSnapshot, doc, updateDoc, serverTimestamp } from 'firebase/firestore';
-import { db } from './lib/firebase';
+import  { db, OperationType, handleFirestoreError } from './lib/firebase';
 
 import { Onboarding } from './components/Onboarding';
 import { LiveChatInterface } from './components/LiveChatInterface';
@@ -71,7 +71,7 @@ export default function App() {
         }
       }
     }, (error) => {
-      console.error("Error listening to broadcast:", error);
+      handleFirestoreError(error, OperationType.GET, 'system/broadcast');
     });
 
     // Config
@@ -90,7 +90,7 @@ export default function App() {
         }));
       }
     }, (error) => {
-      console.error("Error listening to config:", error);
+      handleFirestoreError(error, OperationType.GET, 'system/config');
     });
 
     return () => {
@@ -213,6 +213,26 @@ export default function App() {
     };
   }, []);
 
+  // Update Last Active status
+  useEffect(() => {
+    if (user && !profileLoading) {
+      const updateLastActive = async () => {
+        try {
+          await updateDoc(doc(db, 'users', user.uid), {
+            lastActiveAt: serverTimestamp()
+          });
+        } catch (e) {
+          console.warn("Failed to update last active status:", e);
+        }
+      };
+      updateLastActive();
+      
+      // Also update every 5 minutes if app is open
+      const interval = setInterval(updateLastActive, 5 * 60 * 1000);
+      return () => clearInterval(interval);
+    }
+  }, [user, profileLoading]);
+
   // Notify user connected
   useEffect(() => {
     if (user && !profileLoading) {
@@ -223,12 +243,18 @@ export default function App() {
     }
   }, [user, profileLoading, preferences.name]);
 
-  // Auto-create session if none exists
+  // Auto-manage session
   useEffect(() => {
-    if (user && !sessionsLoading && sessions.length === 0 && !currentSessionId) {
-      createSession(preferences.preferredMode || 'student').catch(e => console.error("Auto-create session failed:", e));
+    if (user && !sessionsLoading) {
+      if (sessions.length === 0 && !currentSessionId) {
+        createSession(preferences.preferredMode || 'student').catch(e => console.error("Auto-create session failed:", e));
+      } else if (sessions.length > 0 && !currentSessionId) {
+        // Automatically select the most recent active session
+        const latestSession = sessions.find(s => !s.isArchived) || sessions[0];
+        setCurrentSessionId(latestSession.id);
+      }
     }
-  }, [user, sessionsLoading, sessions.length, currentSessionId, createSession]);
+  }, [user, sessionsLoading, sessions.length, currentSessionId, createSession, setCurrentSessionId, preferences.preferredMode]);
 
   const handleSendMessage = async (content: string, attachments?: string[]) => {
     if (preferences.role === 'suspended') {
@@ -498,7 +524,7 @@ export default function App() {
               <div className="relative w-full px-2">
                 <button
                   onClick={() => setIsModeOpen(!isModeOpen)}
-                  className="w-full flex items-center justify-between pl-1.5 pr-4 py-1.5 bg-white/90 backdrop-blur-xl border border-slate-200/60 rounded-full shadow-lg shadow-slate-200/50 hover:border-brand-200 transition-all active:scale-[0.98] group ring-1 ring-black/5"
+                  className="w-full flex items-center justify-between pl-1.5 pr-4 py-1.5 bg-white backdrop-blur-xl border border-slate-200/60 rounded-full shadow-lg shadow-slate-200/40 hover:border-brand-300 hover:shadow-brand-500/10 transition-all active:scale-[0.98] group ring-1 ring-black/5"
                 >
                   {(() => {
                     const currentModeId = currentSession?.mode || preferences.preferredMode || 'student';
@@ -512,7 +538,7 @@ export default function App() {
                           </div>
                           <div className="flex flex-col items-start leading-none overflow-hidden">
                             <span className="text-[12px] font-black text-slate-900 truncate uppercase tracking-tighter">{activeMode.label}</span>
-                            <span className="text-[9px] text-slate-400 font-bold uppercase tracking-widest truncate">AI Node</span>
+                            <span className="text-[9px] text-slate-400 font-bold uppercase tracking-widest truncate">AI Mode</span>
                           </div>
                         </div>
                         <div className="flex items-center gap-1 ml-2">
@@ -634,85 +660,11 @@ export default function App() {
           <div className="flex-1 flex flex-col h-full overflow-hidden pt-20">
             <div className="flex-1 overflow-hidden">
               {!currentSession ? (
-                <div className="h-full flex flex-col items-center justify-center p-8 text-center relative overflow-hidden bg-white">
-                  {/* Decorative Background Elements */}
-                  <div className="absolute top-0 left-0 w-full h-full pointer-events-none opacity-[0.03]">
-                    <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-brand-500 rounded-full blur-[120px]" />
-                    <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-blue-500 rounded-full blur-[120px]" />
+                <div className="h-full flex flex-col items-center justify-center bg-white gap-4">
+                  <div className="w-12 h-12 flex items-center justify-center">
+                    <Loader2 className="w-6 h-6 text-brand-500 animate-spin" />
                   </div>
-
-                  <motion.div 
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="relative z-10 space-y-10 max-w-2xl"
-                  >
-                    <div className="space-y-4">
-                      <div className="w-24 h-24 mx-auto relative group">
-                        <div className="absolute inset-0 bg-brand-500 rounded-[2.5rem] blur-2xl opacity-20 group-hover:opacity-40 transition-opacity" />
-                        <div className="relative w-full h-full bg-white border-2 border-slate-100 rounded-[2.5rem] flex items-center justify-center p-4 shadow-2xl transition-transform hover:scale-105">
-                          <img 
-                            src={LOGO_URL} 
-                            alt="Logo" 
-                            className="w-full h-full object-contain"
-                            referrerPolicy="no-referrer"
-                          />
-                        </div>
-                      </div>
-                      <h1 className="text-4xl md:text-5xl font-black text-slate-900 tracking-tight">
-                        {systemConfig.welcomeMessage}
-                      </h1>
-                      <p className="text-slate-500 font-medium max-w-md mx-auto">
-                        Your intelligent companion for the SALU community. Start a conversation to explore insights and knowledge.
-                      </p>
-                    </div>
-
-                    <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-                      <button
-                        onClick={async () => {
-                          try {
-                            await createSession(preferences.preferredMode || 'student');
-                          } catch (e) {
-                            console.error("Failed to create session:", e);
-                          }
-                        }}
-                        className="px-8 py-4 bg-slate-900 text-white rounded-2xl font-bold text-sm hover:bg-black transition-all active:scale-95 shadow-xl shadow-slate-200 flex items-center gap-2 group"
-                      >
-                        <Plus className="w-4 h-4 group-hover:rotate-90 transition-transform" />
-                        New Chat
-                      </button>
-                      <button
-                        onClick={() => setIsSettingsOpen(true)}
-                        className="px-8 py-4 bg-white text-slate-700 border border-slate-200 rounded-2xl font-bold text-sm hover:bg-slate-50 transition-all active:scale-95 flex items-center gap-2"
-                      >
-                        <Settings className="w-4 h-4" />
-                        Configure AI
-                      </button>
-                    </div>
-
-                    {/* Creator Spotlight */}
-                    <motion.div 
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      transition={{ delay: 0.5 }}
-                      className="pt-12 flex flex-col items-center gap-4"
-                    >
-                      <div className="h-px w-12 bg-slate-200" />
-                      <div className="flex items-center gap-4 px-5 py-3 bg-slate-50/50 backdrop-blur-sm rounded-2xl border border-slate-100">
-                        <div className="w-10 h-10 rounded-xl overflow-hidden border border-white shadow-sm ring-2 ring-brand-100">
-                          <img 
-                            src={CREATOR_IMAGE_URL} 
-                            alt="Creator" 
-                            className="w-full h-full object-cover"
-                            referrerPolicy="no-referrer"
-                          />
-                        </div>
-                        <div className="text-left">
-                          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Crafted with ❤️ by</p>
-                          <p className="text-xs font-black text-slate-900 tracking-tight underline decoration-brand-500 decoration-2 underline-offset-2">Babar Ali (Salu Coders)</p>
-                        </div>
-                      </div>
-                    </motion.div>
-                  </motion.div>
+                  <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Loading your AI Workspace...</p>
                 </div>
               ) : currentSession.mode === 'live' ? (
                 <LiveChatInterface 
@@ -723,6 +675,23 @@ export default function App() {
                       console.error("Failed to close live chat:", e);
                     }
                   }} 
+                  onSendMessage={handleSendMessage}
+                  onGenerateImage={async (prompt) => {
+                    if (!currentSessionId) return;
+                    setIsLoading(true);
+                    try {
+                      notify('Live AI is painting your vision...', 'change', 3000);
+                      const imageUrl = await generateImageWithSALU(prompt);
+                      await addMessage(currentSessionId, 'model', `[IMAGE_GEN: ${prompt}]`, []);
+                      // Also add the actual image result
+                      await addMessage(currentSessionId, 'model', `Here is your creation based on: ${prompt}`, [imageUrl]);
+                      notify('Image generated and saved to chat!', 'success', 4000);
+                    } catch (e: any) {
+                      notify(`Image generation failed: ${e.message}`, 'error', 5000);
+                    } finally {
+                      setIsLoading(false);
+                    }
+                  }}
                 />
               ) : (
                 <ChatInterface 

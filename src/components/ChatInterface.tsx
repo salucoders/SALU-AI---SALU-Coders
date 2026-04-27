@@ -18,8 +18,10 @@ import { Message, Mode, UserPreferences } from '../types';
 import { cn } from '../lib/utils';
 import { LOGO_URL } from '../constants';
 import { CameraModal } from './CameraModal';
+import { GoogleGenAI, Modality } from "@google/genai";
 import { useNotification } from '../context/NotificationContext';
 import { useUserProfile } from '../context/UserProfileContext';
+import { useAuth } from '../context/AuthContext';
 import { generateImageWithSALU } from '../services/gemini';
 import { uploadToImageKit } from '../lib/imagekit';
 import { Toolbox } from './Toolbox';
@@ -254,13 +256,30 @@ const TypingIndicator = () => {
   );
 };
 
+// Cache the AI instance for TTS
+let aiInstance: GoogleGenAI | null = null;
+const getAI = () => {
+  if (!aiInstance) {
+     const apiKey = process.env.GEMINI_API_KEY;
+     if (!apiKey) throw new Error("GEMINI_API_KEY is not configured");
+     aiInstance = new GoogleGenAI({ apiKey });
+  }
+  return aiInstance;
+};
+
 const SpeakButton = ({ content, voicePreference }: { content: string, voicePreference: 'male' | 'female' }) => {
   const [speaking, setSpeaking] = useState(false);
+  const [audioContext, setAudioContext] = useState<AudioContext | null>(null);
 
-  const handleSpeak = () => {
+  const stopSpeaking = useCallback(() => {
+     setSpeaking(false);
+     if (audioContext) audioContext.close();
+     setAudioContext(null);
+  }, [audioContext]);
+
+  const handleSpeak = async () => {
     if (speaking) {
-      window.speechSynthesis.cancel();
-      setSpeaking(false);
+      stopSpeaking();
       return;
     }
 
@@ -272,37 +291,60 @@ const SpeakButton = ({ content, voicePreference }: { content: string, voicePrefe
       .replace(/```[\s\S]*?```/g, ' [Code block omitted] ') // Omit code blocks
       .replace(/`[^`]+`/g, (match) => match.slice(1, -1)); // Keep inline code content
 
-    const utterance = new SpeechSynthesisUtterance(cleanContent);
-    const voices = window.speechSynthesis.getVoices();
-    
-    // Try to find a voice that matches the preference
-    let voice = voices.find(v => {
-      const name = v.name.toLowerCase();
-      if (voicePreference === 'male') {
-        return name.includes('male') || name.includes('david') || name.includes('puck') || name.includes('guy') || name.includes('andrew');
-      } else {
-        return name.includes('female') || name.includes('zira') || name.includes('kore') || name.includes('samantha') || name.includes('victoria');
-      }
-    });
-
-    if (!voice && voices.length > 0) {
-      voice = voices.find(v => v.default) || voices[0];
-    }
-
-    if (voice) utterance.voice = voice;
-    utterance.rate = 1.0;
-    utterance.pitch = 1.0;
-    
-    utterance.onend = () => setSpeaking(false);
-    utterance.onerror = () => setSpeaking(false);
-    
-    window.speechSynthesis.speak(utterance);
     setSpeaking(true);
+    try {
+        const ai = getAI();
+        const response = await ai.models.generateContent({
+          model: "gemini-3.1-flash-tts-preview",
+          contents: [{ parts: [{ text: cleanContent }] }],
+          config: {
+            responseModalities: [Modality.AUDIO],
+            speechConfig: {
+                voiceConfig: {
+                  prebuiltVoiceConfig: { voiceName: voicePreference === 'male' ? 'Puck' : 'Kore' },
+                },
+            },
+          },
+        });
+        
+        const base64Audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+        if (base64Audio) {
+            const binaryString = atob(base64Audio);
+            const bytes = new Uint8Array(binaryString.length);
+            for (let i = 0; i < binaryString.length; i++) {
+                bytes[i] = binaryString.charCodeAt(i);
+            }
+            
+            // Gemini TTS returns raw 16-bit PCM Mono at 24kHz
+            const int16Array = new Int16Array(bytes.buffer);
+            const float32Array = new Float32Array(int16Array.length);
+            for (let i = 0; i < int16Array.length; i++) {
+                float32Array[i] = int16Array[i] / 32768.0;
+            }
+            
+            const ctx = new AudioContext({ sampleRate: 24000 });
+            setAudioContext(ctx);
+            
+            const buffer = ctx.createBuffer(1, float32Array.length, 24000);
+            buffer.getChannelData(0).set(float32Array);
+            
+            const source = ctx.createBufferSource();
+            source.buffer = buffer;
+            source.connect(ctx.destination);
+            source.onended = () => stopSpeaking();
+            source.start(0);
+        } else {
+            throw new Error("No audio returned");
+        }
+    } catch (err) {
+        console.error(err);
+        setSpeaking(false);
+    }
   };
 
   useEffect(() => {
-    return () => window.speechSynthesis.cancel();
-  }, []);
+    return () => stopSpeaking();
+  }, [stopSpeaking]);
 
   return (
     <button
@@ -321,6 +363,7 @@ const SpeakButton = ({ content, voicePreference }: { content: string, voicePrefe
 };
 
 const ImageResult = ({ prompt }: { prompt: string }) => {
+  const { user } = useAuth();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [seed, setSeed] = useState(() => Math.floor(Math.random() * 1000000));
@@ -362,7 +405,7 @@ const ImageResult = ({ prompt }: { prompt: string }) => {
         
         // Auto-save to ImageKit
         try {
-          const ikResult = await uploadToImageKit(imageUrl, `salu-art-${Date.now()}.png`);
+          const ikResult = await uploadToImageKit(imageUrl, `salu-art-${Date.now()}.png`, user ? [user.uid] : undefined);
           setImageUrl(ikResult.url);
         } catch (ikErr) {
           console.warn("Saving SALU image to Vault failed:", ikErr);
@@ -384,7 +427,7 @@ const ImageResult = ({ prompt }: { prompt: string }) => {
         const togetherResponse = await fetch('/api/generate-together-image', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ prompt, saveToImageKit: true }),
+          body: JSON.stringify({ prompt, saveToImageKit: true, userId: user?.uid }),
         });
 
         if (togetherResponse.ok) {
@@ -506,7 +549,7 @@ const ImageResult = ({ prompt }: { prompt: string }) => {
                     {steps[step].label}
                   </motion.h4>
                   <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                    SALU AI is painting your vision
+                    drawing picture...
                   </p>
                 </div>
               </div>
@@ -688,7 +731,7 @@ const MessageContent = ({ content, role, preferences }: { content: string, role:
       {isStartingImageGen && !imageMatch && (
         <div className="flex items-center gap-3 p-4 bg-slate-50 rounded-2xl border border-slate-100 animate-pulse">
           <Sparkles className="w-5 h-5 text-brand-500" />
-          <p className="text-xs font-black text-slate-400 uppercase tracking-widest">SALU AI is conceiving an image...</p>
+          <p className="text-xs font-black text-slate-400 uppercase tracking-widest text-center">drawing picture...</p>
         </div>
       )}
 
@@ -711,6 +754,7 @@ const MessageContent = ({ content, role, preferences }: { content: string, role:
 export const ChatInterface = React.memo(({ messages, onSendMessage, isLoading, mode, isStreaming, streamedText }: ChatInterfaceProps) => {
   const { notify } = useNotification();
   const { preferences } = useUserProfile();
+  const { user } = useAuth();
   const [input, setInput] = useState('');
   const [isListening, setIsListening] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
@@ -923,7 +967,7 @@ export const ChatInterface = React.memo(({ messages, onSendMessage, isLoading, m
         if (att.startsWith('data:image/')) {
           try {
             const fileName = `chat-upload-${Date.now()}-${idx}.png`;
-            const result = await uploadToImageKit(att, fileName);
+            const result = await uploadToImageKit(att, fileName, user ? [user.uid] : undefined);
             return result.url; // Replace base64 with ImageKit URL
           } catch (e) {
             console.warn("Failed to save to ImageKit, using base64 fallback:", e);
@@ -1231,8 +1275,8 @@ export const ChatInterface = React.memo(({ messages, onSendMessage, isLoading, m
               <div className={cn(
                 "relative group/bubble transition-all duration-300",
                 message.role === 'user' 
-                  ? "bg-[#f0f4f9] text-slate-800 px-5 py-3.5 rounded-3xl rounded-tr-lg" 
-                  : "bg-white text-slate-800 px-5 py-3.5 rounded-3xl rounded-tl-lg shadow-sm border border-slate-100"
+                  ? "bg-[var(--brand-color)] text-white px-6 py-4 rounded-3xl rounded-br-none shadow-lg shadow-brand-500/20" 
+                  : "bg-white text-slate-800 px-6 py-4 rounded-3xl rounded-bl-none shadow-sm border border-slate-200/60"
               )}>
                 {/* Message Actions (Copy) - User Only */}
                 {message.role === 'user' && (

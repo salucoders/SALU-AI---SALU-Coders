@@ -314,7 +314,7 @@ export async function sendMessage(
     Be friendly, to the point, smart, and motivational. Avoid unnecessary repetition. Use clear, structured formatting with headings and bullet points.
     
     IMAGE GENERATION PROTOCOL:
-    If the user requests an image, painting, or picture, or uses the "/image" command, or if specifically asked to "Respond EXCLUSIVELY with the image generation tag":
+    If the user requests an image, painting, or picture, or wants to "make pictures", or uses the "/image" command, or if specifically asked to "Respond EXCLUSIVELY with the image generation tag":
     1. EXCLUSIVELY output the tag: [IMAGE_GEN: expanded_artistic_prompt]
     2. Expand the user's simple request into a 50-80 word cinematic-grade masterpiece prompt.
     3. Include lighting, texture, camera angle, and artistic style (e.g., hyper-realistic, photorealistic, 8k resolution).
@@ -459,7 +459,7 @@ export async function sendMessageStream(
     Be friendly, to the point, smart, and motivational. Avoid unnecessary repetition. Use clear, structured formatting with headings and bullet points.
     
     IMAGE GENERATION PROTOCOL:
-    If the user requests an image, painting, or picture, or uses the "/image" command, or if specifically asked to "Respond EXCLUSIVELY with the image generation tag":
+    If the user requests an image, painting, or picture, or wants to "make pictures", or uses the "/image" command, or if specifically asked to "Respond EXCLUSIVELY with the image generation tag":
     1. EXCLUSIVELY output the tag: [IMAGE_GEN: expanded_artistic_prompt]
     2. Expand the user's simple request into a 50-80 word cinematic-grade masterpiece prompt.
     3. Include lighting, texture, camera angle, and artistic style (e.g., hyper-realistic, photorealistic, 8k resolution).
