@@ -560,15 +560,20 @@ export async function sendMessageStream(
 }
 
 export async function generateImageWithSALU(prompt: string): Promise<string> {
-  // Retry helper for quota exhaustion
-  const withRetry = async <T>(fn: () => Promise<T>, retries = 3, delay = 2000): Promise<T> => {
+  // Improved retry helper for quota exhaustion
+  const withBackoff = async <T>(fn: () => Promise<T>, retries = 5, delay = 5000): Promise<T> => {
     try {
       return await fn();
     } catch (error: any) {
-      if (retries > 0 && (error.message.includes('429') || error.message.includes('RESOURCE_EXHAUSTED') || error.message.includes('quota'))) {
+      const isQuotaError = error.message.includes('429') || 
+                           error.message.includes('RESOURCE_EXHAUSTED') || 
+                           error.message.includes('quota');
+      
+      if (retries > 0 && isQuotaError) {
         console.warn(`Quota exhausted. Retrying in ${delay}ms...`, error.message);
         await new Promise(r => setTimeout(r, delay));
-        return withRetry(fn, retries - 1, delay * 2);
+        // Exponential backoff with a cap
+        return withBackoff(fn, retries - 1, Math.min(delay * 2, 60000));
       }
       throw error;
     }
@@ -584,7 +589,7 @@ export async function generateImageWithSALU(prompt: string): Promise<string> {
     const ai = new GoogleGenAI({ apiKey: activeKey });
     
     // Using gemini-2.5-flash-image for standard free-tier availability
-    const response = await withRetry(() => ai.models.generateContent({
+    const response = await withBackoff(() => ai.models.generateContent({
       model: 'gemini-2.5-flash-image',
       contents: {
         parts: [
