@@ -678,10 +678,22 @@ export default function App() {
                   onSendMessage={handleSendMessage}
                   onGenerateImage={async (prompt) => {
                     if (!currentSessionId) return;
+
+                    // Quota check
+                    const maxImages = preferences.subscription === 'paid' ? 5 : 3;
+                    if ((preferences.imagesUsedToday || 0) >= maxImages) {
+                        notify(`You have reached your daily image generation limit (${maxImages} images/day). Upgrade for higher limits.`, 'error', 5000);
+                        return;
+                    }
+                    
                     setIsLoading(true);
                     try {
                       notify('Live AI is painting your vision...', 'change', 3000);
                       const imageUrl = await generateImageWithSALU(prompt);
+                      
+                      // Update quota
+                      await updatePreferences({ imagesUsedToday: (preferences.imagesUsedToday || 0) + 1 });
+
                       await addMessage(currentSessionId, 'model', `[IMAGE_GEN: ${prompt}]`, []);
                       // Also add the actual image result
                       await addMessage(currentSessionId, 'model', `Here is your creation based on: ${prompt}`, [imageUrl]);

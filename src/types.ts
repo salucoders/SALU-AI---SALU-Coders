@@ -28,6 +28,7 @@ export interface UserPreferences {
   subscription?: 'free' | 'paid';
   creditsTotal?: number;
   creditsUsedToday?: number;
+  imagesUsedToday?: number;
   lastCreditReset?: any;
   updatedAt?: any;
   uid?: string;

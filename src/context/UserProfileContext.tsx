@@ -27,6 +27,7 @@ const defaultPreferences: UserPreferences = {
   subscription: 'free',
   creditsTotal: 30,
   creditsUsedToday: 0,
+  imagesUsedToday: 0,
   assistantName: 'SALU AI',
   aiTrainingEnabled: false,
 };
@@ -59,12 +60,14 @@ export const UserProfileProvider: React.FC<{ children: React.ReactNode }> = ({ c
       setPreferences(prev => ({
         ...prev,
         creditsUsedToday: 0,
+        imagesUsedToday: 0,
         creditsTotal: dailyAllowance,
         lastCreditReset: { toDate: () => now } // Mock for local check
       }));
 
       updatePreferences({
         creditsUsedToday: 0,
+        imagesUsedToday: 0,
         creditsTotal: dailyAllowance,
         lastCreditReset: serverTimestamp()
       });

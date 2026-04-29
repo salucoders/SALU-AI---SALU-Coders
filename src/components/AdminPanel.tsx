@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { Users, Settings, Activity, Shield, Key, Database, Server, X, Check, AlertCircle, Loader2, MessageSquare, Radio, Trash2, Download, Eraser, Palette, Cpu, Eye, EyeOff, Crown, Upload, Search, Filter, Calendar, BarChart3, Terminal, Sparkles } from 'lucide-react';
-import { collection, getDocs, doc, updateDoc, deleteDoc, getDoc, setDoc, query, where, collectionGroup } from 'firebase/firestore';
+import { collection, getDocs, doc, updateDoc, deleteDoc, getDoc, setDoc, query, where, collectionGroup, orderBy, limit } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { useAuth } from '../context/AuthContext';
 import { useUserProfile } from '../context/UserProfileContext';
@@ -107,16 +107,17 @@ export function AdminPanel({ onClose }: AdminPanelProps) {
     setLoading(true);
     try {
       // Fetch Users
-      const usersSnapshot = await getDocs(collection(db, 'users'));
+      const usersSnapshot = await getDocs(query(collection(db, 'users'), limit(500)));
       const usersData = usersSnapshot.docs.map(d => ({ id: d.id, ...d.data() })) as any[];
       setUsers(usersData);
 
       // Fetch Sessions for stats
-      const sessionsSnapshot = await getDocs(collection(db, 'sessions'));
+      const sessionsSnapshot = await getDocs(query(collection(db, 'sessions'), limit(500)));
       const sessionsData = sessionsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as any[];
       
       // Fetch Messages for stats
-      const messagesSnapshot = await getDocs(collectionGroup(db, 'messages'));
+      const messagesQuery = query(collectionGroup(db, 'messages'), orderBy('timestamp', 'desc'), limit(1000));
+      const messagesSnapshot = await getDocs(messagesQuery);
       const messagesData = messagesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setAllMessages(messagesData);
       

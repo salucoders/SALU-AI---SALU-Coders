@@ -364,6 +364,7 @@ const SpeakButton = ({ content, voicePreference }: { content: string, voicePrefe
 
 const ImageResult = ({ prompt }: { prompt: string }) => {
   const { user } = useAuth();
+  const { preferences, updatePreferences } = useUserProfile();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [seed, setSeed] = useState(() => Math.floor(Math.random() * 1000000));
@@ -391,6 +392,14 @@ const ImageResult = ({ prompt }: { prompt: string }) => {
   const generateImage = useCallback(async (retryCount = 0) => {
     if (generationStarted.current && retryCount === 0) return;
     
+    // Quota check
+    const maxImages = preferences.subscription === 'paid' ? 5 : 3;
+    if ((preferences.imagesUsedToday || 0) >= maxImages) {
+        setError(`You have reached your daily image generation limit (${maxImages} images/day). Upgrade for higher limits.`);
+        setLoading(false);
+        return;
+    }
+
     if (retryCount === 0) {
       generationStarted.current = true;
       setLoading(true);
@@ -403,9 +412,12 @@ const ImageResult = ({ prompt }: { prompt: string }) => {
       try {
         const imageUrl = await generateImageWithSALU(prompt);
         
+        // Update quota
+        await updatePreferences({ imagesUsedToday: (preferences.imagesUsedToday || 0) + 1 });
+
         // Auto-save to ImageKit
         try {
-          const ikResult = await uploadToImageKit(imageUrl, `salu-art-${Date.now()}.png`, user ? [user.uid] : undefined);
+          const ikResult = await uploadToImageKit(imageUrl, `salu-art-${Date.now()}.png`, user ? [user.uid] : undefined, user ? `/salu-ai-generated/${user.uid}` : undefined);
           setImageUrl(ikResult.url);
         } catch (ikErr) {
           console.warn("Saving SALU image to Vault failed:", ikErr);
@@ -433,6 +445,8 @@ const ImageResult = ({ prompt }: { prompt: string }) => {
         if (togetherResponse.ok) {
           const data = await togetherResponse.json();
           if (data.image) {
+            // Update quota on success
+            await updatePreferences({ imagesUsedToday: (preferences.imagesUsedToday || 0) + 1 });
             setImageUrl(data.image);
             setEngine('together');
             setLoading(false);
@@ -452,7 +466,7 @@ const ImageResult = ({ prompt }: { prompt: string }) => {
       setError(err.message || "Failed to generate image. All engines are currently unreachable.");
       setLoading(false);
     }
-  }, [prompt, seed]);
+  }, [prompt, seed, preferences.subscription, preferences.imagesUsedToday, user, updatePreferences]);
 
   useEffect(() => {
     generateImage();
@@ -967,7 +981,7 @@ export const ChatInterface = React.memo(({ messages, onSendMessage, isLoading, m
         if (att.startsWith('data:image/')) {
           try {
             const fileName = `chat-upload-${Date.now()}-${idx}.png`;
-            const result = await uploadToImageKit(att, fileName, user ? [user.uid] : undefined);
+            const result = await uploadToImageKit(att, fileName, user ? [user.uid] : undefined, user ? `/salu-ai-generated/${user.uid}` : undefined);
             return result.url; // Replace base64 with ImageKit URL
           } catch (e) {
             console.warn("Failed to save to ImageKit, using base64 fallback:", e);

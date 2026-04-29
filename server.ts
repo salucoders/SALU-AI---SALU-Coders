@@ -227,7 +227,7 @@ async function startServer() {
   // ImageKit Direct Upload (for existing base64 content)
   app.post("/api/imagekit/upload", async (req, res) => {
     try {
-      const { file, fileName, tags } = req.body;
+      const { file, fileName, tags, folder } = req.body;
       const imagekit = getSafeImageKit(req);
       if (!imagekit) {
         return res.status(503).json({ error: "ImageKit not configured" });
@@ -236,7 +236,8 @@ async function startServer() {
       const response = await imagekit.upload({
         file: file,
         fileName: fileName || `upload-${Date.now()}`,
-        tags: tags || ["user-upload"]
+        tags: tags || ["user-upload"],
+        folder: folder
       });
 
       res.json(response);
@@ -261,7 +262,7 @@ async function startServer() {
       };
 
       if (userId && typeof userId === 'string') {
-        options.tags = [userId];
+        options.path = `/salu-ai-generated/${userId}`;
       }
 
       const files = await imagekit.listFiles(options);
