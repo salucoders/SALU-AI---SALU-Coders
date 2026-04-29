@@ -560,7 +560,20 @@ export async function sendMessageStream(
 }
 
 export async function generateImageWithSALU(prompt: string): Promise<string> {
-  // ... existing gemini image code ...
+  // Retry helper for quota exhaustion
+  const withRetry = async <T>(fn: () => Promise<T>, retries = 3, delay = 2000): Promise<T> => {
+    try {
+      return await fn();
+    } catch (error: any) {
+      if (retries > 0 && (error.message.includes('429') || error.message.includes('RESOURCE_EXHAUSTED') || error.message.includes('quota'))) {
+        console.warn(`Quota exhausted. Retrying in ${delay}ms...`, error.message);
+        await new Promise(r => setTimeout(r, delay));
+        return withRetry(fn, retries - 1, delay * 2);
+      }
+      throw error;
+    }
+  };
+
   try {
     const config = await getSystemConfig();
     const activeKey = config.imageGenApiKey || config.apiKey;
@@ -571,7 +584,7 @@ export async function generateImageWithSALU(prompt: string): Promise<string> {
     const ai = new GoogleGenAI({ apiKey: activeKey });
     
     // Using gemini-2.5-flash-image for standard free-tier availability
-    const response = await ai.models.generateContent({
+    const response = await withRetry(() => ai.models.generateContent({
       model: 'gemini-2.5-flash-image',
       contents: {
         parts: [
@@ -585,7 +598,7 @@ export async function generateImageWithSALU(prompt: string): Promise<string> {
           aspectRatio: "1:1"
         }
       }
-    });
+    }));
 
     // Find the image part in the response parts
     const candidates = (response as any).candidates;
