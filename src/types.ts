@@ -13,6 +13,7 @@ export interface Message {
 
 export interface UserPreferences {
   name: string;
+  email?: string;
   language: 'English' | 'Urdu' | 'Sindhi' | 'Spanish' | 'French' | 'German';
   profilePicture?: string; // base64
   accentColor: string; // hex or tailwind color name

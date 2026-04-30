@@ -81,6 +81,14 @@ export const UserProfileProvider: React.FC<{ children: React.ReactNode }> = ({ c
       return;
     }
 
+    // Optimistically set the user's name from Firebase Auth instantly
+    setPreferences(prev => ({ 
+      ...prev, 
+      name: user.displayName || user.email?.split('@')[0] || prev.name, 
+      email: user.email || prev.email,
+      profilePicture: user.photoURL || prev.profilePicture
+    }));
+
     setLoading(true);
     const userDocRef = doc(db, 'users', user.uid);
     

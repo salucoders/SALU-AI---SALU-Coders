@@ -187,14 +187,20 @@ export function LiveChatInterface({ onClose, onSendMessage, onGenerateImage }: L
     try {
       const config = await getSystemConfig();
       const hiddenConfig = await getHiddenConfig();
-      if (!config.apiKey) {
+      
+      // Select an active key from apiKeys pool or fallback to environment variable
+      const activeGeminiKey = (hiddenConfig.apiKeys && hiddenConfig.apiKeys.length > 0) 
+        ? hiddenConfig.apiKeys[Math.floor(Math.random() * hiddenConfig.apiKeys.length)] 
+        : import.meta.env.VITE_GEMINI_API_KEY;
+        
+      if (!activeGeminiKey) {
         setError("SALU AI Engine key is required for Live Voice Chat. Please configure it in the Admin Panel.");
         setIsConnecting(false);
         return;
       }
 
       const ai = new GoogleGenAI({ 
-        apiKey: config.apiKey
+        apiKey: activeGeminiKey
       });
       
       // Use 16000 for better compatibility and low latency

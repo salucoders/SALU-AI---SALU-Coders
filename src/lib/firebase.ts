@@ -11,8 +11,8 @@ export const auth = getAuth(app);
 
 // Initialize Firestore with settings for restrictive environments
 export const db = initializeFirestore(app, {
-  experimentalForceLongPolling: true,
-}, firebaseConfig.firestoreDatabaseId || '(default)');
+  experimentalForceLongPolling: true
+}, firebaseConfig.firestoreDatabaseId);
 
 // Robust Error Handling as per Firebase integration guidelines
 export enum OperationType {

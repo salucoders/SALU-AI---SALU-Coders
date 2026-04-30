@@ -3,8 +3,53 @@ import { GoogleGenAI } from "@google/genai";
 import { doc, getDoc } from "firebase/firestore";
 import { db } from "../lib/firebase";
 
+// Helper for retrying on 429 quota exhaustion
+const withBackoff = async <T>(fn: () => Promise<T>, retries = 5, delay = 2000): Promise<T> => {
+  try {
+    return await fn();
+  } catch (error: any) {
+    const isQuotaError = error.message && (error.message.includes('429') || 
+                          error.message.includes('RESOURCE_EXHAUSTED') || 
+                          error.message.includes('quota'));
+    
+    if (retries > 0 && isQuotaError) {
+      console.warn(`Quota exhausted. Retrying in ${delay}ms...`, error.message);
+      await new Promise(r => setTimeout(r, delay));
+      return withBackoff(fn, retries - 1, Math.min(delay * 2, 60000));
+    }
+    throw error;
+  }
+};
+
+export async function generateChatTitle(firstMessage: string): Promise<string> {
+  try {
+    const config = await getSystemConfig();
+    const activeKey = config.apiKeys.length > 0 ? config.apiKeys[Math.floor(Math.random() * config.apiKeys.length)] : config.apiKeys[0];
+    
+    if (!activeKey) {
+      return (firstMessage || "New Conversation").slice(0, 30);
+    }
+    
+    const ai = new GoogleGenAI({ apiKey: activeKey });
+    
+    const response = await withBackoff(() => ai.models.generateContent({
+      model: 'gemini-2.5-flash',
+      contents: `Based on the following first message of a conversation, generate a short, descriptive, and catchy title for the chat (maximum 4 words). Do not include quotes or any other punctuation. Message: "${firstMessage.slice(0, 500)}"`,
+      config: {
+        temperature: 0.7,
+        maxOutputTokens: 20
+      }
+    }), 3, 2000); // 3 retries max for title, 2s initial delay
+    
+    return response.text?.trim()?.replace(/["']/g, "") || "New Conversation";
+  } catch (error: any) {
+    // If it still fails, just mute the error to console.log instead of error and fallback immediately
+    console.log("Could not generate chat title (quota/network issue), falling back to truncated message.");
+    return (firstMessage || "New Conversation").slice(0, 30);
+  }
+}
+
 export async function getSystemConfig(): Promise<{ 
-  apiKey: string, 
   apiKeys: string[],
   groqApiKey: string,
   defaultModel: string, 
@@ -81,10 +126,10 @@ export async function getSystemConfig(): Promise<{
   // Attach the source for debugging purposes on error
   (window as any)._geminiKeySource = keySource;
 
-  return { apiKey: apiKeys[0] || "", apiKeys, groqApiKey, defaultModel, imageGenApiKey };
+  return { apiKeys, groqApiKey, defaultModel, imageGenApiKey };
 }
 
-export async function getHiddenConfig(): Promise<{ assistantName: string, activationResponses: string[], customSystemInstructions: string }> {
+export async function getHiddenConfig(): Promise<{ assistantName: string, activationResponses: string[], customSystemInstructions: string, apiKeys?: string[] }> {
   try {
     const configDoc = await getDoc(doc(db, 'system', 'hidden_config'));
     if (configDoc.exists()) {
@@ -560,28 +605,9 @@ export async function sendMessageStream(
 }
 
 export async function generateImageWithSALU(prompt: string): Promise<string> {
-  // Improved retry helper for quota exhaustion
-  const withBackoff = async <T>(fn: () => Promise<T>, retries = 5, delay = 5000): Promise<T> => {
-    try {
-      return await fn();
-    } catch (error: any) {
-      const isQuotaError = error.message.includes('429') || 
-                           error.message.includes('RESOURCE_EXHAUSTED') || 
-                           error.message.includes('quota');
-      
-      if (retries > 0 && isQuotaError) {
-        console.warn(`Quota exhausted. Retrying in ${delay}ms...`, error.message);
-        await new Promise(r => setTimeout(r, delay));
-        // Exponential backoff with a cap
-        return withBackoff(fn, retries - 1, Math.min(delay * 2, 60000));
-      }
-      throw error;
-    }
-  };
-
   try {
     const config = await getSystemConfig();
-    const activeKey = config.imageGenApiKey || config.apiKey;
+    const activeKey = config.imageGenApiKey || (config.apiKeys && config.apiKeys.length > 0 ? config.apiKeys[0] : "");
     if (!activeKey) {
       throw new Error("SALU AI Engine key is missing for image generation");
     }
@@ -626,11 +652,11 @@ export async function generateImageWithSALU(prompt: string): Promise<string> {
 export async function performWebSearch(query: string): Promise<string> {
   try {
     const config = await getSystemConfig();
-    if (!config.apiKey) {
+    if (!config.apiKeys || config.apiKeys.length === 0) {
       throw new Error("SALU AI Engine key is missing");
     }
 
-    const ai = new GoogleGenAI({ apiKey: config.apiKey });
+    const ai = new GoogleGenAI({ apiKey: config.apiKeys[0] });
     const response = await ai.models.generateContent({
       model: config.defaultModel && config.defaultModel.includes('flash') ? config.defaultModel : 'gemini-2.0-flash', 
       contents: query,

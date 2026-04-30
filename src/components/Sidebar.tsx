@@ -85,6 +85,51 @@ export const Sidebar = React.memo(({
   const activeSessions = sessions.filter(s => !s.isArchived);
   const archivedSessions = sessions.filter(s => s.isArchived);
   const displayedSessions = showArchived ? archivedSessions : activeSessions;
+  
+  const getSessionGroup = (updatedAt: any) => {
+    const getTimestamp = (val: any) => {
+      if (!val) return 0;
+      if (typeof val === 'string') return new Date(val).getTime();
+      if (val.seconds) return val.seconds * 1000 + (val.nanoseconds / 1000000);
+      if (val instanceof Date) return val.getTime();
+      return 0;
+    };
+    
+    const timestamp = getTimestamp(updatedAt);
+    if (!timestamp) return 'Older';
+    
+    const now = new Date();
+    const date = new Date(timestamp);
+    
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+    const startOfYesterday = startOfToday - 86400000;
+    const startOfLast7Days = startOfToday - (7 * 86400000);
+    const startOfLast30Days = startOfToday - (30 * 86400000);
+    
+    if (timestamp >= startOfToday) return 'Today';
+    if (timestamp >= startOfYesterday) return 'Yesterday';
+    if (timestamp >= startOfLast7Days) return 'Previous 7 Days';
+    if (timestamp >= startOfLast30Days) return 'Previous 30 Days';
+    
+    return `${date.toLocaleString('default', { month: 'long' })} ${date.getFullYear()}`;
+  };
+
+  const groupedSessions = displayedSessions.reduce((acc, session) => {
+    const group = getSessionGroup(session.updatedAt);
+    if (!acc[group]) acc[group] = [];
+    acc[group].push(session);
+    return acc;
+  }, {} as Record<string, ChatSession[]>);
+
+  const groupOrder = ['Today', 'Yesterday', 'Previous 7 Days', 'Previous 30 Days'];
+  const sortedGroups = Object.keys(groupedSessions).sort((a, b) => {
+    const idxA = groupOrder.indexOf(a);
+    const idxB = groupOrder.indexOf(b);
+    if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+    if (idxA !== -1) return -1;
+    if (idxB !== -1) return 1;
+    return b.localeCompare(a); // Sort older months descending
+  });
 
   const handleLogin = async () => {
     try {
@@ -294,152 +339,159 @@ export const Sidebar = React.memo(({
               </div>
             </div>
 
-          <div className="flex-1 overflow-y-auto px-4 py-1 custom-scrollbar space-y-1">
+          <div className="flex-1 overflow-y-auto px-4 py-1 custom-scrollbar space-y-4">
             {displayedSessions.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-10 opacity-40">
                 <History className="w-10 h-10 mb-2 text-slate-300" />
                 <p className="text-xs font-bold text-slate-400">Empty list</p>
               </div>
             ) : (
-              displayedSessions.map(session => (
-                <div key={session.id} className="relative group/item">
-                  {editingSessionId === session.id ? (
-                    <div className="flex items-center gap-2 p-2 bg-white rounded-2xl border border-slate-900 shadow-sm z-10 relative animate-in fade-in zoom-in duration-200">
-                      <input
-                        autoFocus
-                        value={editingTitle}
-                        onChange={(e) => setEditingTitle(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') saveRename();
-                          if (e.key === 'Escape') setEditingSessionId(null);
-                        }}
-                        className="bg-transparent border-none focus:ring-0 text-xs text-slate-900 w-full p-0 font-bold"
-                      />
-                      <div className="flex items-center gap-1">
-                        <button onClick={saveRename} className="p-1.5 bg-emerald-50 text-emerald-600 hover:bg-emerald-100 rounded-lg">
-                          <Check className="w-3.5 h-3.5" />
-                        </button>
-                        <button onClick={() => setEditingSessionId(null)} className="p-1.5 text-slate-400 hover:bg-slate-100 rounded-lg">
-                          <X className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="flex items-center gap-1">
-                      <button
-                        onClick={() => {
-                          onSelectSession(session.id);
-                          if (window.innerWidth < 1024) onClose();
-                        }}
-                        className={cn(
-                          "flex-1 flex items-center gap-3 px-3 py-3 rounded-2xl text-[13px] transition-all text-left relative group/btn overflow-hidden",
-                          currentSessionId === session.id
-                            ? "text-white font-bold"
-                            : "hover:bg-slate-50/80 text-slate-600 font-medium active:scale-95"
-                        )}
-                      >
-                        {currentSessionId === session.id && (
-                          <motion.div
-                            layoutId="active-session-bg"
-                            className="absolute inset-0 bg-slate-900 z-0 shadow-lg shadow-slate-200"
-                            transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
+              sortedGroups.map(group => (
+                <div key={group} className="space-y-1">
+                  <div className="text-[9px] font-black uppercase tracking-widest text-slate-400 px-3 py-1.5 sticky top-0 bg-white/90 backdrop-blur-sm z-10">
+                    {group}
+                  </div>
+                  {groupedSessions[group].map(session => (
+                    <div key={session.id} className="relative group/item">
+                      {editingSessionId === session.id ? (
+                        <div className="flex items-center gap-2 p-2 bg-white rounded-2xl border border-slate-900 shadow-sm z-30 relative animate-in fade-in zoom-in duration-200">
+                          <input
+                            autoFocus
+                            value={editingTitle}
+                            onChange={(e) => setEditingTitle(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') saveRename();
+                              if (e.key === 'Escape') setEditingSessionId(null);
+                            }}
+                            className="bg-transparent border-none focus:ring-0 text-xs text-slate-900 w-full p-0 font-bold"
                           />
-                        )}
-                        <MessageSquare className={cn("w-4 h-4 shrink-0 relative z-10", currentSessionId === session.id ? "text-slate-300" : "text-slate-400")} />
-                        <span className="truncate flex-1 pr-4 relative z-10">{session.title}</span>
-                      </button>
-                      
-                        <div className={cn(
-                          "absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1 transition-all duration-300",
-                          activeMenuId === session.id 
-                            ? "opacity-100 translate-x-0" 
-                            : "opacity-0 translate-x-2 pointer-events-none group-hover/item:opacity-100 group-hover/item:translate-x-0 group-hover/item:pointer-events-auto"
-                        )}>
+                          <div className="flex items-center gap-1">
+                            <button onClick={saveRename} className="p-1.5 bg-emerald-50 text-emerald-600 hover:bg-emerald-100 rounded-lg">
+                              <Check className="w-3.5 h-3.5" />
+                            </button>
+                            <button onClick={() => setEditingSessionId(null)} className="p-1.5 text-slate-400 hover:bg-slate-100 rounded-lg">
+                              <X className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-1">
                           <button
-                            onClick={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              setActiveMenuId(activeMenuId === session.id ? null : session.id);
+                            onClick={() => {
+                              onSelectSession(session.id);
+                              if (window.innerWidth < 1024) onClose();
                             }}
                             className={cn(
-                              "p-1.5 rounded-lg transition-all border shadow-sm backdrop-blur-md relative z-20",
-                              currentSessionId === session.id 
-                                ? "bg-white/10 text-white hover:bg-white/20 border-white/20" 
-                                : "bg-white border-slate-100 text-slate-400 hover:text-slate-900 border-slate-200"
+                              "flex-1 flex items-center gap-3 px-3 py-3 rounded-2xl text-[13px] transition-all text-left relative group/btn overflow-hidden",
+                              currentSessionId === session.id
+                                ? "text-white font-bold"
+                                : "hover:bg-slate-50/80 text-slate-600 font-medium active:scale-95"
                             )}
                           >
-                            <MoreVertical className="w-3.5 h-3.5" />
-                          </button>
-
-                          <AnimatePresence>
-                            {activeMenuId === session.id && (
-                              <>
-                                <motion.div 
-                                  initial={{ opacity: 0 }}
-                                  animate={{ opacity: 1 }}
-                                  exit={{ opacity: 0 }}
-                                  className="fixed inset-0 z-40 bg-black/5" 
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setActiveMenuId(null);
-                                  }}
-                                />
-                                <motion.div
-                                  initial={{ opacity: 0, scale: 0.9, x: 10 }}
-                                  animate={{ opacity: 1, scale: 1, x: 0 }}
-                                  exit={{ opacity: 0, scale: 0.9, x: 10 }}
-                                  className="absolute right-full top-0 mr-2 w-48 bg-white border border-slate-200 rounded-2xl shadow-2xl z-[60] overflow-hidden py-1.5"
-                                >
-                                  <button
-                                    onClick={(e) => {
-                                      e.preventDefault();
-                                      e.stopPropagation();
-                                      startEditing(session);
-                                      setActiveMenuId(null);
-                                    }}
-                                    className="w-full flex items-center gap-3 px-4 py-2.5 text-[11px] font-bold text-slate-700 hover:bg-slate-50 transition-colors"
-                                  >
-                                    <div className="w-6 h-6 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
-                                      <Edit2 className="w-3.5 h-3.5" />
-                                    </div>
-                                    Rename Chat
-                                  </button>
-                                  <button
-                                    onClick={(e) => {
-                                      e.preventDefault();
-                                      e.stopPropagation();
-                                      onArchiveSession(session.id);
-                                      setActiveMenuId(null);
-                                    }}
-                                    className="w-full flex items-center gap-3 px-4 py-2.5 text-[11px] font-bold text-slate-700 hover:bg-slate-50 transition-colors"
-                                  >
-                                    <div className="w-6 h-6 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center">
-                                      {session.isArchived ? <ArchiveRestore className="w-3.5 h-3.5" /> : <Archive className="w-3.5 h-3.5" />}
-                                    </div>
-                                    {session.isArchived ? 'Activate Chat' : 'Archive Chat'}
-                                  </button>
-                                  <div className="h-px bg-slate-100 mx-2 my-1" />
-                                  <button
-                                    onClick={(e) => {
-                                      e.preventDefault();
-                                      e.stopPropagation();
-                                      setSessionToDelete(session.id);
-                                      setActiveMenuId(null);
-                                    }}
-                                    className="w-full flex items-center gap-3 px-4 py-2.5 text-[11px] font-bold text-rose-600 hover:bg-rose-50 transition-colors"
-                                  >
-                                    <div className="w-6 h-6 rounded-lg bg-rose-50 text-rose-600 flex items-center justify-center">
-                                      <Trash2 className="w-3.5 h-3.5" />
-                                    </div>
-                                    Delete Chat
-                                  </button>
-                                </motion.div>
-                              </>
+                            {currentSessionId === session.id && (
+                              <motion.div
+                                layoutId="active-session-bg"
+                                className="absolute inset-0 bg-slate-900 z-0 shadow-lg shadow-slate-200"
+                                transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
+                              />
                             )}
-                          </AnimatePresence>
+                            <MessageSquare className={cn("w-4 h-4 shrink-0 relative z-10", currentSessionId === session.id ? "text-slate-300" : "text-slate-400")} />
+                            <span className="truncate flex-1 pr-4 relative z-10">{session.title}</span>
+                          </button>
+                          
+                            <div className={cn(
+                              "absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1 transition-all duration-300 z-20",
+                              activeMenuId === session.id 
+                                ? "opacity-100 translate-x-0" 
+                                : "opacity-0 translate-x-2 pointer-events-none group-hover/item:opacity-100 group-hover/item:translate-x-0 group-hover/item:pointer-events-auto"
+                            )}>
+                              <button
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  setActiveMenuId(activeMenuId === session.id ? null : session.id);
+                                }}
+                                className={cn(
+                                  "p-1.5 rounded-lg transition-all border shadow-sm backdrop-blur-md relative",
+                                  currentSessionId === session.id 
+                                    ? "bg-white/10 text-white hover:bg-white/20 border-white/20" 
+                                    : "bg-white border-slate-100 text-slate-400 hover:text-slate-900 border-slate-200"
+                                )}
+                              >
+                                <MoreVertical className="w-3.5 h-3.5" />
+                              </button>
+
+                              <AnimatePresence>
+                                {activeMenuId === session.id && (
+                                  <>
+                                    <motion.div 
+                                      initial={{ opacity: 0 }}
+                                      animate={{ opacity: 1 }}
+                                      exit={{ opacity: 0 }}
+                                      className="fixed inset-0 z-40 bg-black/5" 
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setActiveMenuId(null);
+                                      }}
+                                    />
+                                    <motion.div
+                                      initial={{ opacity: 0, scale: 0.9, x: 10 }}
+                                      animate={{ opacity: 1, scale: 1, x: 0 }}
+                                      exit={{ opacity: 0, scale: 0.9, x: 10 }}
+                                      className="absolute right-full top-0 mr-2 w-48 bg-white border border-slate-200 rounded-2xl shadow-2xl z-[60] overflow-hidden py-1.5"
+                                    >
+                                      <button
+                                        onClick={(e) => {
+                                          e.preventDefault();
+                                          e.stopPropagation();
+                                          startEditing(session);
+                                          setActiveMenuId(null);
+                                        }}
+                                        className="w-full flex items-center gap-3 px-4 py-2.5 text-[11px] font-bold text-slate-700 hover:bg-slate-50 transition-colors"
+                                      >
+                                        <div className="w-6 h-6 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
+                                          <Edit2 className="w-3.5 h-3.5" />
+                                        </div>
+                                        Rename Chat
+                                      </button>
+                                      <button
+                                        onClick={(e) => {
+                                          e.preventDefault();
+                                          e.stopPropagation();
+                                          onArchiveSession(session.id);
+                                          setActiveMenuId(null);
+                                        }}
+                                        className="w-full flex items-center gap-3 px-4 py-2.5 text-[11px] font-bold text-slate-700 hover:bg-slate-50 transition-colors"
+                                      >
+                                        <div className="w-6 h-6 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center">
+                                          {session.isArchived ? <ArchiveRestore className="w-3.5 h-3.5" /> : <Archive className="w-3.5 h-3.5" />}
+                                        </div>
+                                        {session.isArchived ? 'Activate Chat' : 'Archive Chat'}
+                                      </button>
+                                      <div className="h-px bg-slate-100 mx-2 my-1" />
+                                      <button
+                                        onClick={(e) => {
+                                          e.preventDefault();
+                                          e.stopPropagation();
+                                          setSessionToDelete(session.id);
+                                          setActiveMenuId(null);
+                                        }}
+                                        className="w-full flex items-center gap-3 px-4 py-2.5 text-[11px] font-bold text-rose-600 hover:bg-rose-50 transition-colors"
+                                      >
+                                        <div className="w-6 h-6 rounded-lg bg-rose-50 text-rose-600 flex items-center justify-center">
+                                          <Trash2 className="w-3.5 h-3.5" />
+                                        </div>
+                                        Delete Chat
+                                      </button>
+                                    </motion.div>
+                                  </>
+                                )}
+                              </AnimatePresence>
+                            </div>
                         </div>
+                      )}
                     </div>
-                  )}
+                  ))}
                 </div>
               ))
             )}

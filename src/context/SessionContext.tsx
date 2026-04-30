@@ -168,6 +168,17 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
       
       if (role === 'user' && messages.length === 0) {
         sessionUpdate.title = (content || (finalAttachments.length > 0 ? "Attachment analysis" : "New Conversation")).slice(0, 40) + ((content && content.length > 40) ? '...' : '');
+
+        // Kick off asynchronous AI title generation
+        if (content) {
+          import('../services/gemini').then(({ generateChatTitle }) => {
+            generateChatTitle(content).then(aiTitle => {
+              if (aiTitle) {
+                updateDoc(sessionRef, { title: aiTitle });
+              }
+            }).catch(console.error);
+          }).catch(console.error);
+        }
       }
       
       batch.update(sessionRef, sessionUpdate);

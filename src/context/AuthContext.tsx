@@ -50,7 +50,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             try {
               await setDoc(doc(db, 'users', currentUser.uid), {
                 uid: currentUser.uid,
-                name: currentUser.displayName || 'Guest',
+                name: currentUser.displayName || currentUser.email?.split('@')[0] || 'User',
                 email: currentUser.email,
                 profilePicture: currentUser.photoURL || '',
                 language: 'English',

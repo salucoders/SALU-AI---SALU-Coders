@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
-import { Users, Settings, Activity, Shield, Key, Database, Server, X, Check, AlertCircle, Loader2, MessageSquare, Radio, Trash2, Download, Eraser, Palette, Cpu, Eye, EyeOff, Crown, Upload, Search, Filter, Calendar, BarChart3, Terminal, Sparkles } from 'lucide-react';
+import { Users, Settings, Activity, Shield, Key, Database, Server, X, Check, AlertCircle, Loader2, MessageSquare, Radio, Trash2, Download, Eraser, Palette, Cpu, Eye, EyeOff, Crown, Upload, Search, Filter, Calendar, BarChart3, Terminal, Sparkles, Menu, Bot, FileBox } from 'lucide-react';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell } from 'recharts';
 import { collection, getDocs, doc, updateDoc, deleteDoc, getDoc, setDoc, query, where, collectionGroup, orderBy, limit } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { useAuth } from '../context/AuthContext';
@@ -18,6 +19,7 @@ export function AdminPanel({ onClose }: AdminPanelProps) {
   const { user } = useAuth();
   const { preferences } = useUserProfile();
   const [activeTab, setActiveTab] = useState<'dashboard' | 'users' | 'members' | 'broadcast' | 'analytics' | 'messages' | 'settings' | 'data' | 'api-keys'>('dashboard');
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [users, setUsers] = useState<any[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [userFilterRole, setUserFilterRole] = useState('all');
@@ -35,7 +37,9 @@ export function AdminPanel({ onClose }: AdminPanelProps) {
     activityBreakdown: { today: 0, week: 0, month: 0 },
     avgMessagesPerSession: 0
   });
+  const [sessions, setSessions] = useState<any[]>([]);
   const [allMessages, setAllMessages] = useState<any[]>([]);
+  const [selectedMessage, setSelectedMessage] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
   const [systemConfig, setSystemConfig] = useState({
     maintenanceMode: false,
@@ -106,6 +110,42 @@ export function AdminPanel({ onClose }: AdminPanelProps) {
   const fetchData = async () => {
     setLoading(true);
     try {
+      // 1. Fetch Fast Configuration First
+      const fsConfigDocPromise = getDoc(doc(db, 'system', 'config'));
+      const broadcastDocPromise = getDoc(doc(db, 'system', 'broadcast'));
+      
+      const [fsConfigDoc, broadcastDoc] = await Promise.all([fsConfigDocPromise, broadcastDocPromise]);
+      
+      if (fsConfigDoc.exists()) {
+        const d = fsConfigDoc.data();
+        setSystemConfig(prev => ({
+          ...prev,
+          ...d
+        }));
+      }
+
+      if (broadcastDoc.exists()) {
+        setBroadcast(broadcastDoc.data() as any);
+      }
+      
+      // Stop blocking UI for heavy stats
+      setLoading(false);
+
+      // 2. Fetch Heavy Stats in Background
+      fetchHeavyData();
+
+    } catch (error: any) {
+      if (error.code === 'unavailable' || String(error).includes('Code: unavailable')) {
+        console.warn("Could not fetch admin config (Firestore connection unavailable).");
+      } else {
+        console.error("Error fetching admin data:", error);
+      }
+      setLoading(false);
+    }
+  };
+
+  const fetchHeavyData = async () => {
+    try {
       // Fetch Users
       const usersSnapshot = await getDocs(query(collection(db, 'users'), limit(500)));
       const usersData = usersSnapshot.docs.map(d => ({ id: d.id, ...d.data() })) as any[];
@@ -114,11 +154,12 @@ export function AdminPanel({ onClose }: AdminPanelProps) {
       // Fetch Sessions for stats
       const sessionsSnapshot = await getDocs(query(collection(db, 'sessions'), limit(500)));
       const sessionsData = sessionsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as any[];
+      setSessions(sessionsData);
       
-      // Fetch Messages for stats
-      const messagesQuery = query(collectionGroup(db, 'messages'), orderBy('timestamp', 'desc'), limit(1000));
+      // Fetch Messages for stats (Limit lowered to reduce payload size and speed up query)
+      const messagesQuery = query(collectionGroup(db, 'messages'), orderBy('timestamp', 'desc'), limit(300));
       const messagesSnapshot = await getDocs(messagesQuery);
-      const messagesData = messagesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      const messagesData = messagesSnapshot.docs.map(doc => ({ id: doc.id, sessionId: doc.ref.parent.parent?.id, ...doc.data() }));
       setAllMessages(messagesData);
       
       const now = new Date();
@@ -178,7 +219,7 @@ export function AdminPanel({ onClose }: AdminPanelProps) {
       setStats({ 
         users: usersSnapshot.size, 
         sessions: sessionsSnapshot.size,
-        messages: messagesSnapshot.size,
+        messages: messagesSnapshot.size, // This is now capped at limit(300)
         paidUsers,
         activeToday,
         messagesToday: msgToday,
@@ -189,43 +230,12 @@ export function AdminPanel({ onClose }: AdminPanelProps) {
         avgMessagesPerSession
       });
 
-      // Fetch Firestore Config
-      const fsConfigDoc = await getDoc(doc(db, 'system', 'config'));
-      if (fsConfigDoc.exists()) {
-        const d = fsConfigDoc.data();
-        setSystemConfig(prev => ({
-          ...prev,
-          maintenanceMode: d.maintenanceMode ?? prev.maintenanceMode,
-          publicRegistration: d.publicRegistration ?? prev.publicRegistration,
-          liveAiMode: d.liveAiMode ?? prev.liveAiMode,
-          appName: d.appName ?? prev.appName,
-          welcomeMessage: d.welcomeMessage ?? prev.welcomeMessage,
-          geminiApiKey: d.geminiApiKey ?? prev.geminiApiKey,
-          geminiApiKey2: d.geminiApiKey2 ?? prev.geminiApiKey2,
-          geminiApiKey3: d.geminiApiKey3 ?? prev.geminiApiKey3,
-          geminiApiKey4: d.geminiApiKey4 ?? prev.geminiApiKey4,
-          geminiApiKey5: d.geminiApiKey5 ?? prev.geminiApiKey5,
-          groqApiKey: d.groqApiKey ?? prev.groqApiKey,
-          geminiImageGenApiKey: d.geminiImageGenApiKey ?? prev.geminiImageGenApiKey,
-          togetherApiKey: d.togetherApiKey ?? prev.togetherApiKey,
-          imageKitPublicKey: d.imageKitPublicKey ?? prev.imageKitPublicKey,
-          imageKitPrivateKey: d.imageKitPrivateKey ?? prev.imageKitPrivateKey,
-          imageKitUrlEndpoint: d.imageKitUrlEndpoint ?? prev.imageKitUrlEndpoint,
-          defaultModel: d.defaultModel ?? prev.defaultModel,
-          jazzCashNumber: d.jazzCashNumber ?? prev.jazzCashNumber,
-          paymentQrUrl: d.paymentQrUrl ?? prev.paymentQrUrl
-        }));
+    } catch (error: any) {
+      if (error.code === 'unavailable' || String(error).includes('Code: unavailable')) {
+        console.warn("Could not fetch some background admin data (Firestore connection unavailable).");
+      } else {
+        console.error("Error fetching background admin data:", error);
       }
-
-      // Fetch Broadcast
-      const broadcastDoc = await getDoc(doc(db, 'system', 'broadcast'));
-      if (broadcastDoc.exists()) {
-        setBroadcast(broadcastDoc.data() as any);
-      }
-    } catch (error) {
-      console.error("Error fetching admin data:", error);
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -433,151 +443,149 @@ export function AdminPanel({ onClose }: AdminPanelProps) {
       exit={{ opacity: 0 }}
       className="fixed inset-0 z-50 flex bg-zinc-950/20 backdrop-blur-sm overflow-hidden"
     >
-      <div className="w-full h-full bg-zinc-50 flex flex-col md:flex-row overflow-hidden">
+      <div className="w-full h-full bg-[#FAFAFA] flex flex-col md:flex-row overflow-hidden">
         
         {/* Sidebar */}
-        <div className="w-full md:w-64 bg-zinc-950 text-zinc-400 flex flex-col shrink-0 border-r border-zinc-900 shadow-2xl">
-          <div className="p-6 flex items-center justify-between md:justify-start gap-4 border-b border-zinc-900/50">
+        <div className={cn(
+          "bg-white/80 backdrop-blur-xl text-slate-600 flex flex-col shrink-0 border border-slate-200/60 shadow-[0_8px_30px_rgb(0,0,0,0.04)] absolute md:relative z-20 transition-all duration-300 overflow-hidden",
+          "md:w-[280px] w-72 md:m-4 md:mr-0 md:rounded-[32px]",
+          mobileSidebarOpen ? "translate-x-0 inset-y-0 left-0" : "-translate-x-full md:translate-x-0 inset-y-0 left-0"
+        )}>
+          <div className="p-6 flex items-center justify-between gap-4 border-b border-slate-100/50 bg-white/50">
             <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center p-1.5 shadow-lg shadow-indigo-500/20">
+              <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-violet-600 via-fuchsia-500 to-indigo-500 flex items-center justify-center p-2 shadow-lg shadow-violet-500/30 ring-1 ring-white/20">
                 <img src={LOGO_URL} alt="Logo" className="w-full h-full object-contain brightness-0 invert" referrerPolicy="no-referrer" />
               </div>
-              <div>
-                <h2 className="font-semibold text-zinc-100 uppercase tracking-widest text-[10px] leading-tight">{APP_NAME}</h2>
-                <p className="text-[10px] text-zinc-500 font-mono tracking-wider">ADMIN SERVER</p>
+              <div className="flex flex-col">
+                <h2 className="font-bold text-slate-800 tracking-tight text-sm leading-tight">{APP_NAME}</h2>
+                <span className="text-[9px] font-black text-violet-500 uppercase tracking-widest bg-violet-50 px-2 py-0.5 rounded-full w-max mt-0.5">ADMIN</span>
               </div>
             </div>
-            <button onClick={onClose} className="md:hidden p-2 text-zinc-500 hover:text-zinc-100 transition-colors">
+            <button onClick={() => setMobileSidebarOpen(false)} className="md:hidden p-2 text-slate-400 hover:text-slate-800 hover:bg-slate-100 rounded-full transition-all">
               <X className="w-5 h-5" />
             </button>
           </div>
           
-          <div className="flex-1 py-6 px-4 flex flex-row md:flex-col gap-1 overflow-x-auto md:overflow-y-auto no-scrollbar">
-            <div className="px-3 md:pb-2 text-[10px] font-semibold tracking-widest text-zinc-600 uppercase hidden md:block">Overview</div>
+          <div className="flex-1 py-6 px-4 flex flex-col gap-1 overflow-y-auto custom-scrollbar">
+            <div className="px-3 pb-3 text-[10px] font-black tracking-widest text-slate-400/80 uppercase">Overview</div>
             <button
-              onClick={() => setActiveTab('dashboard')}
+              onClick={() => { setActiveTab('dashboard'); setMobileSidebarOpen(false); }}
               className={cn(
-                "flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all whitespace-nowrap text-sm font-medium",
-                activeTab === 'dashboard' ? "bg-zinc-900 text-zinc-100" : "text-zinc-500 hover:bg-zinc-900/50 hover:text-zinc-300"
+                "flex items-center gap-3 px-3.5 py-3 rounded-2xl transition-all whitespace-nowrap text-sm font-semibold group",
+                activeTab === 'dashboard' ? "bg-violet-600 text-white shadow-md shadow-violet-500/20" : "text-slate-500 hover:bg-slate-100 hover:text-slate-900"
               )}
             >
-              <Activity className="w-4 h-4" />
+              <Activity className={cn("w-4 h-4 shrink-0 transition-transform group-hover:scale-110", activeTab === 'dashboard' ? "text-white" : "text-slate-400")} />
               <span>Dashboard</span>
             </button>
             <button
-              onClick={() => setActiveTab('analytics')}
+              onClick={() => { setActiveTab('analytics'); setMobileSidebarOpen(false); }}
               className={cn(
-                "flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all whitespace-nowrap text-sm font-medium",
-                activeTab === 'analytics' ? "bg-zinc-900 text-zinc-100" : "text-zinc-500 hover:bg-zinc-900/50 hover:text-zinc-300"
+                "flex items-center gap-3 px-3.5 py-3 rounded-2xl transition-all whitespace-nowrap text-sm font-semibold group mt-1",
+                activeTab === 'analytics' ? "bg-violet-600 text-white shadow-md shadow-violet-500/20" : "text-slate-500 hover:bg-slate-100 hover:text-slate-900"
               )}
             >
-              <BarChart3 className="w-4 h-4" />
+              <BarChart3 className={cn("w-4 h-4 shrink-0 transition-transform group-hover:scale-110", activeTab === 'analytics' ? "text-white" : "text-slate-400")} />
               <span>Analytics</span>
             </button>
 
-            <div className="px-3 md:pt-6 md:pb-2 text-[10px] font-semibold tracking-widest text-zinc-600 uppercase hidden md:block">Accounts</div>
+            <div className="px-3 pt-8 pb-3 text-[10px] font-black tracking-widest text-slate-400/80 uppercase">Accounts</div>
             <button
-              onClick={() => setActiveTab('users')}
+              onClick={() => { setActiveTab('users'); setMobileSidebarOpen(false); }}
               className={cn(
-                "flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all whitespace-nowrap text-sm font-medium",
-                activeTab === 'users' ? "bg-zinc-900 text-zinc-100" : "text-zinc-500 hover:bg-zinc-900/50 hover:text-zinc-300"
+                "flex items-center gap-3 px-3.5 py-3 rounded-2xl transition-all whitespace-nowrap text-sm font-semibold group",
+                activeTab === 'users' ? "bg-violet-600 text-white shadow-md shadow-violet-500/20" : "text-slate-500 hover:bg-slate-100 hover:text-slate-900"
               )}
             >
-              <Users className="w-4 h-4" />
-              <span>Users</span>
+              <Users className={cn("w-4 h-4 shrink-0 transition-transform group-hover:scale-110", activeTab === 'users' ? "text-white" : "text-slate-400")} />
+              <span className="flex-1 text-left">Users Setup</span>
             </button>
             <button
-              onClick={() => setActiveTab('members')}
+              onClick={() => { setActiveTab('members'); setMobileSidebarOpen(false); }}
               className={cn(
-                "flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all whitespace-nowrap text-sm font-medium",
-                activeTab === 'members' ? "bg-zinc-900 text-zinc-100" : "text-zinc-500 hover:bg-zinc-900/50 hover:text-zinc-300"
+                "flex items-center gap-3 px-3.5 py-3 rounded-2xl transition-all whitespace-nowrap text-sm font-semibold group mt-1",
+                activeTab === 'members' ? "bg-violet-600 text-white shadow-md shadow-violet-500/20" : "text-slate-500 hover:bg-slate-100 hover:text-slate-900"
               )}
             >
-              <Crown className="w-4 h-4" />
+              <Crown className={cn("w-4 h-4 shrink-0 transition-transform group-hover:scale-110", activeTab === 'members' ? "text-white" : "text-slate-400")} />
               <span>Memberships</span>
             </button>
 
-            <div className="px-3 md:pt-6 md:pb-2 text-[10px] font-semibold tracking-widest text-zinc-600 uppercase hidden md:block">System</div>
+            <div className="px-3 pt-8 pb-3 text-[10px] font-black tracking-widest text-slate-400/80 uppercase">System Config</div>
             <button
-              onClick={() => setActiveTab('messages')}
+              onClick={() => { setActiveTab('messages'); setMobileSidebarOpen(false); }}
               className={cn(
-                "flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all whitespace-nowrap text-sm font-medium",
-                activeTab === 'messages' ? "bg-zinc-900 text-zinc-100" : "text-zinc-500 hover:bg-zinc-900/50 hover:text-zinc-300"
+                "flex items-center gap-3 px-3.5 py-3 rounded-2xl transition-all whitespace-nowrap text-sm font-semibold group",
+                activeTab === 'messages' ? "bg-violet-600 text-white shadow-md shadow-violet-500/20" : "text-slate-500 hover:bg-slate-100 hover:text-slate-900"
               )}
             >
-              <MessageSquare className="w-4 h-4" />
-              <span>Messages</span>
+              <MessageSquare className={cn("w-4 h-4 shrink-0 transition-transform group-hover:scale-110", activeTab === 'messages' ? "text-white" : "text-slate-400")} />
+              <span>Message Logs</span>
             </button>
             <button
-              onClick={() => setActiveTab('broadcast')}
+              onClick={() => { setActiveTab('broadcast'); setMobileSidebarOpen(false); }}
               className={cn(
-                "flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all whitespace-nowrap text-sm font-medium",
-                activeTab === 'broadcast' ? "bg-zinc-900 text-zinc-100" : "text-zinc-500 hover:bg-zinc-900/50 hover:text-zinc-300"
+                "flex items-center gap-3 px-3.5 py-3 rounded-2xl transition-all whitespace-nowrap text-sm font-semibold group mt-1",
+                activeTab === 'broadcast' ? "bg-violet-600 text-white shadow-md shadow-violet-500/20" : "text-slate-500 hover:bg-slate-100 hover:text-slate-900"
               )}
             >
-              <Radio className="w-4 h-4" />
-              <span>Broadcast</span>
+              <Radio className={cn("w-4 h-4 shrink-0 transition-transform group-hover:scale-110", activeTab === 'broadcast' ? "text-white" : "text-slate-400")} />
+              <span>Broadcast Center</span>
             </button>
             <button
-              onClick={() => setActiveTab('data')}
+              onClick={() => { setActiveTab('settings'); setMobileSidebarOpen(false); }}
               className={cn(
-                "flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all whitespace-nowrap text-sm font-medium",
-                activeTab === 'data' ? "bg-zinc-900 text-zinc-100" : "text-zinc-500 hover:bg-zinc-900/50 hover:text-zinc-300"
+                "flex items-center gap-3 px-3.5 py-3 rounded-2xl transition-all whitespace-nowrap text-sm font-semibold group mt-1",
+                activeTab === 'settings' ? "bg-violet-600 text-white shadow-md shadow-violet-500/20" : "text-slate-500 hover:bg-slate-100 hover:text-slate-900"
               )}
             >
-              <Database className="w-4 h-4" />
-              <span>Database</span>
+              <Settings className={cn("w-4 h-4 shrink-0 transition-transform group-hover:scale-110", activeTab === 'settings' ? "text-white" : "text-slate-400")} />
+              <span>General Settings</span>
             </button>
             <button
-              onClick={() => setActiveTab('settings')}
+              onClick={() => { setActiveTab('data'); setMobileSidebarOpen(false); }}
               className={cn(
-                "flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all whitespace-nowrap text-sm font-medium",
-                activeTab === 'settings' ? "bg-zinc-900 text-zinc-100" : "text-zinc-500 hover:bg-zinc-900/50 hover:text-zinc-300"
+                "flex items-center gap-3 px-3.5 py-3 rounded-2xl transition-all whitespace-nowrap text-sm font-semibold group mt-1",
+                activeTab === 'data' ? "bg-violet-600 text-white shadow-md shadow-violet-500/20" : "text-slate-500 hover:bg-slate-100 hover:text-slate-900"
               )}
             >
-              <Settings className="w-4 h-4" />
-              <span>Settings</span>
-            </button>
-            <button
-              onClick={() => setActiveTab('api-keys')}
-              className={cn(
-                "flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all whitespace-nowrap text-sm font-medium",
-                activeTab === 'api-keys' ? "bg-zinc-900 text-zinc-100" : "text-zinc-500 hover:bg-zinc-900/50 hover:text-zinc-300"
-              )}
-            >
-              <Key className="w-4 h-4" />
-              <span>API Keys</span>
+              <Database className={cn("w-4 h-4 shrink-0 transition-transform group-hover:scale-110", activeTab === 'data' ? "text-white" : "text-slate-400")} />
+              <span>Data & Actions</span>
             </button>
           </div>
           
-          <div className="p-4 border-t border-zinc-900/50 hidden md:flex items-center gap-3">
-             <div className="w-8 h-8 rounded bg-zinc-900 border border-zinc-800 flex items-center justify-center overflow-hidden shrink-0">
+          <div className="p-4 border-t border-slate-100/50 bg-white/50 hidden md:flex items-center gap-3">
+             <div className="w-10 h-10 rounded-2xl bg-slate-100 border border-slate-200/60 flex items-center justify-center overflow-hidden shrink-0 shadow-sm">
                {user?.photoURL ? (
                  <img src={user.photoURL} alt="Admin" className="w-full h-full object-cover" />
                ) : (
-                 <Terminal className="w-4 h-4 text-zinc-500" />
+                 <Terminal className="w-5 h-5 text-slate-500" />
                )}
              </div>
              <div className="flex-1 overflow-hidden">
-                <p className="text-xs font-medium text-zinc-300 truncate">{user?.displayName || 'Admin'}</p>
-                <p className="text-[10px] text-zinc-500 truncate">{user?.email}</p>
+                <p className="text-sm font-bold text-slate-700 truncate">{user?.displayName || 'Admin'}</p>
+                <p className="text-[10px] uppercase font-black tracking-widest text-slate-400 truncate">Super Admin</p>
              </div>
-             <button onClick={onClose} className="p-2 text-zinc-500 hover:text-white transition-colors" title="Close Panel">
+             <button onClick={onClose} className="p-2.5 bg-slate-50 rounded-xl text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors" title="Close Panel">
                <X className="w-4 h-4" />
              </button>
           </div>
         </div>
 
         {/* Main Content */}
-        <div className="flex-1 flex flex-col h-full overflow-hidden bg-zinc-50 relative">
+        <div className="flex-1 flex flex-col h-full overflow-hidden bg-[#FAFAFA] relative">
           
           {/* Header */}
-          <div className="h-20 bg-white border-b border-zinc-200 flex items-center px-10 shrink-0">
+          <div className="h-20 bg-white border-b border-slate-100 flex items-center px-6 md:px-10 shrink-0 gap-4 shadow-[0_2px_10px_rgba(0,0,0,0.02)] z-10">
+            <button onClick={() => setMobileSidebarOpen(true)} className="md:hidden p-2 text-slate-500 hover:text-slate-900 transition-colors">
+              <Menu className="w-6 h-6" />
+            </button>
             <div>
-              <h1 className="text-xl font-semibold text-zinc-900 capitalize tracking-tight">
+              <h1 className="text-xl font-bold text-slate-800 capitalize tracking-tight flex items-center gap-2">
                 {activeTab.replace('-', ' ')}
+                <Sparkles className="w-4 h-4 text-violet-500" />
               </h1>
-              <p className="text-xs text-zinc-500 font-medium">Manage {activeTab.replace('-', ' ')} preferences and data</p>
+              <p className="text-[13px] text-slate-500 font-medium">Manage your {activeTab.replace('-', ' ')} data and preferences</p>
             </div>
           </div>
 
@@ -612,131 +620,114 @@ export function AdminPanel({ onClose }: AdminPanelProps) {
                   <div className="space-y-6">
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                       {/* Stat Card 1 */}
-                      <div className="bg-white p-6 rounded-2xl border border-zinc-200/60 shadow-sm flex flex-col justify-between h-36">
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm font-medium text-zinc-500">Total Users</span>
-                          <Users className="w-5 h-5 text-zinc-400" />
+                      <motion.div whileHover={{ y: -4 }} className="bg-white p-6 rounded-[24px] border border-slate-100 shadow-[0_8px_30px_rgb(0,0,0,0.04)] flex flex-col justify-between h-40 relative overflow-hidden group">
+                        <div className="absolute top-0 right-0 p-6 opacity-10 transform scale-150 -translate-y-4 translate-x-4 transition-transform group-hover:scale-110">
+                          <Users className="w-24 h-24 text-emerald-500" />
                         </div>
-                        <div>
-                          <h3 className="text-3xl font-semibold text-zinc-900 tracking-tight">{stats.users}</h3>
-                          <div className="mt-2 flex items-center gap-1.5 text-[11px] text-emerald-600 font-semibold bg-emerald-50 w-fit px-2 py-0.5 rounded-full uppercase tracking-widest">
-                            <Activity className="w-3 h-3" />
+                        <div className="relative z-10 flex items-center justify-between">
+                          <span className="text-[15px] font-bold text-slate-500">Total Users</span>
+                          <div className="w-10 h-10 rounded-full bg-emerald-50 flex items-center justify-center">
+                            <Users className="w-5 h-5 text-emerald-500" />
+                          </div>
+                        </div>
+                        <div className="relative z-10">
+                          <h3 className="text-4xl font-black text-slate-800 tracking-tighter">{stats.users}</h3>
+                          <div className="mt-3 flex items-center gap-1.5 text-[11px] text-emerald-700 font-bold bg-emerald-50/80 w-fit px-2.5 py-1 rounded-full uppercase tracking-widest">
+                            <Activity className="w-3.5 h-3.5" />
                             <span>+{stats.activeToday} active today</span>
                           </div>
                         </div>
-                      </div>
+                      </motion.div>
 
                       {/* Stat Card 2 */}
-                      <div className="bg-white p-6 rounded-2xl border border-zinc-200/60 shadow-sm flex flex-col justify-between h-36">
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm font-medium text-zinc-500">SALU Plus Members</span>
-                          <Crown className="w-5 h-5 text-amber-500" />
+                      <motion.div whileHover={{ y: -4 }} className="bg-white p-6 rounded-[24px] border border-slate-100 shadow-[0_8px_30px_rgb(0,0,0,0.04)] flex flex-col justify-between h-40 relative overflow-hidden group">
+                        <div className="absolute top-0 right-0 p-6 opacity-10 transform scale-150 -translate-y-4 translate-x-4 transition-transform group-hover:scale-110">
+                          <Crown className="w-24 h-24 text-amber-500" />
                         </div>
-                        <div>
-                          <h3 className="text-3xl font-semibold text-zinc-900 tracking-tight">{stats.paidUsers}</h3>
-                          <div className="mt-2 flex items-center gap-1.5 text-[11px] text-amber-600 font-semibold bg-amber-50 w-fit px-2 py-0.5 rounded-full uppercase tracking-widest">
-                            <Crown className="w-3 h-3" />
+                        <div className="relative z-10 flex items-center justify-between">
+                          <span className="text-[15px] font-bold text-slate-500">SALU Plus Members</span>
+                          <div className="w-10 h-10 rounded-full bg-amber-50 flex items-center justify-center">
+                            <Crown className="w-5 h-5 text-amber-500" />
+                          </div>
+                        </div>
+                        <div className="relative z-10">
+                          <h3 className="text-4xl font-black text-slate-800 tracking-tighter">{stats.paidUsers}</h3>
+                          <div className="mt-3 flex items-center gap-1.5 text-[11px] text-amber-700 font-bold bg-amber-50/80 w-fit px-2.5 py-1 rounded-full uppercase tracking-widest">
+                            <Crown className="w-3.5 h-3.5" />
                             <span>{Math.round((stats.paidUsers / Math.max(stats.users, 1)) * 100 || 0)}% conversion rate</span>
                           </div>
                         </div>
-                      </div>
+                      </motion.div>
 
                       {/* Stat Card 3 */}
-                      <div className="bg-white p-6 rounded-2xl border border-zinc-200/60 shadow-sm flex flex-col justify-between h-36">
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm font-medium text-zinc-500">Total AI Insights</span>
-                          <MessageSquare className="w-5 h-5 text-indigo-500" />
+                      <motion.div whileHover={{ y: -4 }} className="bg-white p-6 rounded-[24px] border border-slate-100 shadow-[0_8px_30px_rgb(0,0,0,0.04)] flex flex-col justify-between h-40 relative overflow-hidden group">
+                        <div className="absolute top-0 right-0 p-6 opacity-10 transform scale-150 -translate-y-4 translate-x-4 transition-transform group-hover:scale-110">
+                          <MessageSquare className="w-24 h-24 text-indigo-500" />
                         </div>
-                        <div>
-                          <h3 className="text-3xl font-semibold text-zinc-900 tracking-tight">{stats.messages}</h3>
-                          <div className="mt-2 flex items-center gap-1.5 text-[11px] text-indigo-600 font-semibold bg-indigo-50 w-fit px-2 py-0.5 rounded-full uppercase tracking-widest">
-                            <MessageSquare className="w-3 h-3" />
+                        <div className="relative z-10 flex items-center justify-between">
+                          <span className="text-[15px] font-bold text-slate-500">Total AI Insights</span>
+                          <div className="w-10 h-10 rounded-full bg-indigo-50 flex items-center justify-center">
+                            <MessageSquare className="w-5 h-5 text-indigo-500" />
+                          </div>
+                        </div>
+                        <div className="relative z-10">
+                          <h3 className="text-4xl font-black text-slate-800 tracking-tighter">{stats.messages}</h3>
+                          <div className="mt-3 flex items-center gap-1.5 text-[11px] text-indigo-700 font-bold bg-indigo-50/80 w-fit px-2.5 py-1 rounded-full uppercase tracking-widest">
+                            <MessageSquare className="w-3.5 h-3.5" />
                             <span>+{stats.messagesToday} processed today</span>
                           </div>
                         </div>
-                      </div>
+                      </motion.div>
                     </div>
 
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                        {/* Chart Card 1 */}
-                       <div className="bg-white p-6 rounded-2xl border border-zinc-200/60 shadow-sm flex flex-col">
+                       <div className="bg-white p-6 rounded-[32px] border border-slate-100 shadow-[0_8px_30px_rgb(0,0,0,0.04)] flex flex-col">
                           <div className="flex items-center justify-between mb-8">
                              <div>
-                                <h3 className="text-base font-semibold text-zinc-900">User Activity (7 Days)</h3>
-                                <p className="text-xs text-zinc-500 mt-1">Unique active users per day</p>
+                                <h3 className="text-lg font-bold text-slate-800 tracking-tight">User Activity (7 Days)</h3>
+                                <p className="text-[13px] font-medium text-slate-400 mt-1">Unique active users per day</p>
                              </div>
-                             <div className="flex items-center gap-1.5 text-[10px] font-bold text-emerald-600 uppercase tracking-widest px-2 py-1 bg-emerald-50 rounded-md">
-                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                             <div className="flex items-center gap-1.5 text-[10px] font-black text-rose-600 uppercase tracking-widest px-3 py-1.5 bg-rose-50 rounded-lg">
+                                <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse" />
                                 LIVE
                              </div>
                           </div>
                           
-                          <div className="flex-1 min-h-[160px] flex items-end justify-between gap-3">
-                             {stats.activeUsersPerDay.length > 0 ? stats.activeUsersPerDay.map((item, i) => {
-                                const max = Math.max(...stats.activeUsersPerDay.map(d => d.count), 1);
-                                const height = (item.count / max) * 100;
-                                return (
-                                  <div key={i} className="flex-1 flex flex-col items-center gap-3 h-full justify-end">
-                                     <div className="w-full relative group flex flex-col justify-end h-full">
-                                        <div 
-                                          className="bg-indigo-500/80 rounded-sm transition-all duration-500 ease-out group-hover:bg-indigo-500 w-full"
-                                          style={{ height: `${height}%`, minHeight: '4px' }}
-                                        />
-                                        <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-zinc-900 text-white text-[10px] font-medium px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10 pointers-none">
-                                           {item.count} users
-                                        </div>
-                                     </div>
-                                     <span className="text-[10px] font-medium text-zinc-400">
-                                        {item.day.split('-').slice(1).join('/')}
-                                     </span>
-                                  </div>
-                                );
-                             }) : (
-                               <div className="w-full h-full flex items-center justify-center text-zinc-400 text-sm font-medium italic">
-                                  Not enough data yet
-                               </div>
-                             )}
+                          <div className="flex-1 min-h-[160px]">
+                            <ResponsiveContainer width="100%" height="100%">
+                              <BarChart data={stats.activeUsersPerDay}>
+                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e4e4e7" />
+                                <XAxis dataKey="day" tick={{fontSize: 10}} tickFormatter={(val) => val.split('-').slice(1).join('/')} stroke="#a1a1aa" axisLine={false} tickLine={false} />
+                                <Tooltip contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
+                                <Bar dataKey="count" fill="#6366f1" radius={[4, 4, 0, 0]} />
+                              </BarChart>
+                            </ResponsiveContainer>
                           </div>
                        </div>
 
                        {/* Chart Card 2 */}
-                       <div className="bg-white p-6 rounded-2xl border border-zinc-200/60 shadow-sm flex flex-col">
+                       <div className="bg-white p-6 rounded-[32px] border border-slate-100 shadow-[0_8px_30px_rgb(0,0,0,0.04)] flex flex-col">
                           <div className="flex items-center justify-between mb-8">
                              <div>
-                                <h3 className="text-base font-semibold text-zinc-900">Message Volume (7 Days)</h3>
-                                <p className="text-xs text-zinc-500 mt-1">Platform interactions per day</p>
+                                <h3 className="text-lg font-bold text-slate-800 tracking-tight">Message Volume (7 Days)</h3>
+                                <p className="text-[13px] font-medium text-slate-400 mt-1">Platform interactions per day</p>
                              </div>
-                             <div className="flex items-center gap-1.5 text-[10px] font-bold text-indigo-600 uppercase tracking-widest px-2 py-1 bg-indigo-50 rounded-md">
+                             <div className="flex items-center gap-1.5 text-[10px] font-black text-indigo-600 uppercase tracking-widest px-3 py-1.5 bg-indigo-50 rounded-lg">
                                 <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-pulse" />
                                 LIVE
                              </div>
                           </div>
                           
-                          <div className="flex-1 min-h-[160px] flex items-end justify-between gap-3">
-                             {stats.messagesPerDay.length > 0 ? stats.messagesPerDay.map((item, i) => {
-                                const max = Math.max(...stats.messagesPerDay.map(d => d.count), 1);
-                                const height = (item.count / max) * 100;
-                                return (
-                                  <div key={i} className="flex-1 flex flex-col items-center gap-3 h-full justify-end">
-                                     <div className="w-full relative group flex flex-col justify-end h-full">
-                                        <div 
-                                          className="bg-purple-500/80 rounded-sm transition-all duration-500 ease-out group-hover:bg-purple-500 w-full"
-                                          style={{ height: `${height}%`, minHeight: '4px' }}
-                                        />
-                                        <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-zinc-900 text-white text-[10px] font-medium px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10 pointer-events-none">
-                                           {item.count} msgs
-                                        </div>
-                                     </div>
-                                     <span className="text-[10px] font-medium text-zinc-400">
-                                        {item.day.split('-').slice(1).join('/')}
-                                     </span>
-                                  </div>
-                                );
-                             }) : (
-                               <div className="w-full h-full flex items-center justify-center text-zinc-400 text-sm font-medium italic">
-                                  Not enough data yet
-                               </div>
-                             )}
+                          <div className="flex-1 min-h-[160px]">
+                            <ResponsiveContainer width="100%" height="100%">
+                              <BarChart data={stats.messagesPerDay}>
+                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e4e4e7" />
+                                <XAxis dataKey="day" tick={{fontSize: 10}} tickFormatter={(val) => val.split('-').slice(1).join('/')} stroke="#a1a1aa" axisLine={false} tickLine={false} />
+                                <Tooltip contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
+                                <Bar dataKey="count" fill="#a855f7" radius={[4, 4, 0, 0]} />
+                              </BarChart>
+                            </ResponsiveContainer>
                           </div>
                        </div>
                     </div>
@@ -830,7 +821,12 @@ export function AdminPanel({ onClose }: AdminPanelProps) {
                                     </div>
                                   </div>
                                 </td>
-                                <td className="px-6 py-4 text-zinc-600">{u.email}</td>
+                                <td className="px-6 py-4">
+                                  <div className="flex flex-col">
+                                    <span className="text-sm text-zinc-600">{u.email}</span>
+                                    <span className="text-[10px] text-zinc-400 font-medium">Joined: {u.createdAt?.toDate?.()?.toLocaleDateString() || new Date(u.createdAt).toLocaleDateString() || 'Unknown'}</span>
+                                  </div>
+                                </td>
                                 <td className="px-6 py-4">
                                   <span className={cn(
                                     "px-2.5 py-1 rounded text-[10px] font-bold uppercase tracking-widest inline-flex items-center gap-1.5",
@@ -919,9 +915,11 @@ export function AdminPanel({ onClose }: AdminPanelProps) {
                              <thead>
                                 <tr className="bg-zinc-50/80 border-b border-zinc-200/60">
                                    <th className="px-6 py-4 font-semibold text-zinc-500 text-[10px] uppercase tracking-widest leading-4">Sender Role</th>
+                                   <th className="px-6 py-4 font-semibold text-zinc-500 text-[10px] uppercase tracking-widest leading-4">User</th>
+                                   <th className="px-6 py-4 font-semibold text-zinc-500 text-[10px] uppercase tracking-widest leading-4">User</th>
                                    <th className="px-6 py-4 font-semibold text-zinc-500 text-[10px] uppercase tracking-widest leading-4">Content Preview</th>
                                    <th className="px-6 py-4 font-semibold text-zinc-500 text-[10px] uppercase tracking-widest leading-4">Timestamp</th>
-                                   <th className="px-6 py-4 font-semibold text-zinc-500 text-[10px] uppercase tracking-widest leading-4">Attachments</th>
+                                   <th className="px-6 py-4 font-semibold text-zinc-500 text-[10px] uppercase tracking-widest leading-4 text-right">Action</th>
                                 </tr>
                              </thead>
                              <tbody className="divide-y divide-zinc-100 text-sm">
@@ -931,16 +929,29 @@ export function AdminPanel({ onClose }: AdminPanelProps) {
                                    const t1 = a.timestamp?.toDate?.() || new Date(a.timestamp);
                                    const t2 = b.timestamp?.toDate?.() || new Date(b.timestamp);
                                    return t2 - t1;
-                                }).map((m, i) => (
-                                   <tr key={i} className="hover:bg-zinc-50/50 transition-colors">
+                                }).map((m, i) => {
+                                    const session = sessions.find(s => s.id === m.sessionId);
+                                    const user = session ? users.find(u => u.id === session.userId) : null;
+                                    return (
+                                    <tr key={i} onClick={() => setSelectedMessage({...m, user})} className="hover:bg-zinc-50/50 transition-colors cursor-pointer group">
                                       <td className="px-6 py-4">
-                                         <span className={cn(
-                                            "px-2.5 py-1 rounded text-[10px] font-bold uppercase tracking-widest",
-                                            m.role === 'user' ? "bg-blue-50 text-blue-600 border border-blue-100" : "bg-indigo-50 text-indigo-600 border border-indigo-100"
-                                         )}>
-                                            {m.role}
-                                         </span>
-                                      </td>
+                                          <span className={cn(
+                                             "px-2.5 py-1 rounded text-[10px] font-bold uppercase tracking-widest",
+                                             m.role === 'user' ? "bg-blue-50 text-blue-600 border border-blue-100" : "bg-indigo-50 text-indigo-600 border border-indigo-100"
+                                          )}>
+                                             {m.role}
+                                          </span>
+                                       </td>
+                                       <td className="px-6 py-4">
+                                          {user ? (
+                                            <div className="flex flex-col">
+                                              <span className="text-sm font-semibold text-slate-800 line-clamp-1">{user.name}</span>
+                                              <span className="text-[10px] text-zinc-400 line-clamp-1">{user.email}</span>
+                                            </div>
+                                          ) : (
+                                            <span className="text-xs text-zinc-400 italic">Unknown</span>
+                                          )}
+                                       </td>
                                       <td className="px-6 py-4">
                                          <p className="line-clamp-1 max-w-sm text-zinc-700">
                                             {m.content}
@@ -949,17 +960,16 @@ export function AdminPanel({ onClose }: AdminPanelProps) {
                                       <td className="px-6 py-4 text-zinc-400 text-xs font-medium">
                                          {m.timestamp?.toDate?.() ? m.timestamp.toDate().toLocaleString() : new Date(m.timestamp).toLocaleString()}
                                       </td>
-                                      <td className="px-6 py-4">
-                                         {m.attachments?.length > 0 ? (
-                                            <span className="text-[10px] font-bold text-indigo-600 bg-indigo-50 px-2.5 py-1 rounded border border-indigo-100">
-                                               {m.attachments.length} ASSETS
-                                            </span>
-                                         ) : (
-                                            <span className="text-zinc-300 text-[10px] font-semibold uppercase tracking-widest">NONE</span>
-                                         )}
-                                      </td>
+                                      <td className="px-6 py-4 text-right w-24">
+                                          <button 
+                                            onClick={(e) => { e.stopPropagation(); setSelectedMessage({...m, user}); }}
+                                            className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-bold uppercase tracking-wider rounded-lg transition-colors inline-block"
+                                          >
+                                            View
+                                          </button>
+                                       </td>
                                    </tr>
-                                ))}
+                                )})}
                              </tbody>
                           </table>
                        </div>
@@ -1649,6 +1659,78 @@ export function AdminPanel({ onClose }: AdminPanelProps) {
           </div>
         </div>
       </div>
+
+      {selectedMessage && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-zinc-900/40 backdrop-blur-sm">
+          <div className="bg-white rounded-3xl w-full max-w-2xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">
+            <div className="flex items-center justify-between p-6 border-b border-slate-100 bg-slate-50/50">
+              <div className="flex items-center gap-4">
+                <div className={cn(
+                  "p-2.5 rounded-xl text-white",
+                  selectedMessage.role === 'user' ? "bg-blue-500" : "bg-indigo-500"
+                )}>
+                  {selectedMessage.role === 'user' ? <Users className="w-5 h-5" /> : <Bot className="w-5 h-5" />}
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-slate-800 tracking-tight">
+                    {selectedMessage.role === 'user' ? 'User Message' : 'AI Response'}
+                  </h3>
+                  <p className="text-xs font-medium text-slate-500 mt-0.5">
+                    {selectedMessage.user ? `${selectedMessage.user.name} (${selectedMessage.user.email})` : 'Unknown User'} • {selectedMessage.timestamp?.toDate?.() ? selectedMessage.timestamp.toDate().toLocaleString() : new Date(selectedMessage.timestamp).toLocaleString()}
+                  </p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setSelectedMessage(null)}
+                className="p-2 text-slate-400 hover:bg-slate-200 hover:text-slate-700 rounded-full transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            
+            <div className="p-6 overflow-y-auto flex-1">
+              <div className="prose prose-sm max-w-none text-slate-700 whitespace-pre-wrap font-medium">
+                {selectedMessage.content || <span className="italic text-slate-400">No text content</span>}
+              </div>
+
+              {selectedMessage.attachments?.length > 0 && (
+                <div className="mt-8 pt-6 border-t border-slate-100">
+                  <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">Attachments ({selectedMessage.attachments.length})</h4>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                    {selectedMessage.attachments.map((att: any, idx: number) => (
+                      <div key={idx} className="bg-slate-50 rounded-xl border border-slate-200/60 p-3 flex flex-col gap-2">
+                        {att.type?.startsWith('image/') ? (
+                          <div className="relative aspect-video rounded-lg overflow-hidden bg-slate-200">
+                            <img src={att.url} alt="Attachment" className="w-full h-full object-cover" />
+                          </div>
+                        ) : (
+                          <div className="aspect-video rounded-lg bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-400">
+                            <FileBox className="w-8 h-8" />
+                          </div>
+                        )}
+                        <span className="text-[10px] font-bold text-slate-500 truncate" title={att.name}>{att.name || 'document'}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+            
+            <div className="p-4 border-t border-slate-100 bg-slate-50 flex justify-between items-center gap-4">
+               <span className="text-xs font-semibold text-slate-400 uppercase tracking-widest">
+                 Session ID: {selectedMessage.sessionId || 'Unknown'}
+               </span>
+               <button 
+                 onClick={() => setSelectedMessage(null)}
+                 className="px-5 py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-800 text-xs font-bold uppercase tracking-wider rounded-xl transition-colors"
+               >
+                 Close
+               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </motion.div>
   );
 }
