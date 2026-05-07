@@ -625,42 +625,66 @@ export async function sendMessageStream(
 export async function generateImageWithSALU(prompt: string): Promise<string> {
   try {
     const config = await getSystemConfig();
-    const activeKey = config.imageGenApiKey || (config.apiKeys && config.apiKeys.length > 0 ? config.apiKeys[0] : "");
-    if (!activeKey) {
+    
+    let keysToTry: string[] = [];
+    if (config.imageGenApiKey) keysToTry.push(config.imageGenApiKey);
+    if (config.apiKeys && config.apiKeys.length > 0) {
+      keysToTry = [...keysToTry, ...config.apiKeys];
+    }
+    
+    // Remove duplicates
+    keysToTry = Array.from(new Set(keysToTry));
+
+    if (keysToTry.length === 0) {
       throw new Error("SALU AI Engine key is missing for image generation");
     }
 
-    const ai = new GoogleGenAI({ apiKey: activeKey });
-    
-    // Using gemini-2.5-flash-image for standard free-tier availability
-    const response = await withBackoff(() => ai.models.generateContent({
-      model: 'gemini-2.5-flash-image',
-      contents: {
-        parts: [
-          {
-            text: prompt,
-          },
-        ],
-      },
-      config: {
-        imageConfig: {
-          aspectRatio: "1:1"
-        }
-      }
-    }));
+    let lastError: any;
 
-    // Find the image part in the response parts
-    const candidates = (response as any).candidates;
-    if (candidates && candidates[0]?.content?.parts) {
-      for (const part of candidates[0].content.parts) {
-        if (part.inlineData) {
-          const base64EncodeString: string = part.inlineData.data;
-          return `data:image/png;base64,${base64EncodeString}`;
+    for (let i = 0; i < keysToTry.length; i++) {
+      const activeKey = keysToTry[i];
+      try {
+        const ai = new GoogleGenAI({ apiKey: activeKey });
+        
+        // Using gemini-2.5-flash-image for standard free-tier availability
+        const response = await ai.models.generateContent({
+          model: 'gemini-2.5-flash-image',
+          contents: {
+            parts: [
+              {
+                text: prompt,
+              },
+            ],
+          },
+          config: {
+            imageConfig: {
+              aspectRatio: "1:1"
+            }
+          }
+        });
+
+        // Find the image part in the response parts
+        const candidates = (response as any).candidates;
+        if (candidates && candidates[0]?.content?.parts) {
+          for (const part of candidates[0].content.parts) {
+            if (part.inlineData) {
+              const base64EncodeString: string = part.inlineData.data;
+              return `data:image/png;base64,${base64EncodeString}`;
+            }
+          }
+        }
+        throw new Error("No image was returned by SALU AI Engine");
+      } catch (err: any) {
+        lastError = err;
+        console.warn(`Image Gen failed for key ${i + 1}: ${err.message}`);
+        // wait a little bit before trying next
+        if (i < keysToTry.length - 1) {
+          await new Promise(r => setTimeout(r, 1000));
         }
       }
     }
 
-    throw new Error("No image was returned by SALU AI Engine");
+    throw new Error(lastError?.message || "Failed to generate image with SALU over all available keys.");
   } catch (error: any) {
     console.error("SALU Image Generation Error:", error);
     throw new Error(error.message || "Failed to generate image with SALU.");
