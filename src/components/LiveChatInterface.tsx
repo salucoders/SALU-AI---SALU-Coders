@@ -163,9 +163,16 @@ export function LiveChatInterface({ onClose, onSendMessage, onGenerateImage }: L
       isVideoEnabledRef.current = false;
     } else {
       try {
-        const videoStream = await navigator.mediaDevices.getUserMedia({ 
-          video: { facingMode: 'environment' } 
-        });
+        let videoStream;
+        try {
+          videoStream = await navigator.mediaDevices.getUserMedia({ 
+            video: { facingMode: 'environment' } 
+          });
+        } catch (fallbackErr) {
+          videoStream = await navigator.mediaDevices.getUserMedia({ 
+            video: true 
+          });
+        }
         videoStreamRef.current = videoStream;
         if (videoRef.current) {
           videoRef.current.srcObject = videoStream;
@@ -173,9 +180,14 @@ export function LiveChatInterface({ onClose, onSendMessage, onGenerateImage }: L
         setIsVideoEnabled(true);
         isVideoEnabledRef.current = true;
         startVideoProcessing();
-      } catch (err) {
+      } catch (err: any) {
         console.error("Video access error:", err);
-        setError("Camera access denied. Please grant permissions.");
+        const errorMessage = err instanceof Error ? err.message : String(err);
+        if (errorMessage.includes("Permission denied") || err.name === "NotAllowedError") {
+          setError("Camera access denied. If you are in a preview window, please click 'Open in New Tab' (top right) to grant permissions.");
+        } else {
+          setError("Camera access denied or device not found. Please grant permissions.");
+        }
       }
     }
   };

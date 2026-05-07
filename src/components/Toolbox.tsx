@@ -3,10 +3,9 @@ import {
   X, Timer, CheckSquare, Calculator, Languages, FileText, 
   Play, Pause, RotateCcw, Plus, Trash2, Globe, Copy, Check,
   ChevronRight, ChevronLeft, Save, Lock, Crown,
-  ArrowRightLeft, Layers, Search, Loader2
+  ArrowRightLeft, Layers, Search, Loader2, Volume2, VolumeX, Settings, StepForward
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { useUserProfile } from '../context/UserProfileContext';
 import { cn } from '../lib/utils';
 import { performWebSearch } from '../services/gemini';
 import Markdown from 'react-markdown';
@@ -22,7 +21,6 @@ type ToolType = 'pomodoro' | 'tasks' | 'calculator' | 'translator' | 'notes' | '
 
 export const Toolbox: React.FC<ToolboxProps> = ({ isOpen, onClose, onOpenUpgrade }) => {
   const [activeTool, setActiveTool] = useState<ToolType>(null);
-  const { isPaid } = useUserProfile();
 
   const tools = [
     { id: 'pomodoro', name: 'Pomodoro Timer', icon: Timer, color: 'text-rose-500', bg: 'bg-rose-50', new: false },
@@ -69,37 +67,7 @@ export const Toolbox: React.FC<ToolboxProps> = ({ isOpen, onClose, onOpenUpgrade
 
             {/* Content */}
             <div className="flex-1 overflow-y-auto p-4 pt-2 custom-scrollbar">
-              {!isPaid ? (
-                <div className="h-full flex flex-col items-center justify-center p-8 text-center space-y-6">
-                  <div className="w-20 h-20 bg-amber-50 rounded-[2rem] flex items-center justify-center relative">
-                    <CheckSquare className="w-8 h-8 text-amber-500" />
-                    <div className="absolute -top-1 -right-1 w-8 h-8 bg-white shadow-md rounded-full flex items-center justify-center">
-                      <Lock className="w-4 h-4 text-slate-400" />
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <h3 className="text-xl font-black text-slate-900">Toolbox is Locked</h3>
-                    <p className="text-sm text-slate-500 font-medium">Pomodoro, Expert Calculator, and Smart Notes are part of the SALU AI Plus experience.</p>
-                  </div>
-                  <div className="w-full bg-white p-4 rounded-2xl border border-slate-100 flex items-center gap-3 text-left">
-                    <div className="w-8 h-8 bg-amber-500 text-white rounded-lg flex items-center justify-center shrink-0">
-                      <Crown className="w-5 h-5" />
-                    </div>
-                    <p className="text-[10px] font-bold text-slate-600 uppercase tracking-tighter">
-                      Get 100 daily credits & all tools for Rs. 200/month
-                    </p>
-                  </div>
-                  <button 
-                    onClick={() => {
-                      onOpenUpgrade?.();
-                      onClose();
-                    }}
-                    className="w-full py-4 bg-gradient-to-r from-amber-500 to-rose-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest active:scale-95 transition-all shadow-lg shadow-brand-500/20"
-                  >
-                    Upgrade Now
-                  </button>
-                </div>
-              ) : !activeTool ? (
+              {!activeTool ? (
                 <div className="flex flex-col gap-1">
                   {tools.map((tool) => (
                     <button
@@ -149,10 +117,37 @@ export const Toolbox: React.FC<ToolboxProps> = ({ isOpen, onClose, onOpenUpgrade
 // --- MINI TOOLS ---
 
 const PomodoroTool = () => {
+  const [workDuration, setWorkDuration] = useState(25);
+  const [breakDuration, setBreakDuration] = useState(5);
   const [minutes, setMinutes] = useState(25);
   const [seconds, setSeconds] = useState(0);
   const [isActive, setIsActive] = useState(false);
   const [mode, setMode] = useState<'work' | 'break'>('work');
+  const [sessionCount, setSessionCount] = useState(0);
+  const [soundEnabled, setSoundEnabled] = useState(true);
+  const [showConfig, setShowConfig] = useState(false);
+
+  // Total seconds purely for progress bar
+  const totalSeconds = mode === 'work' ? workDuration * 60 : breakDuration * 60;
+  const currentSeconds = minutes * 60 + seconds;
+  const progress = totalSeconds > 0 ? ((totalSeconds - currentSeconds) / totalSeconds) * 100 : 0;
+
+  const playBeep = () => {
+    if (!soundEnabled) return;
+    try {
+      const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const osc = ctx.createOscillator();
+      const gainNode = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(800, ctx.currentTime);
+      gainNode.gain.setValueAtTime(0.5, ctx.currentTime);
+      gainNode.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.2);
+      osc.connect(gainNode);
+      gainNode.connect(ctx.destination);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.2);
+    } catch(e) { console.log(e); }
+  };
 
   useEffect(() => {
     let interval: any = null;
@@ -165,63 +160,198 @@ const PomodoroTool = () => {
           setSeconds(59);
         } else {
           // Timer finished
+          playBeep();
           const nextMode = mode === 'work' ? 'break' : 'work';
+          if (mode === 'work') {
+            setSessionCount(prev => prev + 1);
+          }
           setMode(nextMode);
-          setMinutes(nextMode === 'work' ? 25 : 5);
+          setMinutes(nextMode === 'work' ? workDuration : breakDuration);
           setSeconds(0);
           setIsActive(false);
-          // Play a sound or notify if possible
         }
       }, 1000);
     } else {
       clearInterval(interval);
     }
     return () => clearInterval(interval);
-  }, [isActive, minutes, seconds, mode]);
+  }, [isActive, minutes, seconds, mode, workDuration, breakDuration, soundEnabled]);
 
   const toggle = () => setIsActive(!isActive);
   const reset = () => {
     setIsActive(false);
-    setMinutes(mode === 'work' ? 25 : 5);
+    setMinutes(mode === 'work' ? workDuration : breakDuration);
     setSeconds(0);
   };
+  
+  const clearSessions = () => setSessionCount(0);
+
+  useEffect(() => {
+    if (!isActive) {
+      setMinutes(mode === 'work' ? workDuration : breakDuration);
+      setSeconds(0);
+    }
+  }, [workDuration, breakDuration, mode, isActive]);
+
+  const radius = 100;
+  const stroke = 12;
+  const normalizedRadius = radius - stroke * 2;
+  const circumference = normalizedRadius * 2 * Math.PI;
+  const strokeDashoffset = circumference - (progress / 100) * circumference;
 
   return (
-    <div className="flex flex-col items-center justify-center gap-8 py-8">
-      <div className="flex gap-4">
-        <button 
-          onClick={() => { setMode('work'); setMinutes(25); setSeconds(0); setIsActive(false); }}
-          className={cn("px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all", mode === 'work' ? "bg-rose-500 text-white shadow-lg shadow-rose-200" : "bg-slate-100 text-slate-400")}
-        >
-          Work
-        </button>
-        <button 
-          onClick={() => { setMode('break'); setMinutes(5); setSeconds(0); setIsActive(false); }}
-          className={cn("px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all", mode === 'break' ? "bg-emerald-500 text-white shadow-lg shadow-emerald-200" : "bg-slate-100 text-slate-400")}
-        >
-          Break
-        </button>
+    <div className="flex flex-col items-center justify-center gap-6 py-4">
+      {/* Configuration Toggle */}
+      <div className="w-full flex justify-between items-center mb-2">
+         <div className="flex gap-2">
+            <button 
+              onClick={() => { setMode('work'); setIsActive(false); }}
+              className={cn("px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all", mode === 'work' ? "bg-rose-500 text-white shadow-md shadow-rose-200" : "bg-slate-100 text-slate-400 hover:bg-slate-200")}
+            >
+              Work
+            </button>
+            <button 
+              onClick={() => { setMode('break'); setIsActive(false); }}
+              className={cn("px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all", mode === 'break' ? "bg-emerald-500 text-white shadow-md shadow-emerald-200" : "bg-slate-100 text-slate-400 hover:bg-slate-200")}
+            >
+              Break
+            </button>
+         </div>
+         
+         <div className="flex gap-2">
+            <button
+               onClick={() => setSoundEnabled(!soundEnabled)}
+               className={cn("p-2 rounded-xl transition-all", soundEnabled ? "text-slate-700 bg-slate-100 hover:bg-slate-200" : "text-slate-400 bg-transparent hover:bg-slate-50")}
+               title={soundEnabled ? "Sound ON" : "Sound OFF"}
+            >
+               {soundEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
+            </button>
+            <button
+               onClick={() => setShowConfig(!showConfig)}
+               className={cn("p-2 rounded-xl transition-all", showConfig ? "bg-brand-50 text-brand-600" : "text-slate-400 bg-transparent hover:bg-slate-50")}
+               title="Settings"
+            >
+               <Settings className="w-4 h-4" />
+            </button>
+         </div>
       </div>
 
-      <div className="text-8xl font-black text-slate-900 tracking-tighter tabular-nums flex items-baseline gap-2">
-        {minutes.toString().padStart(2, '0')}
-        <span className="text-slate-200 text-6xl">:</span>
-        {seconds.toString().padStart(2, '0')}
+      {showConfig && (
+         <div className="w-full bg-slate-50 p-4 rounded-2xl mb-2 space-y-4">
+            <div className="space-y-2">
+               <div className="flex justify-between text-sm font-medium text-slate-600">
+                  <span>Work Duration</span>
+                  <span>{workDuration} min</span>
+               </div>
+               <input 
+                  type="range" 
+                  min="1" 
+                  max="60" 
+                  value={workDuration} 
+                  onChange={(e) => setWorkDuration(Number(e.target.value))}
+                  className="w-full accent-rose-500"
+               />
+            </div>
+            <div className="space-y-2">
+               <div className="flex justify-between text-sm font-medium text-slate-600">
+                  <span>Break Duration</span>
+                  <span>{breakDuration} min</span>
+               </div>
+               <input 
+                  type="range" 
+                  min="1" 
+                  max="30" 
+                  value={breakDuration} 
+                  onChange={(e) => setBreakDuration(Number(e.target.value))}
+                  className="w-full accent-emerald-500"
+               />
+            </div>
+         </div>
+      )}
+
+      {/* Timer Display with Circular Progress */}
+      <div className="relative w-56 h-56 flex flex-col items-center justify-center">
+         <svg
+            height={radius * 2}
+            width={radius * 2}
+            className="absolute top-0 left-0 -rotate-90"
+         >
+            {/* Background circle */}
+            <circle
+               stroke="#f1f5f9"
+               fill="transparent"
+               strokeWidth={stroke}
+               r={normalizedRadius}
+               cx={radius}
+               cy={radius}
+            />
+            {/* Progress circle */}
+            <circle
+               stroke={mode === 'work' ? "#f43f5e" : "#10b981"}
+               fill="transparent"
+               strokeWidth={stroke}
+               strokeDasharray={circumference + ' ' + circumference}
+               style={{ strokeDashoffset }}
+               strokeLinecap="round"
+               r={normalizedRadius}
+               cx={radius}
+               cy={radius}
+               className="transition-all duration-1000 ease-linear"
+            />
+         </svg>
+         
+         <div className="z-10 flex flex-col items-center">
+            <div className="text-5xl font-black text-slate-800 tracking-tighter tabular-nums flex items-baseline z-10">
+               {minutes.toString().padStart(2, '0')}
+               <span className="text-slate-300 text-4xl -translate-y-1 mx-0.5">:</span>
+               {seconds.toString().padStart(2, '0')}
+            </div>
+            <p className="text-slate-400 font-medium text-xs uppercase tracking-widest mt-1">
+               {mode === 'work' ? 'Focus' : 'Relax'}
+            </p>
+         </div>
       </div>
 
-      <div className="flex items-center gap-4">
-        <button 
-          onClick={reset}
-          className="p-4 bg-slate-100 text-slate-500 rounded-2xl hover:bg-slate-200 transition-all active:scale-90"
-        >
-          <RotateCcw className="w-6 h-6" />
-        </button>
-        <button 
-          onClick={toggle}
-          className={cn("p-6 rounded-[2rem] text-white shadow-xl transition-all active:scale-95", mode === 'work' ? "bg-rose-500 shadow-rose-200" : "bg-emerald-500 shadow-emerald-200")}
-        >
-          {isActive ? <Pause className="w-8 h-8" /> : <Play className="w-8 h-8" />}
-        </button>
+      {/* Controls */}
+      <div className="flex items-center gap-6 mt-2">
+         <button 
+           onClick={reset}
+           className="p-3 bg-slate-100 text-slate-500 rounded-2xl hover:bg-slate-200 transition-all active:scale-90"
+           title="Restart"
+         >
+           <RotateCcw className="w-5 h-5" />
+         </button>
+         <button 
+           onClick={toggle}
+           className={cn("p-5 rounded-full text-white shadow-xl transition-all active:scale-95", mode === 'work' ? "bg-rose-500 shadow-rose-200" : "bg-emerald-500 shadow-emerald-200")}
+         >
+           {isActive ? <Pause className="w-7 h-7" /> : <Play className="w-7 h-7 fill-current ml-1" />}
+         </button>
+         <button 
+           onClick={() => {
+              const nextMode = mode === 'work' ? 'break' : 'work';
+              if (mode === 'work') setSessionCount(prev => prev + 1);
+              setMode(nextMode);
+              setMinutes(nextMode === 'work' ? workDuration : breakDuration);
+              setSeconds(0);
+              setIsActive(false);
+           }}
+           className="p-3 bg-slate-100 text-slate-500 rounded-2xl hover:bg-slate-200 transition-all active:scale-90"
+           title="Skip"
+         >
+           <StepForward className="w-5 h-5 fill-current" />
+         </button>
+      </div>
+
+      {/* Stats */}
+      <div className="w-full flex items-center justify-between px-4 py-3 bg-slate-50 rounded-2xl mt-4">
+         <div className="flex items-center gap-2 text-slate-600 font-medium text-sm">
+            <CheckSquare className="w-4 h-4 text-emerald-500" />
+            <span>Completed Sessions: <strong className="text-slate-900">{sessionCount}</strong></span>
+         </div>
+         <button onClick={clearSessions} className="text-xs text-slate-400 hover:text-rose-500 font-medium transition-colors p-1" title="Reset completed sessions count">
+            Clear
+         </button>
       </div>
     </div>
   );

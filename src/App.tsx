@@ -6,7 +6,7 @@ import { ImageKitGallery } from './components/ImageKitGallery';
 import { LoginPage } from './components/LoginPage';
 import { Mode, Message, ChatSession, Persona } from './types';
 import { sendMessage, sendMessageStream, generateImageWithSALU } from './services/gemini';
-import { Menu, Settings, Loader2, Plus, ChevronDown, User, Shield, Crown, PanelLeftOpen, Check, Lock } from 'lucide-react';
+import { Menu, Settings, Loader2, Plus, ChevronDown, User, Shield, Crown, PanelLeftOpen, Check, Lock, Ghost } from 'lucide-react';
 import { LOGO_URL, APP_NAME, MODES, CREATOR_IMAGE_URL } from './constants';
 import { cn } from './lib/utils';
 import { useUserProfile } from './context/UserProfileContext';
@@ -28,7 +28,22 @@ export default function App() {
   const { preferences, loading: profileLoading, isAdmin, isPaid, updatePreferences } = useUserProfile();
   
   useEffect(() => {
-    document.documentElement.style.setProperty('--brand-color', preferences.accentColor || '#0ea5e9');
+    const color = preferences.accentColor || '#38bdf8';
+    document.documentElement.style.setProperty('--brand-color', color);
+    
+    const hexToRgb = (hex: string) => {
+      const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+      return result ? {
+        r: parseInt(result[1], 16),
+        g: parseInt(result[2], 16),
+        b: parseInt(result[3], 16)
+      } : null;
+    };
+    
+    const rgb = hexToRgb(color);
+    if (rgb) {
+      document.documentElement.style.setProperty('--brand-color-rgb', `${rgb.r}, ${rgb.g}, ${rgb.b}`);
+    }
   }, [preferences.accentColor]);
   
   const { user, loading: authLoading } = useAuth();
@@ -233,16 +248,6 @@ export default function App() {
     }
   }, [user, profileLoading]);
 
-  // Notify user connected
-  useEffect(() => {
-    if (user && !profileLoading) {
-      const timer = setTimeout(() => {
-        notify(`${preferences.name || 'User'} connected to SALU AI Network`, 'connect', 4000);
-      }, 1000);
-      return () => clearTimeout(timer);
-    }
-  }, [user, profileLoading, preferences.name]);
-
   // Auto-manage session
   useEffect(() => {
     if (user && !sessionsLoading) {
@@ -288,7 +293,7 @@ export default function App() {
         messages,
         content,
         preferences,
-        'friendly', 
+        currentSession.persona || preferences.persona || 'professional', 
         attachments,
         (chunkText) => {
           setStreamedText(chunkText);
@@ -340,20 +345,7 @@ export default function App() {
 
   if (authLoading || profileLoading) {
     return (
-      <div className="h-screen w-full flex flex-col items-center justify-center bg-white gap-4">
-        <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center shadow-2xl animate-bounce border border-slate-100">
-          <img 
-            src={LOGO_URL} 
-            alt={APP_NAME} 
-            className="w-10 h-10 object-contain"
-            referrerPolicy="no-referrer"
-          />
-        </div>
-        <div className="flex items-center gap-2 text-slate-400 font-black uppercase tracking-widest text-[10px]">
-          <Loader2 className="w-3 h-3 animate-spin" />
-          Initializing {APP_NAME}...
-        </div>
-      </div>
+      <div className="h-screen w-full bg-[#F5F4F0]" />
     );
   }
 
@@ -387,7 +379,7 @@ export default function App() {
     <div className={cn(
       "flex h-screen font-sans overflow-hidden relative",
       preferences.theme === 'dark' ? "dark bg-slate-950" : "bg-slate-50"
-    )} style={{ '--brand-color': preferences.accentColor || '#0ea5e9' } as React.CSSProperties}>
+    )} style={{ '--brand-color': preferences.accentColor || '#38bdf8' } as React.CSSProperties}>
       <Sidebar 
         sessions={sessions}
         currentSessionId={currentSessionId}
@@ -492,59 +484,46 @@ export default function App() {
 
       <InstallPWA />
       
-      <main className="flex-1 flex flex-col min-w-0 h-full relative bg-white overflow-hidden">
+      <main className="flex-1 flex flex-col min-w-0 h-full relative bg-white dark:bg-slate-950 transition-colors duration-300 overflow-hidden">
         <div className="flex-1 flex flex-col h-full overflow-hidden relative z-10">
-          {/* Floating Top Bar (Copilot style) */}
-          <div className="absolute top-0 left-0 right-0 z-40 p-4 pt-5 flex items-center justify-between pointer-events-none">
+          {/* Claude Style Header */}
+          <div className="absolute top-0 left-0 right-0 z-40 p-4 flex items-center justify-between pointer-events-none">
             <div className="flex items-center gap-3 pointer-events-auto">
               {!isSidebarOpen && (
                 <button
                   onClick={() => setIsSidebarOpen(true)}
-                  className="p-2.5 text-slate-500 hover:text-slate-900 hover:bg-white hover:border-slate-300 rounded-xl transition-all shadow-soft border border-slate-200/50 bg-white/80 backdrop-blur-md group active:scale-95"
+                  className="p-2 text-slate-600 hover:bg-slate-100 rounded-lg transition-all"
                   title="Open sidebar"
                 >
-                  <PanelLeftOpen className="w-5 h-5 group-hover:scale-110 transition-transform" />
+                  <Menu className="w-5 h-5" />
                 </button>
               )}
-              <div className="hidden sm:flex items-center gap-2.5 px-3 py-1.5 flex-shrink-0">
-                <div className="w-8 h-8 flex items-center justify-center bg-white rounded-lg shadow-sm border border-slate-100">
-                  <img 
-                    src={LOGO_URL} 
-                    alt="Logo" 
-                    className="w-6 h-6 object-contain"
-                    referrerPolicy="no-referrer"
-                  />
-                </div>
-                <span className="text-slate-900 font-black tracking-tighter text-base lg:text-lg">{APP_NAME}</span>
+              {/* Added SALU AI Logo here */}
+              <div className="hidden sm:flex items-center flex-shrink-0 ml-1">
+                <img 
+                  src={LOGO_URL} 
+                  alt="Logo" 
+                  className="w-6 h-6 object-contain"
+                  referrerPolicy="no-referrer"
+                />
               </div>
             </div>
 
-            {/* Centered Mode Selector - Premium Compact Pill */}
+            {/* Centered Mode Selector */}
             <div className="flex-1 flex items-center justify-center max-w-[240px] pointer-events-auto">
               <div className="relative w-full px-2">
                 <button
                   onClick={() => setIsModeOpen(!isModeOpen)}
-                  className="w-full flex items-center justify-between pl-1.5 pr-4 py-1.5 bg-white backdrop-blur-xl border border-slate-200/60 rounded-full shadow-lg shadow-slate-200/40 hover:border-brand-300 hover:shadow-brand-500/10 transition-all active:scale-[0.98] group ring-1 ring-black/5"
+                  className="w-full flex items-center justify-center gap-2 py-1.5 transition-all text-slate-800 hover:text-slate-900 group"
                 >
                   {(() => {
                     const currentModeId = currentSession?.mode || preferences.preferredMode || 'student';
                     const activeMode = MODES.find(m => m.id === currentModeId) || MODES[0];
-                    const Icon = activeMode.icon;
                     return (
                       <>
-                        <div className="flex items-center gap-3 min-w-0">
-                          <div className={cn("p-2 rounded-full shrink-0 shadow-sm transition-transform group-hover:rotate-12", activeMode.color)}>
-                            <Icon className="w-4 h-4" />
-                          </div>
-                          <div className="flex flex-col items-start leading-none overflow-hidden">
-                            <span className="text-[12px] font-black text-slate-900 truncate uppercase tracking-tighter">{activeMode.label}</span>
-                            <span className="text-[9px] text-slate-400 font-bold uppercase tracking-widest truncate">AI Mode</span>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-1 ml-2">
-                          <div className="w-[1px] h-4 bg-slate-200 mx-1" />
-                          <ChevronDown className={cn("w-4 h-4 text-slate-400 transition-transform duration-300", isModeOpen && "rotate-180")} />
-                        </div>
+                        <span className="text-xl font-serif">SALU AI</span>
+                        <span className="text-xl font-serif text-slate-500">{activeMode.label}</span>
+                        <ChevronDown className={cn("w-4 h-4 text-slate-500 transition-transform duration-300", isModeOpen && "rotate-180")} />
                       </>
                     );
                   })()}
@@ -602,7 +581,7 @@ export default function App() {
                                   <Icon className="w-4 h-4" />
                                 </div>
                                 <div className="flex-1 min-w-0">
-                                  <div className="font-bold flex items-center gap-2">
+                                  <div className="font-bold flex items-center gap-2 font-serif">
                                     {mode.label}
                                     {isLocked && <Lock className="w-3 h-3 opacity-50" />}
                                   </div>
@@ -623,36 +602,25 @@ export default function App() {
             </div>
             
             <div className="flex items-center gap-2 pointer-events-auto">
-              {!isPaid && (
-                <button
-                  onClick={() => setIsUpgradeOpen(true)}
-                  className="hidden md:flex items-center gap-1.5 px-3 py-1.5 mr-2 rounded-xl bg-gradient-to-r from-amber-500 to-rose-600 text-white font-bold text-[11px] uppercase tracking-widest hover:opacity-90 transition-opacity"
-                  title="Get SALU AI Plus"
-                >
-                  <Crown className="w-3.5 h-3.5" />
-                  Get SALU AI Plus
-                </button>
-              )}
               {isAdmin && (
                 <button
                   onClick={() => setIsAdminPanelOpen(true)}
-                  className="p-2 text-rose-600 hover:bg-rose-50 rounded-full transition-colors"
+                  className="w-10 h-10 rounded-full bg-transparent flex items-center justify-center hover:bg-slate-100 transition-all active:scale-95 group"
                   title="Admin Panel"
                 >
-                  <Shield className="w-5 h-5" />
+                  <Shield className="w-5 h-5 text-slate-700 group-hover:text-amber-600 transition-colors" strokeWidth={1.5} />
                 </button>
               )}
               <button 
                 onClick={() => setIsSettingsOpen(true)}
-                className="w-11 h-11 rounded-2xl bg-white/90 backdrop-blur-xl flex items-center justify-center overflow-hidden border border-slate-200 shadow-lg shadow-slate-200/50 hover:border-brand-300 transition-all active:scale-95 group relative ring-1 ring-black/5"
+                className="w-10 h-10 rounded-full bg-transparent flex items-center justify-center hover:bg-slate-100 transition-all active:scale-95 group relative"
                 title="Account Settings"
               >
                 {preferences.profilePicture || user?.photoURL ? (
-                  <img src={preferences.profilePicture || user?.photoURL || ""} alt="Profile" className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" referrerPolicy="no-referrer" />
+                  <img src={preferences.profilePicture || user?.photoURL || ""} alt="Profile" className="w-8 h-8 rounded-full object-cover" referrerPolicy="no-referrer" />
                 ) : (
-                  <User className="w-5 h-5 text-slate-400 group-hover:text-brand-500 transition-colors" />
+                  <Ghost className="w-5 h-5 text-slate-700 group-hover:text-slate-900 transition-colors" strokeWidth={1.5} />
                 )}
-                <div className="absolute inset-0 ring-1 ring-inset ring-black/5 rounded-2xl pointer-events-none" />
               </button>
             </div>
           </div>
@@ -660,12 +628,7 @@ export default function App() {
           <div className="flex-1 flex flex-col h-full overflow-hidden pt-20">
             <div className="flex-1 overflow-hidden">
               {!currentSession ? (
-                <div className="h-full flex flex-col items-center justify-center bg-white gap-4">
-                  <div className="w-12 h-12 flex items-center justify-center">
-                    <Loader2 className="w-6 h-6 text-brand-500 animate-spin" />
-                  </div>
-                  <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Loading your AI Workspace...</p>
-                </div>
+                <div className="h-full flex flex-col items-center justify-center bg-white" />
               ) : currentSession.mode === 'live' ? (
                 <LiveChatInterface 
                   onClose={async () => {

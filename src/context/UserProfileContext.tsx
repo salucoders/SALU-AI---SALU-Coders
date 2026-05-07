@@ -6,7 +6,7 @@ import { useAuth } from './AuthContext';
 
 interface UserProfileContextType {
   preferences: UserPreferences;
-  updatePreferences: (newPrefs: Partial<UserPreferences>) => void;
+  updatePreferences: (newPrefs: Partial<UserPreferences>) => Promise<void>;
   loading: boolean;
   isAdmin: boolean;
   isPaid: boolean;
@@ -15,7 +15,7 @@ interface UserProfileContextType {
 const defaultPreferences: UserPreferences = {
   name: 'Guest User',
   language: 'English',
-  accentColor: '#0ea5e9',
+  accentColor: '#38bdf8',
   theme: 'light',
   persona: 'friendly',
   preferredMode: 'student',
@@ -136,12 +136,20 @@ export const UserProfileProvider: React.FC<{ children: React.ReactNode }> = ({ c
     
     try {
       const userDocRef = doc(db, 'users', user.uid);
+      
+      // Clean undefined values completely
+      const cleanPrefs = Object.entries(newPrefs).reduce((acc, [key, value]) => {
+        if (value !== undefined) acc[key] = value;
+        return acc;
+      }, {} as Record<string, any>);
+
       await updateDoc(userDocRef, {
-        ...newPrefs,
-        updatedAt: serverTimestamp()
+        ...cleanPrefs,
+        updatedAt: serverTimestamp(),
       });
     } catch (error) {
       console.error("Error updating user preferences:", error);
+      throw error;
     }
   };
 

@@ -21,11 +21,9 @@ export const ImageKitGallery: React.FC<ImageKitGalleryProps> = ({ isOpen, onClos
   const [selectedImage, setSelectedImage] = useState<ImageKitFile | null>(null);
   const [systemConfig, setSystemConfig] = useState<{ imageKitUrlEndpoint?: string } | null>(null);
   const { notify } = useNotification();
-  const { isPaid } = useUserProfile();
   const { user } = useAuth();
 
   const fetchImages = async () => {
-    if (!isPaid) return;
     setLoading(true);
     let imageKitCredentials = {
        publicKey: '',
@@ -143,52 +141,6 @@ export const ImageKitGallery: React.FC<ImageKitGalleryProps> = ({ isOpen, onClos
   };
 
   if (!isOpen) return null;
-
-  if (!isPaid) {
-    return (
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        className="fixed inset-0 z-[100] flex items-center justify-center p-4 outline-none"
-      >
-        <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-md" onClick={onClose} />
-        <motion.div
-           initial={{ scale: 0.95, y: 20 }}
-           animate={{ scale: 1, y: 0 }}
-           className="relative w-full max-w-lg bg-white rounded-[3rem] shadow-2xl overflow-hidden p-12 text-center space-y-8"
-        >
-           <div className="w-24 h-24 bg-brand-50 rounded-[2.5rem] flex items-center justify-center mx-auto relative">
-              <ImageIcon className="w-10 h-10 text-brand-500" />
-              <div className="absolute -top-2 -right-2 w-10 h-10 bg-white shadow-lg rounded-full flex items-center justify-center">
-                 <Lock className="w-5 h-5 text-slate-400" />
-              </div>
-           </div>
-           <div className="space-y-3">
-              <h2 className="text-3xl font-black text-slate-900">Media Vault is Locked</h2>
-              <p className="text-slate-500 font-medium">Cloud storage and management for your AI creations is a SALU AI Plus exclusive feature.</p>
-           </div>
-           <div className="bg-slate-50 p-6 rounded-2xl border border-slate-100 flex items-center gap-4 text-left">
-              <div className="w-10 h-10 bg-amber-100 text-amber-600 rounded-xl flex items-center justify-center shrink-0">
-                 <Crown className="w-6 h-6" />
-              </div>
-              <p className="text-xs font-bold text-slate-600 leading-tight">
-                 Upgrade to SALU AI Plus for Rs. 200/month to unlock Media Vault, Live AI, and more.
-              </p>
-           </div>
-           <button 
-             onClick={() => {
-               onOpenUpgrade?.();
-               onClose();
-             }}
-             className="w-full py-4 bg-gradient-to-r from-amber-500 to-rose-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest hover:shadow-lg transition-all active:scale-95"
-           >
-              Upgrade to Plus
-           </button>
-        </motion.div>
-      </motion.div>
-    );
-  }
 
   return (
     <motion.div

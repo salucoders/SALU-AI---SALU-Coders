@@ -24,10 +24,18 @@ export function CameraModal({ isOpen, onClose, onCapture }: CameraModalProps) {
         stream.getTracks().forEach(track => track.stop());
       }
 
-      const newStream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: facingMode },
-        audio: false
-      });
+      let newStream;
+      try {
+        newStream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: facingMode },
+          audio: false
+        });
+      } catch (fallbackErr) {
+        newStream = await navigator.mediaDevices.getUserMedia({
+          video: true,
+          audio: false
+        });
+      }
       
       setStream(newStream);
       if (videoRef.current) {

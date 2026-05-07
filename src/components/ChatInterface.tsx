@@ -152,38 +152,47 @@ const CodeBlock = ({ language, value }: { language?: string; value: string }) =>
   };
 
   return (
-    <div className="relative group/code w-full my-4 rounded-xl border border-slate-700 bg-[#1e1e1e] overflow-hidden">
+    <div className="relative group/code w-full my-6 rounded-2xl border border-slate-700/60 bg-[#0d0d0d] shadow-xl overflow-hidden font-sans">
       {/* Header bar area */}
-      <div className="flex items-center justify-between px-4 py-2 bg-slate-800/50 border-b border-slate-700 shrink-0">
-        <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest truncate mr-2">
-          {language || 'code'}
+      <div className="flex items-center justify-between pl-4 pr-3 py-2 bg-[#1a1a1a] border-b border-slate-800/80 shrink-0">
+        <div className="flex items-center gap-3">
+          {/* Mac-like dots */}
+          <div className="flex gap-1.5">
+            <div className="w-2.5 h-2.5 rounded-full bg-slate-600/50"></div>
+            <div className="w-2.5 h-2.5 rounded-full bg-slate-600/50"></div>
+            <div className="w-2.5 h-2.5 rounded-full bg-slate-600/50"></div>
+          </div>
+          <div className="text-[11px] font-medium text-slate-400 lowercase tracking-wide truncate">
+            {language || 'text'}
+          </div>
         </div>
         <button
           onClick={handleCopy}
-          className="flex items-center gap-1.5 px-2 py-1 rounded bg-slate-700/50 hover:bg-slate-600/50 text-slate-300 hover:text-white transition-all text-xs border border-slate-600 shrink-0"
+          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md hover:bg-white/10 text-slate-400 hover:text-white transition-colors text-xs shrink-0"
           title="Copy Code"
         >
-          {copied ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
-          <span className="hidden sm:inline">{copied ? 'Copied' : 'Copy'}</span>
+          {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+          <span className="hidden sm:inline font-medium">{copied ? 'Copied' : 'Copy'}</span>
         </button>
       </div>
       
       {/* Code area - strictly width limited for responsiveness */}
-      <div className="w-full">
+      <div className="w-full bg-[#0d0d0d]">
         <SyntaxHighlighter
           style={vscDarkPlus}
           language={language || 'text'}
           PreTag="div"
           customStyle={{ 
             margin: 0, 
-            padding: '0.75rem', 
+            padding: '1.25rem', 
             width: '100%', 
-            fontSize: '0.75rem',
+            fontSize: '0.8125rem',
             lineHeight: '1.6',
             whiteSpace: 'pre-wrap',
-            wordBreak: 'break-word'
+            wordBreak: 'break-word',
+            background: 'transparent'
           }}
-          className="!m-0 md:text-sm"
+          className="!m-0 md:text-sm font-mono"
         >
           {value}
         </SyntaxHighlighter>
@@ -699,7 +708,7 @@ const MessageContent = ({ content, role, preferences }: { content: string, role:
   const isStartingImageGen = content.toLowerCase().includes('[image_gen:') && !content.includes(']');
 
   const renderContent = (text: string) => (
-    <div className="markdown-body prose prose-slate max-w-none prose-sm md:prose-base overflow-hidden prose-pre:!max-w-full">
+    <div className="markdown-body prose prose-slate dark:prose-invert max-w-none prose-sm md:prose-base overflow-hidden prose-pre:!max-w-full prose-p:leading-relaxed prose-li:marker:text-slate-400 prose-a:text-brand-600 dark:prose-a:text-brand-400">
       <Markdown 
         remarkPlugins={[remarkGfm]}
         components={{
@@ -1220,77 +1229,71 @@ export const ChatInterface = React.memo(({ messages, onSendMessage, isLoading, m
       <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 md:p-8 space-y-8 md:space-y-12 scroll-smooth relative custom-scrollbar">
         {messages.length === 0 && (
           <div className="min-h-full flex flex-col items-center justify-center max-w-3xl mx-auto py-12 relative z-10">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.8, ease: "easeOut", delay: 0.1 }}
+              className="mb-8 p-3 lg:p-4 bg-white dark:bg-slate-900 rounded-3xl shadow-sm border border-slate-100 dark:border-slate-800 ring-4 ring-slate-50 dark:ring-slate-900/50 flex items-center justify-center"
+            >
+              <img 
+                src={LOGO_URL} 
+                alt="SALU AI Logo" 
+                className="w-10 h-10 md:w-12 md:h-12 object-contain mx-auto"
+                referrerPolicy="no-referrer"
+              />
+            </motion.div>
             <motion.h1 
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6, ease: "easeOut" }}
-              className="text-[2rem] md:text-[2.75rem] font-medium tracking-tight mb-8 text-center text-transparent bg-clip-text bg-gradient-to-r from-brand-500 via-purple-500 to-rose-400"
+              className="text-[2rem] md:text-[2.5rem] font-semibold tracking-tight mb-8 text-center text-slate-800 dark:text-slate-100 leading-tight"
             >
-              How can I help you today?
+              How can I help you this {(() => {
+                const hour = new Date().getHours();
+                if (hour < 12) return 'morning';
+                if (hour < 17) return 'afternoon';
+                return 'evening';
+              })()}?
             </motion.h1>
-            
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full max-w-2xl px-4">
-              {MODE_QUICK_ACTIONS[mode]?.map((action, idx) => (
-                <motion.button
-                  key={idx}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.2 + idx * 0.1 }}
-                  onClick={() => onSendMessage(action.prompt)}
-                  className="flex items-start gap-4 p-4 md:p-5 bg-white border border-slate-100 rounded-[1.5rem] md:rounded-[2rem] text-left hover:bg-slate-50 hover:shadow-sm transition-all active:scale-[0.98] group"
-                >
-                  <div className="p-2.5 rounded-2xl bg-brand-50/50 text-brand-600 transition-colors shrink-0">
-                    {action.icon}
-                  </div>
-                  <div>
-                    <p className="text-sm font-semibold text-slate-800 mb-0.5">{action.label}</p>
-                    <p className="text-[13px] text-slate-500 font-medium line-clamp-2 leading-relaxed">
-                      {action.prompt}
-                    </p>
-                  </div>
-                </motion.button>
-              ))}
-            </div>
           </div>
         )}
 
         {messages.map((message, index) => (
           <motion.div
             layout
-            initial={{ opacity: 0, y: 30, scale: 0.95 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
             transition={{ 
-              duration: 0.5, 
-              ease: [0.23, 1, 0.32, 1],
-              delay: index === messages.length - 1 ? 0 : 0.05 
+              duration: 0.4, 
+              ease: [0.23, 1, 0.32, 1] 
             }}
             key={message.id}
             id={`message-${message.id}`}
             className={cn(
-              "flex gap-3 md:gap-4 max-w-5xl mx-auto group/message",
+              "flex gap-4 md:gap-5 max-w-4xl mx-auto group/message w-full",
               message.role === 'user' ? "flex-row-reverse" : "flex-row"
             )}
           >
             {message.role !== 'user' && (
-              <div className="w-8 h-8 md:w-10 md:h-10 rounded-full flex items-center justify-center shrink-0 mt-1">
+              <div className="w-8 h-8 md:w-9 md:h-9 rounded-full flex items-center justify-center shrink-0 mt-1 ring-1 ring-slate-200 dark:ring-slate-800 bg-white dark:bg-slate-900 shadow-sm">
                 <img 
                   src={LOGO_URL} 
                   alt="AI Avatar" 
-                  className="w-6 h-6 md:w-8 md:h-8 object-contain drop-shadow-sm"
+                  className="w-5 h-5 md:w-6 md:h-6 object-contain"
                   referrerPolicy="no-referrer"
                 />
               </div>
             )}
             
             <div className={cn(
-              "flex flex-col gap-2 max-w-[88%] md:max-w-[80%]",
+              "flex flex-col gap-2 max-w-[85%] md:max-w-[80%]",
               message.role === 'user' ? "items-end" : "items-start"
             )}>
               <div className={cn(
-                "relative group/bubble transition-all duration-300",
+                "relative group/bubble transition-all duration-300 text-[15px] leading-relaxed",
                 message.role === 'user' 
-                  ? "bg-[var(--brand-color)] text-white px-6 py-4 rounded-3xl rounded-br-none shadow-lg shadow-brand-500/20" 
-                  : "bg-white text-slate-800 px-6 py-4 rounded-3xl rounded-bl-none shadow-sm border border-slate-200/60"
+                  ? "bg-[rgba(var(--brand-color-rgb),0.15)] dark:bg-[rgba(var(--brand-color-rgb),0.2)] text-slate-800 dark:text-slate-100 px-5 py-3.5 rounded-[1.5rem] rounded-tr-md shadow-sm border border-[rgba(var(--brand-color-rgb),0.3)]" 
+                  : "bg-transparent text-slate-800 dark:text-slate-100 px-1 py-2"
               )}>
                 {/* Message Actions (Copy) - User Only */}
                 {message.role === 'user' && (
@@ -1351,19 +1354,19 @@ export const ChatInterface = React.memo(({ messages, onSendMessage, isLoading, m
           <motion.div 
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            className="flex gap-3 md:gap-4 max-w-5xl mx-auto"
+            className="flex gap-4 md:gap-5 max-w-4xl mx-auto w-full"
           >
-            <div className="w-8 h-8 md:w-10 md:h-10 rounded-full flex items-center justify-center shrink-0 mt-1">
+            <div className="w-8 h-8 md:w-9 md:h-9 rounded-full flex items-center justify-center shrink-0 mt-1 ring-1 ring-slate-200 dark:ring-slate-800 bg-white dark:bg-slate-900 shadow-sm">
               <img 
                 src={LOGO_URL} 
                 alt="Logo" 
-                className="w-6 h-6 md:w-8 md:h-8 object-contain drop-shadow-sm animate-pulse"
+                className="w-5 h-5 md:w-6 md:h-6 object-contain animate-pulse"
                 referrerPolicy="no-referrer"
               />
             </div>
             {isStreaming && streamedText ? (
-              <div className="flex flex-col gap-2 max-w-[88%] md:max-w-[80%] items-start">
-                <div className="relative pt-1 transition-all duration-300 text-slate-800 bg-transparent w-full">
+              <div className="flex flex-col gap-2 max-w-[85%] md:max-w-[80%] items-start">
+                <div className="relative group/bubble transition-all duration-300 text-[15px] leading-relaxed bg-transparent text-slate-800 dark:text-slate-100 px-1 py-2 w-full">
                   <div className="flex flex-col">
                     <MessageContent content={streamedText} role="model" preferences={preferences} />
                     <motion.div 
@@ -1397,149 +1400,134 @@ export const ChatInterface = React.memo(({ messages, onSendMessage, isLoading, m
         )}
       </AnimatePresence>
 
-      <div className="px-2 pb-2 md:px-8 md:pb-6 relative z-20 bg-gradient-to-t from-white via-white to-transparent pt-10">
-        <div className="max-w-4xl mx-auto">
+      <div className="px-3 pb-3 md:px-8 md:pb-8 relative z-20 bg-gradient-to-t from-white via-white to-transparent dark:from-slate-950 dark:via-slate-950 pt-10 transition-colors duration-300">
+        <div className="max-w-3xl mx-auto">
           <motion.form 
             id="chat-input-area"
             onSubmit={handleSubmit} 
             animate={{
-               boxShadow: isTyping ? "0 8px 30px rgba(0,0,0,0.08)" : "0 4px 24px rgba(0,0,0,0.04)"
+               boxShadow: isTyping ? "0 12px 32px rgba(0,0,0,0.06)" : "0 4px 16px rgba(0,0,0,0.03)"
             }}
             className={cn(
-               "relative bg-white border border-slate-200 rounded-[2rem] p-1.5 transition-all duration-500 ease-out",
-               isTyping ? "border-slate-300 transform -translate-y-1" : "border-slate-200"
+               "relative bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border border-slate-200/80 dark:border-slate-800 rounded-[2rem] p-2 transition-all duration-500 ease-out shadow-sm flex flex-col w-full",
+               isTyping ? "border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900" : ""
             )}
           >
-            {/* Backdrop for closing menu */}
             <AnimatePresence>
-              {showAttachmentMenu && (
+              {fileError && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: 'auto', opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  className="bg-red-50 border-b border-red-100 p-3 mx-2 mt-2 rounded-xl flex items-center gap-2 text-red-600 text-[10px] font-black uppercase tracking-wider"
+                >
+                  <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                  <span className="flex-1">{fileError}</span>
+                  <button onClick={() => setFileError(null)} className="p-1 hover:bg-red-100 rounded-full transition-colors">
+                    <X className="w-3 h-3" />
+                  </button>
+                </motion.div>
+              )}
+              {(attachments.length > 0 || isUploading) && (
                 <motion.div 
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  onClick={() => setShowAttachmentMenu(false)}
-                  className="fixed inset-0 z-[90] bg-transparent"
-                />
+                  initial={{ height: 0, opacity: 0, y: 10 }}
+                  animate={{ height: 'auto', opacity: 1, y: 0 }}
+                  exit={{ height: 0, opacity: 0, y: 10 }}
+                  transition={{ type: "spring", stiffness: 400, damping: 30 }}
+                  className="flex flex-wrap gap-3 p-3 overflow-y-auto max-h-[160px] custom-scrollbar"
+                >
+                  {attachments.map((att, i) => (
+                    <motion.div 
+                      initial={{ scale: 0.8, opacity: 0 }}
+                      animate={{ scale: 1, opacity: 1 }}
+                      exit={{ scale: 0.8, opacity: 0 }}
+                      key={i} 
+                      className="relative group/att"
+                    >
+                      {(att && typeof att === 'string' && (att.startsWith('data:image/') || att.startsWith('http'))) ? (
+                        <div className="relative">
+                          <img 
+                            src={att || null} 
+                            alt="preview" 
+                            referrerPolicy="no-referrer"
+                            className="w-16 h-16 object-cover rounded-xl border border-slate-200 shadow-sm transition-all group-hover/att:scale-[1.02]" 
+                          />
+                        </div>
+                      ) : (
+                        <div className="w-32 h-16 rounded-xl bg-slate-50 border border-slate-200 shadow-sm flex flex-col p-2 transition-all group-hover/att:scale-[1.02] overflow-hidden relative text-left">
+                          <div className="flex items-center gap-1.5 shrink-0">
+                              <div className="p-1 rounded flex items-center justify-center">
+                                  {getFileIcon(att)}
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                  <p className="text-[9px] font-bold text-slate-700 truncate">
+                                      {getFileName(att)}
+                                  </p>
+                              </div>
+                          </div>
+                        </div>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => removeAttachment(i)}
+                        className="absolute -top-1.5 -right-1.5 bg-white border border-slate-200 text-slate-600 rounded-full p-1 shadow-sm md:opacity-0 group-hover/att:opacity-100 transition-all hover:bg-slate-100 hover:text-red-500 z-10"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </motion.div>
+                  ))}
+                  {isUploading && (
+                    <div className="w-16 h-16 rounded-xl border border-dashed border-slate-300 bg-slate-50 flex items-center justify-center">
+                      <Loader2 className="w-4 h-4 text-slate-400 animate-spin" />
+                    </div>
+                  )}
+                </motion.div>
               )}
             </AnimatePresence>
 
+            <div className="flex-1 relative flex flex-col px-2 pt-2 md:px-3 md:pt-3">
+               <textarea
+                  ref={textareaRef}
+                  value={input}
+                  onChange={(e) => {
+                    setInput(e.target.value);
+                    e.target.style.height = 'inherit';
+                    e.target.style.height = `${Math.min(e.target.scrollHeight, 200)}px`;
+                  }}
+                  onPaste={handlePaste}
+                  onFocus={() => setIsTyping(true)}
+                  onBlur={() => setIsTyping(false)}
+                  onKeyDown={(e) => {
+                      if (e.key === 'Enter' && !e.shiftKey && !isMobile()) {
+                      e.preventDefault();
+                      handleSubmit(e);
+                      textareaRef.current!.style.height = '48px';
+                      }
+                  }}
+                  placeholder={isListening ? "" : "Ask SALU AI anything..."}
+                  className={cn(
+                      "w-full bg-transparent border-none focus:ring-0 resize-none px-1 text-slate-800 placeholder-slate-400 text-[15px] md:text-[16px] leading-[24px] min-h-[48px] max-h-[200px] outline-none rounded-none py-1",
+                      isListening && "blur-[1px] opacity-40"
+                  )}
+                  rows={1}
+                />
 
-              <AnimatePresence>
-                {showAttachmentMenu && (
-                  <motion.div 
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    onClick={() => setShowAttachmentMenu(false)}
-                    className="fixed inset-0 z-[150] bg-slate-900/10 backdrop-blur-[2px]"
-                  />
-                )}
-              </AnimatePresence>
+                <AnimatePresence>
+                  {isListening && (
+                    <motion.div 
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      className="absolute inset-0 flex items-center justify-center pointer-events-none"
+                    >
+                      <VoiceVisualizer isListening={isListening} />
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+            </div>
 
-              <AnimatePresence>
-                {fileError && (
-                  <motion.div
-                    initial={{ height: 0, opacity: 0 }}
-                    animate={{ height: 'auto', opacity: 1 }}
-                    exit={{ height: 0, opacity: 0 }}
-                    className="bg-red-50 border-b border-red-100 p-3 flex items-center gap-2 text-red-600 text-[10px] font-black uppercase tracking-wider"
-                  >
-                    <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-                    <span className="flex-1">{fileError}</span>
-                    <button onClick={() => setFileError(null)} className="p-1 hover:bg-red-100 rounded-full transition-colors">
-                      <X className="w-3 h-3" />
-                    </button>
-                  </motion.div>
-                )}
-                {(attachments.length > 0 || isUploading) && (
-                  <motion.div 
-                    initial={{ height: 0, opacity: 0, y: 10 }}
-                    animate={{ height: 'auto', opacity: 1, y: 0 }}
-                    exit={{ height: 0, opacity: 0, y: 10 }}
-                    transition={{ type: "spring", stiffness: 400, damping: 30 }}
-                    className="flex flex-wrap gap-3 p-4 border-b border-slate-100 bg-white rounded-t-[2rem]"
-                  >
-                    {attachments.map((att, i) => (
-                      <motion.div 
-                        initial={{ scale: 0.8, opacity: 0 }}
-                        animate={{ scale: 1, opacity: 1 }}
-                        exit={{ scale: 0.8, opacity: 0 }}
-                        key={i} 
-                        className="relative group/att"
-                      >
-                        {(att && typeof att === 'string' && (att.startsWith('data:image/') || att.startsWith('http'))) ? (
-                          <div className="relative">
-                            <img 
-                              src={att || null} 
-                              alt="preview" 
-                              referrerPolicy="no-referrer"
-                              className="w-20 h-20 md:w-24 md:h-24 object-cover rounded-2xl border-2 border-white shadow-md transition-all group-hover/att:scale-[1.02] group-hover/att:shadow-lg" 
-                            />
-                            <div className="absolute inset-0 bg-black/5 rounded-2xl pointer-events-none" />
-                          </div>
-                        ) : (
-                          <div className="w-40 md:w-48 h-20 md:h-24 rounded-2xl bg-white border-2 border-slate-100 shadow-sm flex flex-col p-2.5 transition-all group-hover/att:scale-[1.02] group-hover/att:shadow-md group-hover/att:border-brand-100 overflow-hidden relative text-left">
-                            <div className="flex items-center gap-2 mb-1.5 shrink-0">
-                                <div className="p-1.5 rounded-lg bg-slate-50 group-hover/att:bg-brand-50 transition-colors">
-                                    {getFileIcon(att)}
-                                </div>
-                                <div className="min-w-0 flex-1">
-                                    <p className="text-[10px] font-black text-slate-900 truncate uppercase mt-0.5">
-                                        {getFileName(att)}
-                                    </p>
-                                    <p className="text-[8px] text-slate-400 font-bold uppercase tracking-widest leading-none">
-                                        {getFileLabel(att)}
-                                    </p>
-                                </div>
-                            </div>
-                            
-                            {/* Document Content Preview Snippet */}
-                            <div className="flex-1 bg-slate-50/50 rounded-lg p-2 overflow-hidden border border-slate-100 group-hover/att:bg-white transition-colors">
-                                {getFilePreviewSnippet(att) ? (
-                                    <div className="h-full">
-                                        <p className="text-[9px] text-slate-500 leading-tight line-clamp-4 font-mono select-none">
-                                            {getFilePreviewSnippet(att)}
-                                        </p>
-                                    </div>
-                                ) : (
-                                    <div className="h-full flex flex-col items-center justify-center gap-1.5 opacity-30">
-                                        {att.startsWith('data:application/pdf') ? (
-                                            <>
-                                                <FileText className="w-5 h-5 text-red-500" />
-                                                <span className="text-[8px] font-black uppercase tracking-widest text-slate-600">Portable Doc</span>
-                                            </>
-                                        ) : (
-                                            <>
-                                                <FileText className="w-5 h-5 text-slate-400" />
-                                                <span className="text-[8px] font-black uppercase tracking-widest text-slate-400">Analysis Ready</span>
-                                            </>
-                                        )}
-                                    </div>
-                                )}
-                            </div>
-                          </div>
-                        )}
-                        <button
-                          type="button"
-                          onClick={() => removeAttachment(i)}
-                          className="absolute -top-2 -right-2 bg-slate-900 text-white rounded-full p-1.5 shadow-xl md:opacity-0 group-hover/att:opacity-100 transition-all hover:bg-red-500 hover:scale-110 z-10"
-                        >
-                          <X className="w-3 h-3" />
-                        </button>
-                      </motion.div>
-                    ))}
-                    {isUploading && (
-                      <div className="w-16 h-16 rounded-xl border border-dashed border-slate-200 bg-white flex flex-col items-center justify-center gap-1">
-                        <Loader2 className="w-4 h-4 text-brand-500 animate-spin" />
-                        <span className="text-[8px] text-slate-400 font-black uppercase tracking-widest">Reading</span>
-                      </div>
-                    )}
-                  </motion.div>
-                )}
-              </AnimatePresence>
-
-              <div className="flex items-center gap-2 px-1">
-                {/* File Input Source (Hidden) */}
+            <div className="flex items-center justify-between px-2 pb-2 mt-2">
+              <div className="flex items-center gap-0.5 md:gap-1 overflow-x-auto no-scrollbar">
                 <input
                   type="file"
                   ref={fileInputRef}
@@ -1549,267 +1537,81 @@ export const ChatInterface = React.memo(({ messages, onSendMessage, isLoading, m
                   className="hidden"
                 />
 
-                <div className="flex items-center">
-                  <motion.button
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                    type="button"
-                    disabled={isUploading}
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      setShowAttachmentMenu(!showAttachmentMenu);
-                    }}
-                    className={cn(
-                      "p-1.5 md:p-2 rounded-full transition-all shrink-0 relative z-[160] ml-1 flex items-center justify-center",
-                      showAttachmentMenu ? "text-brand-500 bg-brand-50" : "text-slate-500 hover:text-slate-800 hover:bg-slate-100/80"
-                    )}
-                    title="Add attachment"
-                  >
-                    <Plus className={cn("w-[22px] h-[22px] stroke-[2.5px] transition-transform duration-300", showAttachmentMenu && "rotate-45")} />
-                  </motion.button>
-
-                  <motion.button
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                    type="button"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      setIsToolboxOpen(true);
-                    }}
-                    className={cn(
-                      "p-1.5 md:p-2 rounded-full transition-all shrink-0 ml-0.5 flex items-center justify-center",
-                      isToolboxOpen ? "text-brand-500 bg-brand-50" : "text-slate-500 hover:text-slate-800 hover:bg-slate-100/80"
-                    )}
-                    title="Study Toolbox"
-                  >
-                    <Sparkles className="w-5 h-5 md:w-[22px] md:h-[22px] stroke-[2px]" />
-                  </motion.button>
-
-                  <AnimatePresence>
-                    {showAttachmentMenu && (
-                      <motion.div
-                        initial={{ opacity: 0, scale: 0.9, y: 10, x: -10 }}
-                        animate={{ opacity: 1, scale: 1, y: 0, x: 0 }}
-                        exit={{ opacity: 0, scale: 0.9, y: 10, x: -10 }}
-                        className="absolute bottom-full left-0 mb-6 w-80 bg-white rounded-[2.5rem] shadow-[0_30px_100px_rgba(0,0,0,0.25)] border border-slate-100 overflow-hidden z-[160] p-3"
-                      >
-                        <div className="flex items-center justify-between px-4 py-3 border-b border-slate-50 mb-2">
-                          <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Quick Actions</span>
-                          <Sparkles className="w-3.5 h-3.5 text-brand-500 animate-pulse" />
-                        </div>
-                        <div className="grid grid-cols-1 gap-1.5">
-                          <motion.button
-                            whileHover={{ scale: 1.02 }}
-                            whileTap={{ scale: 0.98 }}
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setIsMagicImageModalOpen(true);
-                              setShowAttachmentMenu(false);
-                            }}
-                            className="w-full flex items-center gap-4 p-4 hover:bg-emerald-50/50 rounded-2xl transition-all text-left group border border-transparent hover:border-emerald-100"
-                          >
-                            <div className="w-12 h-12 rounded-xl bg-emerald-50 flex items-center justify-center group-hover:bg-emerald-500 group-hover:text-white transition-all duration-300 shrink-0 shadow-sm group-hover:shadow-[0_4px_12px_rgba(16,185,129,0.3)] group-hover:scale-110">
-                              <ImageIcon className="w-6 h-6 text-emerald-500 group-hover:text-white transition-colors" />
-                            </div>
-                            <div className="flex-1">
-                              <p className="text-sm font-black text-slate-900 group-hover:text-emerald-700 transition-colors">Magic Image</p>
-                              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider group-hover:text-emerald-500/70 transition-colors">AI Art Generation</p>
-                            </div>
-                          </motion.button>
-
-                          <motion.button
-                            whileHover={{ scale: 1.02 }}
-                            whileTap={{ scale: 0.98 }}
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              fileInputRef.current?.click();
-                              setShowAttachmentMenu(false);
-                            }}
-                            className="w-full flex items-center gap-4 p-4 hover:bg-blue-50/50 rounded-2xl transition-all text-left group border border-transparent hover:border-blue-100"
-                          >
-                            <div className="w-12 h-12 rounded-xl bg-blue-50 flex items-center justify-center group-hover:bg-blue-500 group-hover:text-white transition-all duration-300 shrink-0 shadow-sm group-hover:shadow-[0_4px_12px_rgba(59,130,246,0.3)] group-hover:scale-110">
-                              <FileText className="w-6 h-6 text-blue-500 group-hover:text-white transition-colors" />
-                            </div>
-                            <div className="flex-1">
-                              <p className="text-sm font-black text-slate-900 group-hover:text-blue-700 transition-colors">Upload Files</p>
-                              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider group-hover:text-blue-500/70 transition-colors">PDF, Docs, Images</p>
-                            </div>
-                          </motion.button>
-                          
-                          <motion.button
-                            whileHover={{ scale: 1.02 }}
-                            whileTap={{ scale: 0.98 }}
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setIsCameraOpen(true);
-                              setShowAttachmentMenu(false);
-                            }}
-                            className="w-full flex items-center gap-4 p-4 hover:bg-purple-50/50 rounded-2xl transition-all text-left group border border-transparent hover:border-purple-100"
-                          >
-                            <div className="w-12 h-12 rounded-xl bg-purple-50 flex items-center justify-center group-hover:bg-purple-500 group-hover:text-white transition-all duration-300 shrink-0 shadow-sm group-hover:shadow-[0_4px_12px_rgba(168,85,247,0.3)] group-hover:scale-110">
-                              <Camera className="w-6 h-6 text-purple-500 group-hover:text-white transition-colors" />
-                            </div>
-                            <div className="flex-1">
-                              <p className="text-sm font-black text-slate-900 group-hover:text-purple-700 transition-colors">Take Photo</p>
-                              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider group-hover:text-purple-500/70 transition-colors">Use Device Camera</p>
-                            </div>
-                          </motion.button>
-
-                          <motion.button
-                            whileHover={{ scale: 1.02 }}
-                            whileTap={{ scale: 0.98 }}
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setInput("Please generate a detailed study note and summary based on our conversation so far.");
-                              setShowAttachmentMenu(false);
-                            }}
-                            className="w-full flex items-center gap-4 p-4 hover:bg-amber-50/50 rounded-2xl transition-all text-left group border border-transparent hover:border-amber-100"
-                          >
-                            <div className="w-12 h-12 rounded-xl bg-amber-50 flex items-center justify-center group-hover:bg-amber-500 group-hover:text-white transition-all duration-300 shrink-0 shadow-sm group-hover:shadow-[0_4px_12px_rgba(245,158,11,0.3)] group-hover:scale-110">
-                              <StickyNote className="w-6 h-6 text-amber-500 group-hover:text-white transition-colors" />
-                            </div>
-                            <div className="flex-1">
-                              <p className="text-sm font-black text-slate-900 group-hover:text-amber-700 transition-colors">Generate Note</p>
-                              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider group-hover:text-amber-500/70 transition-colors">AI Study Summary</p>
-                            </div>
-                          </motion.button>
-                        </div>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </div>
-
-                {/* Textarea: Auto-expanding */}
-                <div className="flex-1 relative flex items-center">
-                  <textarea
-                    ref={textareaRef}
-                    value={input}
-                    onChange={(e) => {
-                      setInput(e.target.value);
-                      e.target.style.height = 'inherit';
-                      e.target.style.height = `${Math.min(e.target.scrollHeight, 200)}px`;
-                    }}
-                    onPaste={handlePaste}
-                    onFocus={() => setIsTyping(true)}
-                    onBlur={() => setIsTyping(false)}
-                    onKeyDown={(e) => {
-                        if (e.key === 'Enter' && !e.shiftKey && !isMobile()) {
-                        e.preventDefault();
-                        handleSubmit(e);
-                        textareaRef.current!.style.height = '52px';
-                        }
-                    }}
-                    placeholder={isListening 
-                      ? "" 
-                      : MODE_QUICK_ACTIONS[mode] 
-                        ? `Try: "${MODE_QUICK_ACTIONS[mode][0].label}" or "${MODE_QUICK_ACTIONS[mode][1].label}"...`
-                        : "Ask SALU AI..."
-                    }
-                    className={cn(
-                        "w-full bg-transparent border-none focus:ring-0 resize-none py-3 px-1 min-h-[52px] max-h-[200px] text-slate-800 placeholder-slate-500 no-scrollbar text-[15px] md:text-[16px] font-medium leading-[28px] transition-all self-center mt-0.5",
-                        isListening && "blur-[1px] opacity-40"
-                    )}
-                    rows={1}
-                  />
-
-                  {/* Inline Voice Visualizer */}
-                  <AnimatePresence>
-                    {isListening && (
-                      <motion.div 
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        className="absolute inset-0 flex items-center justify-center pointer-events-none"
-                      >
-                        <VoiceVisualizer isListening={isListening} />
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-
-                  {/* Clear Attachments Button */}
-                  {attachments.length > 0 && (
-                    <button
-                      type="button"
-                      onClick={() => setAttachments([])}
-                      className="absolute -top-10 right-0 flex items-center gap-1 text-[10px] bg-slate-100 px-3 py-1 rounded-full font-bold uppercase tracking-widest text-slate-600 hover:bg-red-50 hover:text-red-600 transition-colors"
-                    >
-                      <X className="w-3 h-3" /> Clear All
-                    </button>
-                  )}
-                </div>
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  type="button"
+                  disabled={isUploading}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    fileInputRef.current?.click();
+                  }}
+                  className="p-2 text-slate-500 hover:text-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 dark:hover:text-slate-300 rounded-full transition-colors flex items-center justify-center shrink-0"
+                  title="Add attachment"
+                >
+                  <Paperclip className="w-5 h-5" />
+                </motion.button>
                 
-                {/* Right Actions: Mic & Send */}
-                <div className="flex items-center gap-1.5 md:gap-2 shrink-0 py-1.5 pr-1.5 md:pr-2">
-                  <motion.button
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                    type="button"
-                    onClick={isListening ? stopListening : startListening}
-                    className={cn(
-                      "w-[38px] h-[38px] md:w-[42px] md:h-[42px] rounded-full transition-all duration-300 shrink-0 flex items-center justify-center border",
-                      isListening 
-                        ? "bg-brand-500 text-white shadow-[0_0_20px_rgba(14,165,233,0.4)] border-transparent" 
-                        : "text-slate-500 bg-transparent border-transparent hover:bg-slate-100/80 hover:text-slate-800"
-                    )}
-                    title={isListening ? "Stop listening" : "Voice input"}
-                  >
-                    {isListening ? (
-                        <motion.div
-                            animate={{ scale: [1, 1.2, 1] }}
-                            transition={{ duration: 1.5, repeat: Infinity }}
-                        >
-                            <AudioLines className="w-5 h-5 md:w-[22px] md:h-[22px]" />
-                        </motion.div>
-                    ) : (
-                        <Mic className="w-5 h-5 md:w-[22px] md:h-[22px]" />
-                    )}
-                  </motion.button>
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  type="button"
+                  onClick={isListening ? stopListening : startListening}
+                  className={cn(
+                    "p-2 rounded-full transition-colors flex items-center justify-center shrink-0",
+                    isListening ? "bg-red-50 dark:bg-red-900/20 text-red-500" : "text-slate-500 hover:text-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 dark:hover:text-slate-300"
+                  )}
+                  title={isListening ? "Stop listening" : "Voice input"}
+                >
+                  {isListening ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
+                </motion.button>
+                
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  type="button"
+                  onClick={(e) => { e.preventDefault(); setIsCameraOpen(true); }}
+                  className="p-2 text-slate-500 hover:text-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 dark:hover:text-slate-300 rounded-full transition-colors flex items-center justify-center shrink-0"
+                  title="Take Photo"
+                >
+                  <Camera className="w-5 h-5" />
+                </motion.button>
 
-                  <motion.button
-                    whileHover={(input.trim() || attachments.length > 0) && !isLoading ? { scale: 1.05 } : {}}
-                    whileTap={(input.trim() || attachments.length > 0) && !isLoading ? { scale: 0.95 } : {}}
-                    type="submit"
-                    disabled={(!input.trim() && attachments.length === 0) || isLoading}
-                    className={cn(
-                      "w-[38px] h-[38px] md:w-[42px] md:h-[42px] rounded-full transition-all duration-300 flex items-center justify-center shrink-0 ml-1 relative overflow-hidden",
-                      isLoading 
-                        ? "bg-slate-100 text-slate-400 cursor-wait"
-                        : (input.trim() || attachments.length > 0)
-                          ? "bg-slate-900 text-white shadow-xl hover:bg-black hover:shadow-2xl"
-                          : "bg-slate-100 text-slate-400"
-                    )}
-                  >
-                    <AnimatePresence mode="wait">
-                      {isLoading ? (
-                        <motion.div
-                          key="loading"
-                          initial={{ scale: 0, opacity: 0 }}
-                          animate={{ scale: 1, opacity: 1 }}
-                          exit={{ scale: 0, opacity: 0 }}
-                        >
-                          <Loader2 className="w-[18px] h-[18px] md:w-[20px] md:h-[20px] animate-spin" />
-                        </motion.div>
-                      ) : (
-                        <motion.div
-                          key="send"
-                          initial={{ y: 20, opacity: 0 }}
-                          animate={{ y: 0, opacity: 1 }}
-                          exit={{ y: -20, opacity: 0 }}
-                          className="flex items-center justify-center"
-                        >
-                          <ArrowUp className="w-[18px] h-[18px] md:w-[20px] md:h-[20px] stroke-[2.5px]" />
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
-                  </motion.button>
-                </div>
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  type="button"
+                  onClick={(e) => { e.preventDefault(); setIsToolboxOpen(true); }}
+                  className="p-2 text-slate-500 hover:text-purple-600 hover:bg-purple-50 dark:hover:bg-purple-900/20 dark:hover:text-purple-400 rounded-full transition-colors flex items-center justify-center shrink-0"
+                  title="AI Tools"
+                >
+                  <Sparkles className="w-5 h-5" />
+                </motion.button>
               </div>
+
+              <div className="flex items-center shrink-0 ml-2">
+                <motion.button
+                  whileHover={(!input.trim() && attachments.length === 0) || isLoading ? {} : { scale: 1.05 }}
+                  whileTap={(!input.trim() && attachments.length === 0) || isLoading ? {} : { scale: 0.95 }}
+                  type="submit"
+                  disabled={(!input.trim() && attachments.length === 0) || isLoading}
+                  className={cn(
+                    "w-9 h-9 rounded-full flex items-center justify-center transition-all duration-300 relative overflow-hidden",
+                    isLoading 
+                      ? "bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500 cursor-wait"
+                      : (input.trim() || attachments.length > 0)
+                        ? "bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 shadow-md hover:bg-slate-800 dark:hover:bg-white"
+                        : "bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500"
+                  )}
+                >
+                    {isLoading ? (
+                      <Loader2 className="w-[18px] h-[18px] animate-spin" />
+                    ) : (
+                      <ArrowUp className="w-[18px] h-[18px] stroke-[2.5px]" />
+                    )}
+                </motion.button>
+              </div>
+            </div>
             </motion.form>
 
             <p className="text-xs text-center text-slate-500 mt-4">

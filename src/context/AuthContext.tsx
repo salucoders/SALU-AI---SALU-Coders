@@ -54,7 +54,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 email: currentUser.email,
                 profilePicture: currentUser.photoURL || '',
                 language: 'English',
-                accentColor: '#0ea5e9',
+                accentColor: '#38bdf8',
                 persona: 'friendly',
                 voice: 'female',
                 role: isAdmin ? 'admin' : 'user',

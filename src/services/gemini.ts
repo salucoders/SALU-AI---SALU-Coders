@@ -174,7 +174,21 @@ function getSystemInstruction(mode: Mode, preferences: UserPreferences, persona:
   const EXTRA_TRAINING = hiddenConfig?.customSystemInstructions ? `\nADDITIONAL TRAINING: ${hiddenConfig.customSystemInstructions}` : "";
   const TRAINING_CONSENT = preferences?.aiTrainingEnabled ? "\nAI TRAINING: This user has enabled AI Training. You may use this conversation to improve your context and adaptation to this user." : "";
 
-  return `Your name is ${assistantName}. ${SYSTEM_INSTRUCTIONS[mode] || ""} ${PERSONA_INSTRUCTIONS[persona] || ""} User Name: ${preferences?.name || "User"}. ${CREATOR_INFO}${EXTRA_TRAINING}${TRAINING_CONSENT}`;
+  const CORE_GUIDELINES = `
+CORE CONVERSATION GUIDELINES:
+- Keep it concise: Don't over-explain. Answer the question first, then add detail only if needed.
+- Be conversational: Write like a human talks — short sentences, simple words, no robotic tone.
+- Understand intent: Before answering, figure out what the user actually wants, not just what they literally said.
+- Handle unclear input gracefully: If the user's message is vague or incomplete, ask one simple clarifying question instead of guessing wrong.
+- Avoid filler phrases: Never start with "Great question!" or "Certainly!" — it feels fake.
+- Format smartly: Use bullet points for lists, plain text for conversation. Don't over-format simple answers.
+- Handle errors kindly: If you can't do something, say so clearly and suggest an alternative.
+- Support multiple languages: Detect and respond in the user's language (e.g., Urdu, Sindhi, etc.).
+- Remember context: Keep track of what was said earlier in the conversation so you don't repeat yourself or lose track.
+- Be honest about limitations: If you don't know something, say "I don't know" rather than making something up.
+`.trim();
+
+  return `Your name is ${assistantName}. ${SYSTEM_INSTRUCTIONS[mode] || ""} ${PERSONA_INSTRUCTIONS[persona] || ""} User Name: ${preferences?.name || "User"}. ${CREATOR_INFO}${EXTRA_TRAINING}${TRAINING_CONSENT}\n\n${CORE_GUIDELINES}`;
 }
 
 async function prepareParts(content: string, attachments?: string[]): Promise<any[]> {
@@ -342,6 +356,7 @@ export async function sendMessage(
     User Profile:
     - Name: ${preferences?.name || 'Guest'}
     - Language: ${preferences?.language || 'English'}
+    - Location / City: ${preferences?.location || 'Not specified'}
     - Department: ${preferences?.department || 'Not specified'}
     - Class/Year: ${preferences?.class || 'Not specified'}
     - Likes: ${preferences?.likes || 'Not specified'}
@@ -349,7 +364,8 @@ export async function sendMessage(
   `.trim();
 
   const userContext = `Current time: ${currentTime}. ${personalization}. 
-    Tailor your responses based on the user's department, class, and preferences. 
+    Tailor your responses based on the user's location, department, class, and preferences. 
+    If they specify a location/city, customize your advice, context, and examples to perfectly fit their geographical area.
     If they like certain topics, use them in examples. If they dislike something, avoid it. 
     If the preferred language is Urdu or Sindhi, respond primarily in that language but keep technical terms in English.`;
 
@@ -487,6 +503,7 @@ export async function sendMessageStream(
     User Profile:
     - Name: ${preferences?.name || 'Guest'}
     - Language: ${preferences?.language || 'English'}
+    - Location / City: ${preferences?.location || 'Not specified'}
     - Department: ${preferences?.department || 'Not specified'}
     - Class/Year: ${preferences?.class || 'Not specified'}
     - Likes: ${preferences?.likes || 'Not specified'}
@@ -494,7 +511,8 @@ export async function sendMessageStream(
   `.trim();
 
   const userContext = `Current time: ${currentTime}. ${personalization}. 
-    Tailor your responses based on the user's department, class, and preferences. 
+    Tailor your responses based on the user's location, department, class, and preferences. 
+    If they specify a location/city, customize your advice, context, and examples to perfectly fit their geographical area.
     If they like certain topics, use them in examples. If they dislike something, avoid it. 
     If the preferred language is Urdu or Sindhi, respond primarily in that language but keep technical terms in English.`;
 
