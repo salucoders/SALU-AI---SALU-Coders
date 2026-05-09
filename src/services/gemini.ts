@@ -651,9 +651,9 @@ export async function generateImageWithSALU(prompt: string): Promise<string> {
         try {
           // Standard Image Model
           const response = await ai.models.generateContent({
-            model: 'gemini-3.1-flash-image-preview',
+            model: 'gemini-2.5-flash-image',
             contents: { parts: [{ text: prompt }] },
-            config: { imageConfig: { aspectRatio: "1:1", imageSize: "1K" } }
+            config: { imageConfig: { aspectRatio: "1:1" } }
           });
           
           const candidates = (response as any).candidates;
