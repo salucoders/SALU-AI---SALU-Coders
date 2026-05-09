@@ -519,24 +519,31 @@ CRITICAL RULES:
       </AnimatePresence>
 
       {/* Background Animation */}
-      <div className="absolute inset-0 pointer-events-none overflow-hidden z-0">
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-rose-500/5 rounded-full blur-[120px] animate-pulse" />
-        <div className="absolute top-1/4 left-1/4 w-[400px] h-[400px] bg-blue-500/5 rounded-full blur-[100px]" />
+      <div className="absolute inset-0 pointer-events-none overflow-hidden z-0 bg-slate-50 dark:bg-slate-950">
+        <motion.div 
+          animate={isActive ? {
+            scale: [1, 1.2, 1],
+            opacity: [0.1, 0.15, 0.1]
+          } : { opacity: 0.05 }}
+          transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
+          className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-[var(--brand-color)] rounded-full blur-[100px] md:blur-[140px]" 
+        />
+        <div className="absolute top-1/4 left-1/4 w-[300px] h-[300px] bg-blue-500/10 rounded-full blur-[80px]" />
       </div>
 
-      <div className="w-full h-full bg-slate-50/90 dark:bg-slate-950/90 backdrop-blur-3xl shadow-2xl overflow-hidden relative z-10 flex flex-col">
+      <div className="w-full h-full bg-white/40 dark:bg-slate-900/40 backdrop-blur-2xl overflow-hidden relative z-10 flex flex-col">
         {/* Header */}
-        <div className="px-6 py-5 border-b border-slate-200/50 dark:border-slate-800/50 flex items-center justify-between bg-white/50 dark:bg-slate-900/50 backdrop-blur-xl sticky top-0 z-20">
+        <div className="px-6 py-5 flex items-center justify-between sticky top-0 z-20">
           <div className="flex items-center gap-4">
-            <div className="w-12 h-12 bg-rose-50 dark:bg-rose-500/10 rounded-2xl flex items-center justify-center shadow-sm border border-rose-100 dark:border-rose-500/20">
-              <Sparkles className="w-6 h-6 text-rose-500 dark:text-rose-400" />
+            <div className="w-10 h-10 bg-white/80 dark:bg-slate-800/80 backdrop-blur-md rounded-2xl flex items-center justify-center shadow-sm border border-slate-200/50 dark:border-slate-700/50">
+              <Sparkles className="w-5 h-5 text-[var(--brand-color)]" />
             </div>
             <div>
-              <h2 className="text-xl font-bold text-slate-900 dark:text-white tracking-tight">SALU AI Live</h2>
+              <h2 className="text-lg font-bold text-slate-800 dark:text-slate-100 tracking-tight">SALU Voice</h2>
               <div className="flex items-center gap-2">
                 <div className={cn(
-                  "w-2 h-2 rounded-full",
-                  isActive ? "bg-emerald-500 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.5)]" : "bg-slate-300 dark:bg-slate-700"
+                  "w-1.5 h-1.5 rounded-full transition-all duration-300",
+                  isActive ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]" : "bg-slate-300 dark:bg-slate-600"
                 )} />
                 <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest">
                   {isActive ? "Connected" : isConnecting ? "Connecting..." : "Ready"}
@@ -546,9 +553,9 @@ CRITICAL RULES:
           </div>
           <button 
             onClick={onClose}
-            className="p-3 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full text-slate-400 hover:text-slate-700 dark:hover:text-slate-300 transition-all active:scale-90"
+            className="p-2.5 bg-white/50 dark:bg-slate-800/50 backdrop-blur-md border border-slate-200/50 dark:border-slate-700/50 hover:bg-white dark:hover:bg-slate-800 rounded-full text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 transition-all active:scale-95 shadow-sm"
           >
-            <X className="w-6 h-6" />
+            <X className="w-5 h-5" />
           </button>
         </div>
 
@@ -562,7 +569,7 @@ CRITICAL RULES:
             playsInline 
             muted 
             className={cn(
-              "absolute bottom-28 md:bottom-32 right-4 md:right-8 w-28 h-40 md:w-40 md:h-56 lg:w-48 lg:h-64 object-cover rounded-2xl shadow-xl shadow-black/20 border border-slate-200/50 dark:border-slate-700/50 z-30 transition-all duration-500",
+              "absolute top-24 md:top-28 right-4 md:right-8 w-32 h-44 md:w-48 md:h-64 object-cover rounded-3xl shadow-2xl shadow-black/20 border-2 border-white/40 dark:border-white/10 z-30 transition-all duration-500 backdrop-blur-md bg-black/10",
               isVideoEnabled ? "opacity-100 scale-100 translate-y-0" : "opacity-0 scale-95 translate-y-4 pointer-events-none"
             )}
           />
@@ -578,14 +585,14 @@ CRITICAL RULES:
                     animate={{ scale: 1.8, opacity: 0.15 }}
                     exit={{ scale: 0.8, opacity: 0 }}
                     transition={{ repeat: Infinity, duration: 2, ease: "easeOut" }}
-                    className="absolute inset-0 bg-[rgba(var(--brand-color-rgb),1)] rounded-full blur-[1px]"
+                    className="absolute inset-0 bg-[rgba(var(--brand-color-rgb),1)] rounded-full blur-[2px] opacity-20"
                   />
                   <motion.div 
                     initial={{ scale: 0.8, opacity: 0 }}
-                    animate={{ scale: 2.4, opacity: 0.08 }}
+                    animate={{ scale: 2.2, opacity: 0.08 }}
                     exit={{ scale: 0.8, opacity: 0 }}
                     transition={{ repeat: Infinity, duration: 2, delay: 0.5, ease: "easeOut" }}
-                    className="absolute inset-0 bg-[rgba(var(--brand-color-rgb),1)] rounded-full blur-[2px]"
+                    className="absolute inset-0 bg-[rgba(var(--brand-color-rgb),1)] rounded-full blur-[4px]"
                   />
                 </>
               )}
@@ -597,38 +604,38 @@ CRITICAL RULES:
               } : {}}
               transition={{ repeat: Infinity, duration: 2 }}
               className={cn(
-                "w-32 h-32 md:w-48 md:h-48 rounded-full flex items-center justify-center transition-all duration-700 relative z-10 border-4",
+                "w-36 h-36 md:w-48 md:h-48 rounded-full flex items-center justify-center transition-all duration-700 relative z-10",
                 isActive 
-                  ? "bg-white dark:bg-slate-900 border-[rgba(var(--brand-color-rgb),0.2)] shadow-[0_0_60px_rgba(var(--brand-color-rgb),0.3)]" 
-                  : "bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700"
+                  ? "bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl shadow-[0_0_60px_rgba(var(--brand-color-rgb),0.4)]" 
+                  : "bg-white/50 dark:bg-slate-800/50 backdrop-blur-md shadow-sm border border-slate-200/50 dark:border-slate-700/50"
               )}
             >
               {isActive ? (
-                <div className="flex items-center gap-1 md:gap-1.5">
-                  {[1, 2, 3, 4, 5, 6, 7].map((i) => (
+                <div className="flex items-center gap-1.5 md:gap-2">
+                  {[1, 2, 3, 4, 5, 6].map((i) => (
                     <motion.div
                       key={i}
                       animate={{ 
-                        height: [10, Math.random() * 50 + 15, 10],
-                        opacity: [0.5, 1, 0.5]
+                        height: [16, Math.random() * 50 + 20, 16],
+                        opacity: [0.6, 1, 0.6]
                       }}
                       transition={{ 
                         repeat: Infinity, 
                         duration: 0.6 + Math.random() * 0.4, 
                         delay: i * 0.05 
                       }}
-                      className="w-1.5 md:w-2 bg-gradient-to-t from-[rgba(var(--brand-color-rgb),1)] to-[rgba(var(--brand-color-rgb),0.5)] rounded-full shadow-[0_0_15px_rgba(var(--brand-color-rgb),0.5)]"
+                      className="w-2 md:w-2.5 bg-gradient-to-t from-[rgba(var(--brand-color-rgb),1)] to-[rgba(var(--brand-color-rgb),0.5)] rounded-full shadow-[0_0_15px_rgba(var(--brand-color-rgb),0.5)]"
                     />
                   ))}
                 </div>
               ) : (
                 <div className="relative">
-                  <Mic className="w-12 h-12 md:w-16 md:h-16 text-slate-300 dark:text-slate-600" />
+                  <Mic className="w-12 h-12 md:w-16 md:h-16 text-slate-400 dark:text-slate-500" />
                   {isConnecting && (
                     <motion.div 
                       animate={{ rotate: 360 }}
                       transition={{ repeat: Infinity, duration: 2, ease: "linear" }}
-                      className="absolute -inset-4 md:-inset-6 border-4 border-[var(--brand-color)] border-t-transparent rounded-full"
+                      className="absolute -inset-6 border-[3px] border-[var(--brand-color)] border-t-transparent rounded-full opacity-50"
                     />
                   )}
                 </div>
@@ -637,44 +644,54 @@ CRITICAL RULES:
           </div>
 
           {/* Status/Error */}
-          <div className="text-center space-y-4 md:space-y-6 w-full max-w-lg mx-auto z-10">
-            {error ? (
-              <motion.div 
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                className="flex items-center justify-center gap-3 text-rose-600 bg-rose-50 dark:bg-rose-500/10 dark:text-rose-400 p-4 rounded-xl md:rounded-[2rem] border border-rose-200 dark:border-rose-500/20 shadow-sm"
-              >
-                <AlertCircle className="w-5 h-5 shrink-0" />
-                <p className="text-sm font-semibold leading-tight">{error}</p>
-              </motion.div>
-            ) : (
-              <div className="space-y-2 md:space-y-3">
-                <h3 className="text-xl md:text-3xl font-bold text-slate-900 dark:text-white tracking-tight leading-none">
-                  {isActive ? "I'm Listening..." : isConnecting ? "Connecting..." : "SALU AI Live"}
-                </h3>
-                <p className="text-sm md:text-base text-slate-500 dark:text-slate-400 font-medium leading-relaxed px-4">
-                  {isActive 
-                    ? "Go ahead, I'm ready to chat. Your voice is being processed in real-time." 
-                    : isConnecting 
-                    ? "Establishing secure connection..."
-                    : `Talk to SALU AI naturally with a ${preferences.voice} voice.`}
-                </p>
-              </div>
-            )}
+          <div className="text-center w-full max-w-lg mx-auto z-10 flex flex-col items-center justify-center">
+            <AnimatePresence mode="wait">
+              {error ? (
+                <motion.div 
+                  key="error"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  className="flex items-center gap-3 text-rose-600 bg-rose-50 dark:bg-rose-500/10 dark:text-rose-400 px-6 py-4 rounded-2xl border border-rose-200 dark:border-rose-500/20 shadow-sm"
+                >
+                  <AlertCircle className="w-5 h-5 shrink-0" />
+                  <p className="text-sm font-medium leading-tight">{error}</p>
+                </motion.div>
+              ) : (
+                <motion.div 
+                  key="status"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="space-y-2 md:space-y-3"
+                >
+                  <h3 className="text-2xl md:text-3xl font-semibold text-slate-800 dark:text-slate-100 tracking-tight leading-none text-center">
+                    {isActive ? "I'm Listening..." : isConnecting ? "Connecting..." : "SALU AI Live"}
+                  </h3>
+                  <p className="text-[15px] text-slate-500 dark:text-slate-400 font-medium leading-relaxed px-4 text-center max-w-sm mx-auto">
+                    {isActive 
+                      ? "Go ahead, I'm ready to chat. Your voice is being processed in real-time." 
+                      : isConnecting 
+                      ? "Establishing secure connection..."
+                      : `Talk to SALU AI naturally with a ${preferences.voice} voice.`}
+                  </p>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
 
           {/* Transcription Preview */}
           <AnimatePresence>
             {activeTool && (
               <motion.div
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0 }}
-                className="flex items-center gap-3 px-6 py-3 bg-[rgba(var(--brand-color-rgb),0.1)] text-[var(--brand-color)] rounded-full border border-[rgba(var(--brand-color-rgb),0.2)] shadow-sm mb-4 mx-auto w-max z-10"
+                initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                className="flex items-center gap-2.5 px-5 py-2.5 bg-white/80 dark:bg-slate-800/80 backdrop-blur-md rounded-full shadow-sm mb-4 mx-auto w-max z-10 border border-slate-200/50 dark:border-slate-700/50"
               >
-                <Loader2 className="w-4 h-4 animate-spin" />
-                <span className="text-xs font-bold uppercase tracking-widest">
-                  AI Trigger: {activeTool.replace('_', ' ')}
+                <Loader2 className="w-4 h-4 animate-spin text-[var(--brand-color)]" />
+                <span className="text-[11px] font-semibold text-slate-600 dark:text-slate-300 tracking-wide">
+                  Running: {activeTool.replace('_', ' ')}
                 </span>
               </motion.div>
             )}
@@ -684,29 +701,23 @@ CRITICAL RULES:
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: 20 }}
-                className="w-full max-w-3xl mx-auto space-y-4 z-10"
+                className="w-full max-w-2xl mx-auto space-y-6 z-10"
               >
                 {transcription && (
-                  <div className="bg-slate-100/80 dark:bg-slate-800/80 backdrop-blur-md p-5 md:p-6 rounded-3xl border border-slate-200/50 dark:border-slate-700/50 shadow-sm ml-auto w-fit max-w-[85%] relative">
-                    <div className="flex items-center gap-2 mb-2">
-                       <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-pulse" />
-                       <p className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest">You said</p>
-                    </div>
-                    <p className="text-sm md:text-base text-slate-800 dark:text-slate-200 font-medium leading-relaxed">
+                  <div className="flex flex-col items-end gap-2 ml-auto w-fit max-w-[85%]">
+                    <p className="text-[10px] font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-widest pl-2 pr-4 text-right">You</p>
+                    <div className="bg-slate-100 dark:bg-slate-800 px-6 py-4 rounded-3xl rounded-tr-md shadow-sm text-[15px] text-slate-800 dark:text-slate-200 leading-relaxed font-medium">
                       {transcription}
-                    </p>
+                    </div>
                   </div>
                 )}
                 
                 {modelTranscription && (
-                  <div className="bg-[rgba(var(--brand-color-rgb),0.1)] dark:bg-[rgba(var(--brand-color-rgb),0.15)] backdrop-blur-md p-5 md:p-6 rounded-3xl border border-[rgba(var(--brand-color-rgb),0.2)] shadow-sm mr-auto w-fit max-w-[85%] relative">
-                    <div className="flex items-center gap-2 mb-2">
-                      <div className="w-1.5 h-1.5 bg-[var(--brand-color)] rounded-full animate-pulse" />
-                      <p className="text-[10px] font-bold text-[var(--brand-color)] uppercase tracking-widest opacity-80">SALU AI</p>
-                    </div>
-                    <p className="text-sm md:text-base text-slate-800 dark:text-slate-100 font-medium leading-relaxed">
+                  <div className="flex flex-col items-start gap-2 mr-auto w-fit max-w-[85%]">
+                    <p className="text-[10px] font-semibold text-[var(--brand-color)] uppercase tracking-widest pr-2 pl-4">SALU AI</p>
+                    <div className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-md px-6 py-4 rounded-3xl rounded-tl-md shadow-sm border border-slate-200/50 dark:border-slate-800/50 text-[15px] text-slate-800 dark:text-slate-200 leading-relaxed font-medium">
                       {modelTranscription}
-                    </p>
+                    </div>
                   </div>
                 )}
               </motion.div>
@@ -715,7 +726,7 @@ CRITICAL RULES:
         </div>
 
         {/* Controls */}
-        <div className="p-6 md:p-8 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border-t border-slate-200/50 dark:border-slate-800/50 flex flex-col md:flex-row items-center justify-center gap-4 md:gap-6 z-20">
+        <div className="p-6 md:p-8 flex flex-col items-center justify-center gap-4 z-20 sticky bottom-0">
           {!isActive && !isConnecting ? (
             <button
               onClick={() => startLiveSession().catch(err => {
@@ -723,46 +734,48 @@ CRITICAL RULES:
                 setError(err.message || "Failed to connect to AI service. Please check your microphone and internet connection.");
                 setIsConnecting(false);
               })}
-              className="group relative flex items-center justify-center gap-3 px-8 py-5 bg-[var(--brand-color)] text-white rounded-full font-bold text-lg hover:brightness-110 shadow-lg shadow-[rgba(var(--brand-color-rgb),0.3)] transition-all active:scale-95 overflow-hidden w-full md:w-auto min-w-[240px]"
+              className="group relative flex items-center justify-center gap-3 px-8 py-4 bg-[var(--brand-color)] text-white rounded-full font-semibold text-[17px] hover:shadow-lg hover:shadow-[rgba(var(--brand-color-rgb),0.3)] hover:-translate-y-0.5 transition-all active:scale-95 overflow-hidden w-full md:w-auto min-w-[240px]"
             >
               <div className="absolute inset-0 bg-white/20 opacity-0 group-hover:opacity-100 transition-opacity" />
-              <Mic className="w-6 h-6 relative z-10" />
-              <span className="relative z-10">Start Live AI</span>
+              <Mic className="w-5 h-5 relative z-10" />
+              <span className="relative z-10">Start Live Voice</span>
             </button>
           ) : (
-            <div className="flex items-center gap-4 md:gap-6 w-full md:w-auto">
+            <div className="flex items-center gap-4 bg-white/80 dark:bg-slate-800/80 backdrop-blur-2xl px-6 py-4 rounded-full shadow-lg border border-slate-200/50 dark:border-slate-700/50 w-full md:w-auto justify-center mx-auto">
               <button
                 onClick={() => setIsMuted(!isMuted)}
                 className={cn(
-                  "p-5 rounded-full transition-all shadow-md active:scale-90 flex-1 md:flex-none flex justify-center border",
+                  "w-12 h-12 md:w-14 md:h-14 rounded-full transition-all flex items-center justify-center shrink-0",
                   isMuted 
-                    ? "bg-rose-50 text-rose-500 border-rose-200 dark:bg-rose-900/20 dark:border-rose-800" 
-                    : "bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700"
+                    ? "bg-rose-100 dark:bg-rose-500/20 text-rose-500 border border-rose-200 dark:border-rose-500/30" 
+                    : "bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-600 dark:text-slate-200"
                 )}
                 title={isMuted ? "Unmute" : "Mute"}
               >
-                {isMuted ? <MicOff className="w-6 h-6" /> : <Mic className="w-6 h-6" />}
+                {isMuted ? <MicOff className="w-5 h-5 md:w-6 md:h-6" /> : <Mic className="w-5 h-5 md:w-6 md:h-6" />}
               </button>
 
               <button
                 onClick={toggleVideo}
                 className={cn(
-                  "p-5 rounded-full transition-all shadow-md active:scale-90 flex-1 md:flex-none flex justify-center border",
+                  "w-12 h-12 md:w-14 md:h-14 rounded-full transition-all flex items-center justify-center shrink-0",
                   isVideoEnabled 
-                    ? "bg-[rgba(var(--brand-color-rgb),0.1)] text-[var(--brand-color)] border-[rgba(var(--brand-color-rgb),0.3)] dark:bg-[rgba(var(--brand-color-rgb),0.2)]" 
-                    : "bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700"
+                    ? "bg-[rgba(var(--brand-color-rgb),0.1)] dark:bg-[rgba(var(--brand-color-rgb),0.2)] text-[var(--brand-color)] border border-[rgba(var(--brand-color-rgb),0.3)]" 
+                    : "bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-600 dark:text-slate-200"
                 )}
                 title={isVideoEnabled ? "Turn off camera" : "Turn on camera"}
               >
-                {isVideoEnabled ? <Camera className="w-6 h-6" /> : <CameraOff className="w-6 h-6" />}
+                {isVideoEnabled ? <Camera className="w-5 h-5 md:w-6 md:h-6" /> : <CameraOff className="w-5 h-5 md:w-6 md:h-6" />}
               </button>
               
+              <div className="w-px h-8 bg-slate-200 dark:bg-slate-700 mx-1"></div>
+
               <button
                 onClick={stopLiveSession}
-                className="px-8 py-5 bg-red-500 hover:bg-red-600 text-white rounded-full font-bold text-base shadow-lg shadow-red-500/30 transition-all active:scale-95 flex-[2] md:flex-none flex items-center justify-center gap-2"
+                className="w-12 h-12 md:w-14 md:h-14 bg-rose-500 hover:bg-rose-600 hover:shadow-lg hover:shadow-rose-500/30 text-white rounded-full transition-all active:scale-95 flex items-center justify-center shrink-0"
+                title="End Session"
               >
-                <X className="w-5 h-5" />
-                End Session
+                <X className="w-6 h-6 md:w-7 md:h-7" />
               </button>
             </div>
           )}

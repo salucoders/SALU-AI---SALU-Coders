@@ -646,38 +646,46 @@ export async function generateImageWithSALU(prompt: string): Promise<string> {
       try {
         const ai = new GoogleGenAI({ apiKey: activeKey });
         
-        // Using gemini-2.5-flash-image for standard free-tier availability
-        const response = await ai.models.generateContent({
-          model: 'gemini-2.5-flash-image',
-          contents: {
-            parts: [
-              {
-                text: prompt,
-              },
-            ],
-          },
-          config: {
-            imageConfig: {
-              aspectRatio: "1:1"
+        let base64EncodeString: string | null = null;
+        
+        try {
+          // Try newer models first
+          const response = await ai.models.generateContent({
+            model: 'gemini-3.1-flash-image-preview',
+            contents: { parts: [{ text: prompt }] },
+            config: { imageConfig: { aspectRatio: "1:1", imageSize: "1K" } }
+          });
+          
+          const candidates = (response as any).candidates;
+          if (candidates && candidates[0]?.content?.parts) {
+            for (const part of candidates[0].content.parts) {
+              if (part.inlineData && part.inlineData.data) {
+                base64EncodeString = part.inlineData.data;
+                break;
+              }
             }
           }
-        });
+        } catch (err: any) {
+             console.warn("First model failed, trying legacy model...", err);
+             // fallback to imagen-3.0-generate-001
+             const imageResponse = await ai.models.generateImages({
+                 model: 'imagen-3.0-generate-001',
+                 prompt: prompt,
+                 config: { numberOfImages: 1, outputMimeType: 'image/jpeg', aspectRatio: '1:1' },
+             });
+             if (imageResponse.generatedImages && imageResponse.generatedImages[0]?.image?.imageBytes) {
+                 base64EncodeString = imageResponse.generatedImages[0].image.imageBytes;
+             }
+        }
 
-        // Find the image part in the response parts
-        const candidates = (response as any).candidates;
-        if (candidates && candidates[0]?.content?.parts) {
-          for (const part of candidates[0].content.parts) {
-            if (part.inlineData) {
-              const base64EncodeString: string = part.inlineData.data;
-              return `data:image/png;base64,${base64EncodeString}`;
-            }
-          }
+        if (base64EncodeString) {
+            return `data:image/jpeg;base64,${base64EncodeString}`;
         }
         throw new Error("No image was returned by SALU AI Engine");
       } catch (err: any) {
         lastError = err;
         console.warn(`Image Gen failed for key ${i + 1}: ${err.message}`);
-        // wait a little bit before trying next
+        // wait a little bit before trying next key
         if (i < keysToTry.length - 1) {
           await new Promise(r => setTimeout(r, 1000));
         }
