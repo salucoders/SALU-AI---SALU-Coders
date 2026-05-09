@@ -667,9 +667,9 @@ export async function generateImageWithSALU(prompt: string): Promise<string> {
           }
         } catch (err: any) {
              console.warn("First model failed, trying legacy model...", err);
-             // fallback to imagen-3.0-generate-002
+             // fallback to imagen-4.0-generate-001
              const imageResponse = await ai.models.generateImages({
-                 model: 'imagen-3.0-generate-002',
+                 model: 'imagen-4.0-generate-001',
                  prompt: prompt,
                  config: { numberOfImages: 1, outputMimeType: 'image/jpeg', aspectRatio: '1:1' },
              });
