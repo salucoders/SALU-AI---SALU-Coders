@@ -1219,12 +1219,12 @@ export const ChatInterface = React.memo(({ messages, onSendMessage, isLoading, m
         )}
       </AnimatePresence>
 
-      <div className="px-3 pb-3 md:px-8 md:pb-8 relative z-20 bg-gradient-to-t from-white via-white to-transparent dark:from-slate-950 dark:via-slate-950 pt-10 transition-colors duration-300">
-        <div className="max-w-3xl mx-auto relative group/input rounded-[2.2rem] z-10 w-full hover:shadow-xl transition-all duration-500">
-          <div className="relative rounded-[2.2rem] p-[2px] overflow-hidden z-10">
+      <div className="px-4 pb-4 md:px-8 md:pb-8 relative z-20 bg-gradient-to-t from-white via-white/90 to-transparent dark:from-slate-950 dark:via-slate-950/90 pt-16 transition-colors duration-300">
+        <div className="max-w-3xl mx-auto relative group/input z-10 w-full mb-2 md:mb-4">
+          <div className="relative rounded-[2rem] p-[2px] overflow-hidden z-10 shadow-[0_8px_30px_rgb(0,0,0,0.08)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.2)] hover:shadow-[0_8px_40px_rgb(var(--brand-color-rgb),0.15)] transition-all duration-500 bg-white/50 dark:bg-slate-900/50 backdrop-blur-xl">
             {/* Always Running Multicolor Crisp Border */}
             <div 
-              className="absolute inset-[-200%] animate-[spin_4s_linear_infinite] opacity-100 pointer-events-none"
+              className="absolute inset-[-200%] animate-[spin_3s_linear_infinite] opacity-100 pointer-events-none"
               style={{
                 background: `conic-gradient(from 0deg at 50% 50%, #ff0f7b, #f89b29, #eab308, #10b981, #0ea5e9, #8b5cf6, #ff0f7b)`
               }}
@@ -1233,7 +1233,7 @@ export const ChatInterface = React.memo(({ messages, onSendMessage, isLoading, m
             <motion.form 
               id="chat-input-area"
               onSubmit={handleSubmit} 
-              className="relative bg-white dark:bg-slate-950 rounded-[calc(2.2rem-2px)] p-2 transition-colors duration-500 flex flex-col w-full z-10 shadow-inner"
+              className="relative bg-[#f4f4f4] dark:bg-[#2f2f2f] rounded-[calc(2rem-2px)] py-1.5 px-2 transition-colors duration-500 flex flex-col w-full z-10"
             >
             <AnimatePresence>
               {fileError && (
@@ -1323,12 +1323,12 @@ export const ChatInterface = React.memo(({ messages, onSendMessage, isLoading, m
                       if (e.key === 'Enter' && !e.shiftKey && !isMobile()) {
                       e.preventDefault();
                       handleSubmit(e);
-                      textareaRef.current!.style.height = '48px';
+                      textareaRef.current!.style.height = '24px';
                       }
                   }}
-                  placeholder={isListening ? "" : "Ask SALU AI anything..."}
+                  placeholder={isListening ? "" : "Message SALU AI..."}
                   className={cn(
-                      "w-full bg-transparent border-none focus:ring-0 resize-none px-2 text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 text-[16px] md:text-[17px] leading-[24px] min-h-[48px] max-h-[200px] outline-none rounded-none py-1",
+                      "w-full bg-transparent border-none focus:ring-0 resize-none px-3 text-slate-800 dark:text-slate-100 placeholder-slate-500 dark:placeholder-slate-400 text-[16px] leading-[24px] min-h-[24px] max-h-[200px] outline-none rounded-none py-2 mt-1",
                       isListening && "blur-[1px] opacity-40"
                   )}
                   rows={1}
@@ -1348,8 +1348,8 @@ export const ChatInterface = React.memo(({ messages, onSendMessage, isLoading, m
                 </AnimatePresence>
             </div>
 
-            <div className="flex items-center justify-between px-2 pb-1 mt-1">
-              <div className="flex items-center gap-1 md:gap-1.5 overflow-x-auto no-scrollbar">
+            <div className="flex items-center justify-between px-2 pb-0.5 mt-2">
+              <div className="flex items-center gap-1 overflow-x-auto no-scrollbar">
                 <input
                   type="file"
                   ref={fileInputRef}
@@ -1368,10 +1368,10 @@ export const ChatInterface = React.memo(({ messages, onSendMessage, isLoading, m
                     e.preventDefault();
                     fileInputRef.current?.click();
                   }}
-                  className="w-10 h-10 text-slate-400 hover:text-slate-700 hover:bg-slate-100 dark:text-slate-500 dark:hover:text-slate-300 dark:hover:bg-slate-800 rounded-full transition-all flex items-center justify-center shrink-0"
+                  className="w-9 h-9 text-slate-500 hover:text-slate-800 hover:bg-slate-200/50 dark:text-slate-400 dark:hover:text-slate-200 dark:hover:bg-slate-700/50 rounded-full transition-all flex items-center justify-center shrink-0"
                   title="Add file"
                 >
-                  <Paperclip className="w-[18px] h-[18px]" />
+                  <Paperclip className="w-5 h-5" />
                 </motion.button>
                 
                 <motion.button
@@ -1380,12 +1380,12 @@ export const ChatInterface = React.memo(({ messages, onSendMessage, isLoading, m
                   type="button"
                   onClick={isListening ? stopListening : startListening}
                   className={cn(
-                    "w-10 h-10 rounded-full transition-all flex items-center justify-center shrink-0",
-                    isListening ? "bg-red-50 dark:bg-red-500/10 text-red-500" : "text-slate-400 hover:text-slate-700 hover:bg-slate-100 dark:text-slate-500 dark:hover:text-slate-300 dark:hover:bg-slate-800"
+                    "w-9 h-9 rounded-full transition-all flex items-center justify-center shrink-0",
+                    isListening ? "bg-red-500/20 text-red-500" : "text-slate-500 hover:text-slate-800 hover:bg-slate-200/50 dark:text-slate-400 dark:hover:text-slate-200 dark:hover:bg-slate-700/50"
                   )}
                   title={isListening ? "Stop listening" : "Voice input"}
                 >
-                  {isListening ? <MicOff className="w-[18px] h-[18px]" /> : <Mic className="w-[18px] h-[18px]" />}
+                  {isListening ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
                 </motion.button>
                 
                 <motion.button
@@ -1393,10 +1393,10 @@ export const ChatInterface = React.memo(({ messages, onSendMessage, isLoading, m
                   whileTap={{ scale: 0.95 }}
                   type="button"
                   onClick={(e) => { e.preventDefault(); setIsCameraOpen(true); }}
-                  className="w-10 h-10 text-slate-400 hover:text-slate-700 hover:bg-slate-100 dark:text-slate-500 dark:hover:text-slate-300 dark:hover:bg-slate-800 rounded-full transition-all flex items-center justify-center shrink-0"
+                  className="w-9 h-9 text-slate-500 hover:text-slate-800 hover:bg-slate-200/50 dark:text-slate-400 dark:hover:text-slate-200 dark:hover:bg-slate-700/50 rounded-full transition-all flex items-center justify-center shrink-0"
                   title="Take Photo"
                 >
-                  <Camera className="w-[18px] h-[18px]" />
+                  <Camera className="w-5 h-5" />
                 </motion.button>
 
                 <motion.button
@@ -1404,10 +1404,10 @@ export const ChatInterface = React.memo(({ messages, onSendMessage, isLoading, m
                   whileTap={{ scale: 0.95 }}
                   type="button"
                   onClick={(e) => { e.preventDefault(); setIsToolboxOpen(true); }}
-                  className="w-10 h-10 text-slate-400 hover:text-[var(--brand-color)] hover:bg-[rgba(var(--brand-color-rgb),0.1)] dark:text-slate-500 dark:hover:text-[var(--brand-color)] dark:hover:bg-[rgba(var(--brand-color-rgb),0.1)] rounded-full transition-all flex items-center justify-center shrink-0"
+                  className="w-9 h-9 text-slate-500 hover:text-slate-800 hover:bg-slate-200/50 dark:text-slate-400 dark:hover:text-slate-200 dark:hover:bg-slate-700/50 rounded-full transition-all flex items-center justify-center shrink-0"
                   title="Tools"
                 >
-                  <Sparkles className="w-[18px] h-[18px]" />
+                  <Sparkles className="w-5 h-5" />
                 </motion.button>
               </div>
 
@@ -1418,12 +1418,12 @@ export const ChatInterface = React.memo(({ messages, onSendMessage, isLoading, m
                   type="submit"
                   disabled={(!input.trim() && attachments.length === 0) || isLoading}
                   className={cn(
-                    "w-10 h-10 rounded-full flex items-center justify-center transition-all relative overflow-hidden",
+                    "w-9 h-9 rounded-full flex items-center justify-center transition-all relative overflow-hidden",
                     isLoading 
-                      ? "bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500 cursor-wait"
+                      ? "bg-slate-300 dark:bg-slate-600 text-slate-500 dark:text-slate-400 cursor-wait"
                       : (input.trim() || attachments.length > 0)
-                        ? "bg-black dark:bg-white text-white dark:text-black shadow-md hover:bg-slate-800 dark:hover:bg-slate-200"
-                        : "bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500"
+                        ? "bg-black dark:bg-white text-white dark:text-black shadow-sm"
+                        : "bg-slate-200 dark:bg-slate-700 text-slate-400 dark:text-slate-500"
                   )}
                 >
                     {isLoading ? (
@@ -1437,7 +1437,7 @@ export const ChatInterface = React.memo(({ messages, onSendMessage, isLoading, m
             </motion.form>
           </div>
 
-          <p className="text-xs text-center text-slate-500 mt-4">
+          <p className="text-[11px] text-center text-slate-500 mt-2 hidden md:block opacity-80">
             SALU AI can make mistakes. Check important info.
           </p>
         </div>

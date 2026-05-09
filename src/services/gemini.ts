@@ -651,9 +651,9 @@ export async function generateImageWithSALU(prompt: string): Promise<string> {
         try {
           // Standard Image Model
           const response = await ai.models.generateContent({
-            model: 'gemini-2.5-flash-image',
+            model: 'gemini-3.1-flash-image-preview',
             contents: { parts: [{ text: prompt }] },
-            config: { imageConfig: { aspectRatio: "1:1" } }
+            config: { imageConfig: { aspectRatio: "1:1", imageSize: "1K" } }
           });
           
           const candidates = (response as any).candidates;
@@ -666,16 +666,8 @@ export async function generateImageWithSALU(prompt: string): Promise<string> {
             }
           }
         } catch (err: any) {
-             console.warn("First model failed, trying legacy model...", err);
-             // fallback to imagen-4.0-generate-001
-             const imageResponse = await ai.models.generateImages({
-                 model: 'imagen-4.0-generate-001',
-                 prompt: prompt,
-                 config: { numberOfImages: 1, outputMimeType: 'image/jpeg', aspectRatio: '1:1' },
-             });
-             if (imageResponse.generatedImages && imageResponse.generatedImages[0]?.image?.imageBytes) {
-                 base64EncodeString = imageResponse.generatedImages[0].image.imageBytes;
-             }
+             console.warn("Model failed to generate image:", err);
+             throw err;
         }
 
         if (base64EncodeString) {
