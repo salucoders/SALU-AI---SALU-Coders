@@ -667,7 +667,14 @@ export async function generateImageWithSALU(prompt: string): Promise<string> {
           }
         } catch (err: any) {
              console.warn("Model failed to generate image:", err);
-             throw err;
+             
+             let errorMsg = err?.message || String(err);
+             if (errorMsg.includes("429") || errorMsg.includes("Quota") || errorMsg.includes("RESOURCE_EXHAUSTED")) {
+                 errorMsg = `Image generation free-tier quota exhausted. Please try again later, or configure a Together AI API Key in the Admin Panel to keep generating images.`;
+             } else if (errorMsg.includes("403") || errorMsg.includes("PERMISSION_DENIED")) {
+                 errorMsg = `SALU API key does not have permission to generate images.`;
+             }
+             throw new Error(errorMsg);
         }
 
         if (base64EncodeString) {
