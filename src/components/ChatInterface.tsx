@@ -432,6 +432,14 @@ const ImageResult = ({ prompt }: { prompt: string }) => {
             setLoading(false);
             return;
           }
+        } else {
+            const errorData = await togetherResponse.json().catch(() => ({}));
+            console.error("Together AI also failed:", errorData);
+            
+            // If Together AI failed because of missing API key, show a combined helpful message
+            if (errorData.error && errorData.error.includes("key is not configured")) {
+                 throw new Error(`${e.message}\n\nAdditionally, the fallback Together AI engine is missing its API key. Please configure it in the Admin Panel to keep generating images.`);
+            }
         }
         throw new Error(e.message || "All generation engines failed.");
       }

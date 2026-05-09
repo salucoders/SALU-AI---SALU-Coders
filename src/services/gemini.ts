@@ -668,12 +668,22 @@ export async function generateImageWithSALU(prompt: string): Promise<string> {
         } catch (err: any) {
              console.warn("Model failed to generate image:", err);
              
-             let errorMsg = err?.message || String(err);
-             if (errorMsg.includes("429") || errorMsg.includes("Quota") || errorMsg.includes("RESOURCE_EXHAUSTED")) {
-                 errorMsg = `Image generation free-tier quota exhausted. Please try again later, or configure a Together AI API Key in the Admin Panel to keep generating images.`;
-             } else if (errorMsg.includes("403") || errorMsg.includes("PERMISSION_DENIED")) {
-                 errorMsg = `SALU API key does not have permission to generate images.`;
+             let errorStr = "";
+             try {
+                 errorStr = typeof err === 'object' ? JSON.stringify(err) : String(err);
+             } catch (e) {
+                 errorStr = String(err);
              }
+             let errorMsg = err?.message || errorStr;
+             
+             if (errorStr.includes("429") || errorStr.includes("Quota") || errorStr.includes("RESOURCE_EXHAUSTED") || errorMsg.includes("429") || errorMsg.includes("Quota")) {
+                 errorMsg = "Image generation free-tier quota exhausted. Please try again later, or configure a Together AI API Key.";
+             } else if (errorStr.includes("403") || errorStr.includes("PERMISSION_DENIED") || errorMsg.includes("403") || errorMsg.includes("PERMISSION_DENIED")) {
+                 errorMsg = "SALU API key does not have permission to generate images.";
+             } else if (errorStr.includes("NOT_FOUND") || errorMsg.includes("NOT_FOUND")) {
+                 errorMsg = "The selected Image Generation model is not available or not supported on this API key.";
+             }
+             
              throw new Error(errorMsg);
         }
 
