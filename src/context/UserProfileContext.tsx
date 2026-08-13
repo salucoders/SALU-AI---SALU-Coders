@@ -1,8 +1,9 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { doc, onSnapshot, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, onSnapshot, updateDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { UserPreferences } from '../types';
 import { db } from '../lib/firebase';
 import { useAuth } from './AuthContext';
+import { compressImage } from '../lib/utils';
 
 interface UserProfileContextType {
   preferences: UserPreferences;
@@ -92,11 +93,31 @@ export const UserProfileProvider: React.FC<{ children: React.ReactNode }> = ({ c
     setLoading(true);
     const userDocRef = doc(db, 'users', user.uid);
     
-    const unsubscribe = onSnapshot(userDocRef, (docSnap) => {
+    const unsubscribe = onSnapshot(userDocRef, async (docSnap) => {
       if (docSnap.exists()) {
+        const rawData = docSnap.data();
+        let profilePic = rawData.profilePicture || '';
+
+        // If stored profile picture is super large (>50KB), compress and repair document on server
+        if (typeof profilePic === 'string' && profilePic.length > 50000) {
+          try {
+            profilePic = await compressImage(profilePic, 128, 128, 0.7);
+            const sanitizedDoc = {
+              ...rawData,
+              profilePicture: profilePic,
+              updatedAt: serverTimestamp()
+            };
+            await setDoc(userDocRef, sanitizedDoc);
+            console.info("Auto-repaired oversized user profile document in Firestore.");
+          } catch (repairErr) {
+            console.warn("Could not auto-repair user profile document:", repairErr);
+          }
+        }
+
         setPreferences({
           ...defaultPreferences,
-          ...docSnap.data(),
+          ...rawData,
+          profilePicture: profilePic,
           uid: docSnap.id
         } as UserPreferences);
       }
@@ -137,16 +158,54 @@ export const UserProfileProvider: React.FC<{ children: React.ReactNode }> = ({ c
     try {
       const userDocRef = doc(db, 'users', user.uid);
       
+      // Auto-compress profile picture if it's large before saving
+      let updatedPrefs = { ...newPrefs };
+      if (updatedPrefs.profilePicture && typeof updatedPrefs.profilePicture === 'string' && updatedPrefs.profilePicture.length > 30000) {
+        updatedPrefs.profilePicture = await compressImage(updatedPrefs.profilePicture, 128, 128, 0.7);
+      }
+
       // Clean undefined values completely
-      const cleanPrefs = Object.entries(newPrefs).reduce((acc, [key, value]) => {
+      const cleanPrefs = Object.entries(updatedPrefs).reduce((acc, [key, value]) => {
         if (value !== undefined) acc[key] = value;
         return acc;
       }, {} as Record<string, any>);
 
-      await updateDoc(userDocRef, {
-        ...cleanPrefs,
-        updatedAt: serverTimestamp(),
-      });
+      // Optimistically update local preferences state immediately
+      setPreferences((prev) => ({
+        ...prev,
+        ...updatedPrefs,
+      }));
+
+      try {
+        await setDoc(
+          userDocRef,
+          {
+            ...cleanPrefs,
+            updatedAt: serverTimestamp(),
+          },
+          { merge: true }
+        );
+      } catch (docErr: any) {
+        // If document size exceeds 1MB limit or cannot be written due to size, force replace with sanitized setDoc
+        if (docErr?.message?.includes('cannot be written because its size') || docErr?.message?.includes('exceeds the maximum allowed size') || docErr?.code === 'invalid-argument') {
+          console.warn("Document size limit exceeded. Replacing document with sanitized preferences.");
+          const currentPic = typeof preferences.profilePicture === 'string' ? preferences.profilePicture : '';
+          const compressedPic = currentPic.length > 30000 ? await compressImage(currentPic, 128, 128, 0.7) : currentPic;
+
+          const sanitizedFullDoc = {
+            ...defaultPreferences,
+            ...preferences,
+            ...cleanPrefs,
+            profilePicture: compressedPic.length > 50000 ? '' : compressedPic,
+            updatedAt: serverTimestamp(),
+            uid: user.uid
+          };
+
+          await setDoc(userDocRef, sanitizedFullDoc);
+        } else {
+          throw docErr;
+        }
+      }
     } catch (error) {
       console.error("Error updating user preferences:", error);
       throw error;

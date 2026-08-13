@@ -22,31 +22,52 @@ const withBackoff = async <T>(fn: () => Promise<T>, retries = 5, delay = 2000): 
 };
 
 export async function generateChatTitle(firstMessage: string): Promise<string> {
+  const cleanSnippet = (firstMessage || "").trim().replace(/^[\s#*>-]+/, '');
+  const fallback = cleanSnippet ? (cleanSnippet.slice(0, 35) + (cleanSnippet.length > 35 ? "..." : "")) : "New Conversation";
+
   try {
     const config = await getSystemConfig();
     const activeKey = config.apiKeys.length > 0 ? config.apiKeys[Math.floor(Math.random() * config.apiKeys.length)] : config.apiKeys[0];
     
     if (!activeKey) {
-      return (firstMessage || "New Conversation").slice(0, 30);
+      return fallback;
     }
     
     const ai = new GoogleGenAI({ apiKey: activeKey });
     
     const response = await withBackoff(() => ai.models.generateContent({
-      model: 'gemini-2.5-flash',
-      contents: `Based on the following first message of a conversation, generate a short, descriptive, and catchy title for the chat (maximum 4 words). Do not include quotes or any other punctuation. Message: "${firstMessage.slice(0, 500)}"`,
+      model: 'gemini-3.6-flash',
+      contents: `Based on the following first message of a conversation, generate a short, concise, and descriptive title for the chat (maximum 4 words). Do not include quotes, markdown, or punctuation. Message: "${firstMessage.slice(0, 500)}"`,
       config: {
-        temperature: 0.7,
+        temperature: 0.5,
         maxOutputTokens: 20
       }
-    }), 3, 2000); // 3 retries max for title, 2s initial delay
+    }), 2, 1000);
     
-    return response.text?.trim()?.replace(/["']/g, "") || "New Conversation";
+    const title = response.text?.trim()?.replace(/["'`#*]/g, "");
+    return title && title.length > 0 ? title : fallback;
   } catch (error: any) {
-    // If it still fails, just mute the error to console.log instead of error and fallback immediately
-    console.log("Could not generate chat title (quota/network issue), falling back to truncated message.");
-    return (firstMessage || "New Conversation").slice(0, 30);
+    console.log("Could not generate AI chat title, using fallback snippet:", error?.message);
+    return fallback;
   }
+}
+
+// Client-side config cache to eliminate redundant network/Firestore roundtrips on every turn
+let clientConfigCache: {
+  data: { apiKeys: string[]; groqApiKey: string; defaultModel: string; imageGenApiKey?: string };
+  timestamp: number;
+} | null = null;
+
+let hiddenConfigCache: {
+  data: { assistantName: string; activationResponses: string[]; customSystemInstructions: string };
+  timestamp: number;
+} | null = null;
+
+const CLIENT_CACHE_TTL = 30000; // 30 seconds
+
+export function invalidateConfigCache() {
+  clientConfigCache = null;
+  hiddenConfigCache = null;
 }
 
 export async function getSystemConfig(): Promise<{ 
@@ -55,10 +76,15 @@ export async function getSystemConfig(): Promise<{
   defaultModel: string, 
   imageGenApiKey?: string 
 }> {
+  const now = Date.now();
+  if (clientConfigCache && (now - clientConfigCache.timestamp) < CLIENT_CACHE_TTL) {
+    return clientConfigCache.data;
+  }
+
   let apiKeys: string[] = [];
   let groqApiKey = "";
   let imageGenApiKey = "";
-  let defaultModel = "gemini-2.0-flash";
+  let defaultModel = "gemini-3.6-flash";
   let keySource = "";
 
   // 1. Try fetching from Firestore (Most reliable for Admin Panel saves on Static Sites)
@@ -90,7 +116,7 @@ export async function getSystemConfig(): Promise<{
   // 2. Fallback to Express backend `/api/config` (if running as Web Service)
   if (apiKeys.length === 0 || !imageGenApiKey) {
     try {
-      const res = await fetch(`/api/config?t=${new Date().getTime()}`);
+      const res = await fetch(`/api/config?t=${now}`);
       const contentType = res.headers.get("content-type");
       if (res.ok && contentType && contentType.includes("application/json")) {
         const data = await res.json();
@@ -126,28 +152,40 @@ export async function getSystemConfig(): Promise<{
   // Attach the source for debugging purposes on error
   (window as any)._geminiKeySource = keySource;
 
-  return { apiKeys, groqApiKey, defaultModel, imageGenApiKey };
+  const result = { apiKeys, groqApiKey, defaultModel, imageGenApiKey };
+  clientConfigCache = { data: result, timestamp: now };
+  return result;
 }
 
 export async function getHiddenConfig(): Promise<{ assistantName: string, activationResponses: string[], customSystemInstructions: string, apiKeys?: string[] }> {
+  const now = Date.now();
+  if (hiddenConfigCache && (now - hiddenConfigCache.timestamp) < CLIENT_CACHE_TTL) {
+    return hiddenConfigCache.data;
+  }
+
   try {
     const configDoc = await getDoc(doc(db, 'system', 'hidden_config'));
     if (configDoc.exists()) {
       const data = configDoc.data();
-      return {
+      const result = {
         assistantName: data.assistantName || 'SALU AI',
         activationResponses: (data.activationResponses || 'Yes boss, Yes sir, G jan, Ji hukum').split(',').map((s: string) => s.trim()),
         customSystemInstructions: data.customSystemInstructions || ''
       };
+      hiddenConfigCache = { data: result, timestamp: now };
+      return result;
     }
   } catch (e) {
     console.error("Failed to fetch hidden config:", e);
   }
-  return {
+
+  const fallback = {
     assistantName: 'SALU AI',
     activationResponses: ['G Jan', 'Yes Boss', 'Yes Sir', 'Ji Janab'],
     customSystemInstructions: ''
   };
+  hiddenConfigCache = { data: fallback, timestamp: now };
+  return fallback;
 }
 
 function getSystemInstruction(mode: Mode, preferences: UserPreferences, persona: Persona, hiddenConfig?: any) {
@@ -486,7 +524,8 @@ export async function sendMessageStream(
   preferences?: UserPreferences,
   persona: Persona = 'friendly',
   attachments?: string[],
-  onChunk?: (text: string) => void
+  onChunk?: (text: string) => void,
+  signal?: AbortSignal
 ): Promise<string> {
   const currentTime = new Date().toLocaleString('en-US', { 
     weekday: 'long', 
@@ -542,6 +581,75 @@ export async function sendMessageStream(
   contents.push({ role: 'user', parts: currentParts });
 
   const config = await getSystemConfig();
+
+  // 1. Primary High-Performance Server Stream (/api/chat/stream)
+  try {
+    const res = await fetch('/api/chat/stream', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents,
+        systemInstruction,
+        model: config.defaultModel
+      }),
+      signal
+    });
+
+    if (res.ok && res.body) {
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let fullText = "";
+      let buffer = "";
+      let isUpdating = false;
+
+      while (true) {
+        if (signal?.aborted) break;
+        const { value, done } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || "";
+
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (trimmed.startsWith('data: ')) {
+            const jsonStr = trimmed.slice(6);
+            if (jsonStr === '[DONE]') break;
+            try {
+              const data = JSON.parse(jsonStr);
+              if (data.error) {
+                return data.error;
+              }
+              if (data.text) {
+                fullText += data.text;
+                if (onChunk && !isUpdating) {
+                  isUpdating = true;
+                  requestAnimationFrame(() => {
+                    onChunk(fullText);
+                    isUpdating = false;
+                  });
+                }
+              }
+            } catch (e) {}
+          }
+        }
+      }
+
+      if (onChunk && fullText) {
+        onChunk(fullText);
+      }
+
+      if (fullText.trim()) {
+        return fullText;
+      }
+    }
+  } catch (err: any) {
+    if (err.name === 'AbortError') throw err;
+    console.warn("Server streaming failed or route unavailable, attempting client fallback:", err?.message);
+  }
+
+  // 2. Client Fallback if Server Route was unavailable
   const apiKeys = config.apiKeys;
   const groqApiKey = config.groqApiKey;
   let lastError: any = null;
@@ -550,7 +658,7 @@ export async function sendMessageStream(
     return "System Error: SALU AI Engine key is missing. Please configure it in the Admin Panel.";
   }
 
-  // Try each Gemini key
+  // Try each Gemini key on client
   for (let i = 0; i < apiKeys.length; i++) {
     const key = apiKeys[i];
     try {
@@ -565,6 +673,7 @@ export async function sendMessageStream(
 
       let fullText = "";
       for await (const chunk of responseStream) {
+        if (signal?.aborted) break;
         if (chunk.text) {
           fullText += chunk.text;
           if (onChunk) {
@@ -577,16 +686,15 @@ export async function sendMessageStream(
       return fullText;
 
     } catch (e: any) {
+      if (e.name === 'AbortError') throw e;
       lastError = e;
       console.warn(`Gemini key ${i + 1} stream failed:`, e.message);
-      // Wait a moment before trying the next key
       if (i < apiKeys.length - 1) {
         await new Promise(r => setTimeout(r, 1000));
       }
     }
   }
 
-  // If we reach here, all Gemini keys failed or there were none. Let's try Groq if configured!
   if (groqApiKey) {
     try {
       console.info("All Gemini keys failed or none found. Falling back to Groq API Stream.");
@@ -623,6 +731,22 @@ export async function sendMessageStream(
 }
 
 export async function generateImageWithSALU(prompt: string): Promise<string> {
+  // 1. Try server route first
+  try {
+    const res = await fetch('/api/chat/image', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt })
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (data.image) return data.image;
+    }
+  } catch (e) {
+    console.warn("Server image gen endpoint failed, falling back to client SDK:", e);
+  }
+
+  // 2. Client SDK Fallback
   try {
     const config = await getSystemConfig();
     
@@ -632,7 +756,6 @@ export async function generateImageWithSALU(prompt: string): Promise<string> {
       keysToTry = [...keysToTry, ...config.apiKeys];
     }
     
-    // Remove duplicates
     keysToTry = Array.from(new Set(keysToTry));
 
     if (keysToTry.length === 0) {
@@ -646,55 +769,35 @@ export async function generateImageWithSALU(prompt: string): Promise<string> {
       try {
         const ai = new GoogleGenAI({ apiKey: activeKey });
         
-        let base64EncodeString: string | null = null;
-        
-        try {
-          // Standard Image Model
-          const response = await ai.models.generateContent({
-            model: 'gemini-2.5-flash-image',
-            contents: { parts: [{ text: prompt }] },
-            config: { imageConfig: { aspectRatio: "1:1" } }
-          });
-          
-          const candidates = (response as any).candidates;
-          if (candidates && candidates[0]?.content?.parts) {
-            for (const part of candidates[0].content.parts) {
-              if (part.inlineData && part.inlineData.data) {
-                base64EncodeString = part.inlineData.data;
-                break;
-              }
+        const response = await ai.models.generateContent({
+          model: 'gemini-3.1-flash-lite-image',
+          contents: {
+            parts: [
+              {
+                text: prompt,
+              },
+            ],
+          },
+          config: {
+            imageConfig: {
+              aspectRatio: "1:1"
             }
           }
-        } catch (err: any) {
-             console.warn("Model failed to generate image:", err);
-             
-             let errorStr = "";
-             try {
-                 errorStr = typeof err === 'object' ? JSON.stringify(err) : String(err);
-             } catch (e) {
-                 errorStr = String(err);
-             }
-             let errorMsg = err?.message || errorStr;
-             
-             if (errorStr.includes("429") || errorStr.includes("Quota") || errorStr.includes("RESOURCE_EXHAUSTED") || errorMsg.includes("429") || errorMsg.includes("Quota")) {
-                 errorMsg = "Image generation free-tier quota exhausted. Please try again later, or configure a Together AI API Key.";
-             } else if (errorStr.includes("403") || errorStr.includes("PERMISSION_DENIED") || errorMsg.includes("403") || errorMsg.includes("PERMISSION_DENIED")) {
-                 errorMsg = "SALU API key does not have permission to generate images.";
-             } else if (errorStr.includes("NOT_FOUND") || errorMsg.includes("NOT_FOUND")) {
-                 errorMsg = "The selected Image Generation model is not available or not supported on this API key.";
-             }
-             
-             throw new Error(errorMsg);
-        }
+        });
 
-        if (base64EncodeString) {
-            return `data:image/jpeg;base64,${base64EncodeString}`;
+        const candidates = (response as any).candidates;
+        if (candidates && candidates[0]?.content?.parts) {
+          for (const part of candidates[0].content.parts) {
+            if (part.inlineData) {
+              const base64EncodeString: string = part.inlineData.data;
+              return `data:image/png;base64,${base64EncodeString}`;
+            }
+          }
         }
         throw new Error("No image was returned by SALU AI Engine");
       } catch (err: any) {
         lastError = err;
         console.warn(`Image Gen failed for key ${i + 1}: ${err.message}`);
-        // wait a little bit before trying next key
         if (i < keysToTry.length - 1) {
           await new Promise(r => setTimeout(r, 1000));
         }
@@ -709,6 +812,22 @@ export async function generateImageWithSALU(prompt: string): Promise<string> {
 }
 
 export async function performWebSearch(query: string): Promise<string> {
+  // 1. Try server search route first
+  try {
+    const res = await fetch('/api/chat/search', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query })
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (data.text) return data.text;
+    }
+  } catch (e) {
+    console.warn("Server web search endpoint failed, falling back to client SDK:", e);
+  }
+
+  // 2. Client SDK Fallback
   try {
     const config = await getSystemConfig();
     if (!config.apiKeys || config.apiKeys.length === 0) {
@@ -717,7 +836,7 @@ export async function performWebSearch(query: string): Promise<string> {
 
     const ai = new GoogleGenAI({ apiKey: config.apiKeys[0] });
     const response = await ai.models.generateContent({
-      model: config.defaultModel && config.defaultModel.includes('flash') ? config.defaultModel : 'gemini-2.0-flash', 
+      model: config.defaultModel && config.defaultModel.includes('flash') ? config.defaultModel : 'gemini-3.6-flash', 
       contents: query,
       config: {
         systemInstruction: "You are an expert web search researcher. Provide a highly organized, beautifully formatted Markdown response based on your search results. Use markdown H3 (###) for main sections, bullet points, and always provide clickable markdown links [Source Name](URL) for your references at the end.",

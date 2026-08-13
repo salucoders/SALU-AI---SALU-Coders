@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import {
   MessageSquare,
   Settings,
@@ -17,6 +17,10 @@ import {
   CheckSquare,
   ImageIcon,
   MessageSquarePlus,
+  Pin,
+  PinOff,
+  Trash2,
+  MoreVertical,
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { cn } from "../lib/utils";
@@ -39,6 +43,7 @@ interface SidebarProps {
   onDeleteSession: (id: string) => void;
   onRenameSession: (id: string, newTitle: string) => void;
   onArchiveSession: (id: string) => void;
+  onPinSession?: (id: string) => void;
   isOpen: boolean;
   onToggle: () => void;
   onClose: () => void;
@@ -58,6 +63,7 @@ export const Sidebar = React.memo(
     onDeleteSession,
     onRenameSession,
     onArchiveSession,
+    onPinSession,
     isOpen,
     onToggle,
     onClose,
@@ -66,22 +72,90 @@ export const Sidebar = React.memo(
     onOpenToolbox,
   }: SidebarProps) => {
     const { user, loginWithGoogle } = useAuth();
+    const { preferences } = useUserProfile();
     const { notify } = useNotification();
-    const [editingSessionId, setEditingSessionId] = useState<string | null>(
-      null,
-    );
+    const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
     const [editingTitle, setEditingTitle] = useState("");
     const [showArchived, setShowArchived] = useState(false);
+    const [selectedSessionForOptions, setSelectedSessionForOptions] = useState<ChatSession | null>(null);
 
-    const startEditing = (e: React.MouseEvent, session: ChatSession) => {
+    // Touch & Hold (Long Press) gesture handlers
+    const longPressTimerRef = useRef<NodeJS.Timeout | null>(null);
+    const touchStartPosRef = useRef<{ x: number; y: number } | null>(null);
+    const isLongPressTriggeredRef = useRef<boolean>(false);
+
+    const handleTouchStart = (e: React.TouchEvent, session: ChatSession) => {
+      isLongPressTriggeredRef.current = false;
+      const touch = e.touches[0];
+      touchStartPosRef.current = { x: touch.clientX, y: touch.clientY };
+
+      longPressTimerRef.current = setTimeout(() => {
+        isLongPressTriggeredRef.current = true;
+        if (typeof window !== "undefined" && window.navigator && window.navigator.vibrate) {
+          try {
+            window.navigator.vibrate(40);
+          } catch (_) {}
+        }
+        setSelectedSessionForOptions(session);
+      }, 500);
+    };
+
+    const handleTouchMove = (e: React.TouchEvent) => {
+      if (!touchStartPosRef.current) return;
+      const touch = e.touches[0];
+      const dx = Math.abs(touch.clientX - touchStartPosRef.current.x);
+      const dy = Math.abs(touch.clientY - touchStartPosRef.current.y);
+      if (dx > 10 || dy > 10) {
+        if (longPressTimerRef.current) {
+          clearTimeout(longPressTimerRef.current);
+          longPressTimerRef.current = null;
+        }
+      }
+    };
+
+    const handleTouchEnd = () => {
+      if (longPressTimerRef.current) {
+        clearTimeout(longPressTimerRef.current);
+        longPressTimerRef.current = null;
+      }
+    };
+
+    const handleMouseDown = (e: React.MouseEvent, session: ChatSession) => {
+      if (e.button !== 0) return;
+      isLongPressTriggeredRef.current = false;
+      longPressTimerRef.current = setTimeout(() => {
+        isLongPressTriggeredRef.current = true;
+        setSelectedSessionForOptions(session);
+      }, 500);
+    };
+
+    const handleMouseUpOrLeave = () => {
+      if (longPressTimerRef.current) {
+        clearTimeout(longPressTimerRef.current);
+        longPressTimerRef.current = null;
+      }
+    };
+
+    const handleContextMenu = (e: React.MouseEvent, session: ChatSession) => {
+      e.preventDefault();
       e.stopPropagation();
-      setEditingSessionId(session.id);
-      setEditingTitle(session.title || "");
+      setSelectedSessionForOptions(session);
+    };
+
+    const handleSessionClick = (session: ChatSession) => {
+      if (isLongPressTriggeredRef.current) {
+        isLongPressTriggeredRef.current = false;
+        return;
+      }
+      onSelectSession(session.id);
+      if (window.innerWidth < 1024) onClose();
     };
 
     const saveRename = () => {
       if (editingSessionId && editingTitle.trim()) {
         onRenameSession(editingSessionId, editingTitle.trim());
+        setEditingSessionId(null);
+      } else {
         setEditingSessionId(null);
       }
     };
@@ -90,8 +164,10 @@ export const Sidebar = React.memo(
       ? sessions.filter((s) => s.isArchived)
       : sessions.filter((s) => !s.isArchived);
 
-    // Sort by recent
+    // Sort pinned sessions to top, then by recent timestamp
     const sortedSessions = [...displayedSessions].sort((a, b) => {
+      if (a.isPinned && !b.isPinned) return -1;
+      if (!a.isPinned && b.isPinned) return 1;
       const timeA =
         typeof a.updatedAt === "string"
           ? new Date(a.updatedAt).getTime()
@@ -248,6 +324,7 @@ export const Sidebar = React.memo(
                           }}
                           onBlur={saveRename}
                           className="bg-transparent border-none focus:ring-0 text-[15px] text-slate-900 w-full p-0 flex-1"
+                          placeholder="Enter chat title..."
                         />
                         <button
                           onClick={saveRename}
@@ -258,58 +335,40 @@ export const Sidebar = React.memo(
                       </div>
                     ) : (
                       <div
-                        onClick={() => {
-                          onSelectSession(session.id);
-                          if (window.innerWidth < 1024) onClose();
-                        }}
+                        onClick={() => handleSessionClick(session)}
+                        onTouchStart={(e) => handleTouchStart(e, session)}
+                        onTouchMove={handleTouchMove}
+                        onTouchEnd={handleTouchEnd}
+                        onMouseDown={(e) => handleMouseDown(e, session)}
+                        onMouseUp={handleMouseUpOrLeave}
+                        onMouseLeave={handleMouseUpOrLeave}
+                        onContextMenu={(e) => handleContextMenu(e, session)}
                         className={cn(
-                          "w-full flex items-center justify-between px-3 py-2.5 rounded-xl cursor-pointer transition-colors relative text-[15px] group/item",
+                          "w-full flex items-center justify-between px-3 py-2.5 rounded-xl cursor-pointer transition-colors relative text-[15px] group/item select-none",
                           currentSessionId === session.id
                             ? "bg-[#ebeae5] text-slate-900 font-medium"
                             : "text-slate-700 hover:bg-[#ebeae5]",
                         )}
                       >
-                        <span
-                          className="truncate flex-1"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            startEditing(e, session);
-                          }}
-                          title="Click to rename"
-                        >
-                          {session.title || "Untitled"}
-                        </span>
+                        <div className="flex items-center gap-2 truncate flex-1 pr-2">
+                          {session.isPinned && (
+                            <Pin className="w-3.5 h-3.5 text-amber-600 fill-amber-600/30 shrink-0" />
+                          )}
+                          <span className="truncate flex-1">
+                            {session.title || "Untitled"}
+                          </span>
+                        </div>
 
-                        <div className="flex items-center opacity-0 group-hover/item:opacity-100 transition-opacity">
+                        <div className="flex items-center gap-1">
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
-                              if (session.isArchived) {
-                                // To unarchive we need a way, but since we just have onArchiveSession maybe it toggles. Let's assume onArchiveSession toggles or we can add onUnarchive.
-                                // For now, call onArchiveSession.
-                                onArchiveSession(session.id);
-                              } else {
-                                onArchiveSession(session.id);
-                              }
+                              setSelectedSessionForOptions(session);
                             }}
-                            className="p-1 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-200"
-                            title={session.isArchived ? "Unarchive" : "Archive"}
+                            className="p-1 text-slate-400 hover:text-slate-700 rounded-lg hover:bg-slate-200/60 opacity-0 group-hover/item:opacity-100 transition-opacity"
+                            title="Options (Hold or click)"
                           >
-                            {session.isArchived ? (
-                              <ArchiveRestore className="w-4 h-4" />
-                            ) : (
-                              <Archive className="w-4 h-4" />
-                            )}
-                          </button>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onDeleteSession(session.id);
-                            }}
-                            className="p-1 text-slate-400 hover:text-rose-500 rounded-lg hover:bg-slate-200"
-                            title="Delete"
-                          >
-                            <X className="w-4 h-4" />
+                            <MoreVertical className="w-4 h-4" />
                           </button>
                         </div>
                       </div>
@@ -329,20 +388,20 @@ export const Sidebar = React.memo(
                   className="w-full flex items-center gap-3 p-2 hover:bg-[#ebeae5] rounded-xl transition-colors text-slate-700 mt-2"
                 >
                   <div className="w-9 h-9 rounded-full bg-[#3d3c3a] text-white flex items-center justify-center shrink-0 text-sm font-medium overflow-hidden">
-                    {user.photoURL ? (
+                    {preferences?.profilePicture || user?.photoURL ? (
                       <img
-                        src={user.photoURL}
+                        src={preferences?.profilePicture || user?.photoURL || ""}
                         alt="User"
                         className="w-full h-full object-cover"
                         referrerPolicy="no-referrer"
                       />
                     ) : (
-                      getInitials(user.displayName || "")
+                      getInitials(preferences?.name || user?.displayName || "")
                     )}
                   </div>
                   <div className="flex-1 flex text-left items-center min-w-0">
                     <span className="text-[15px] font-medium truncate w-full pr-2 text-slate-800">
-                      {user.displayName || "Guest"}
+                      {preferences?.name || user?.displayName || "Guest"}
                     </span>
                   </div>
                   <Settings className="w-5 h-5 text-slate-500 shrink-0" />
@@ -361,6 +420,98 @@ export const Sidebar = React.memo(
             )}
           </div>
         </motion.div>
+
+        {/* Touch & Hold / Options Modal */}
+        <AnimatePresence>
+          {selectedSessionForOptions && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm"
+                onClick={() => setSelectedSessionForOptions(null)}
+              />
+
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95, y: 10 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.95, y: 10 }}
+                className="relative w-full max-w-xs bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden z-10 p-4"
+              >
+                <div className="flex items-center justify-between pb-3 border-b border-slate-100 mb-2">
+                  <div className="min-w-0 flex-1 pr-2">
+                    <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                      Chat Options
+                    </p>
+                    <p className="text-sm font-semibold text-slate-800 truncate">
+                      {selectedSessionForOptions.title || "Untitled Chat"}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setSelectedSessionForOptions(null)}
+                    className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-full transition-colors"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+
+                <div className="space-y-1">
+                  {/* Option 1: Pin / Unpin Chat */}
+                  <button
+                    onClick={() => {
+                      const session = selectedSessionForOptions;
+                      setSelectedSessionForOptions(null);
+                      if (onPinSession) {
+                        onPinSession(session.id);
+                      }
+                    }}
+                    className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left text-sm font-medium text-slate-700 hover:bg-slate-100 transition-colors"
+                  >
+                    {selectedSessionForOptions.isPinned ? (
+                      <>
+                        <PinOff className="w-4 h-4 text-amber-600" />
+                        <span>Unpin Chat</span>
+                      </>
+                    ) : (
+                      <>
+                        <Pin className="w-4 h-4 text-amber-600" />
+                        <span>Pin Chat</span>
+                      </>
+                    )}
+                  </button>
+
+                  {/* Option 2: Edit Name */}
+                  <button
+                    onClick={() => {
+                      const session = selectedSessionForOptions;
+                      setSelectedSessionForOptions(null);
+                      setEditingSessionId(session.id);
+                      setEditingTitle(session.title || "");
+                    }}
+                    className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left text-sm font-medium text-slate-700 hover:bg-slate-100 transition-colors"
+                  >
+                    <Edit2 className="w-4 h-4 text-blue-600" />
+                    <span>Edit Name</span>
+                  </button>
+
+                  {/* Option 3: Delete Chat */}
+                  <button
+                    onClick={() => {
+                      const session = selectedSessionForOptions;
+                      setSelectedSessionForOptions(null);
+                      onDeleteSession(session.id);
+                    }}
+                    className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left text-sm font-medium text-rose-600 hover:bg-rose-50 transition-colors"
+                  >
+                    <Trash2 className="w-4 h-4 text-rose-500" />
+                    <span>Delete Chat</span>
+                  </button>
+                </div>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>
       </>
     );
   },

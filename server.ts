@@ -5,16 +5,25 @@ import { fileURLToPath } from "url";
 import dotenv from "dotenv";
 import fs from "fs";
 import ImageKit from "imagekit";
+import { GoogleGenAI } from "@google/genai";
 
 dotenv.config();
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Simple file-based config store for the backend
+// Simple file-based config store for the backend with in-memory caching
 const CONFIG_FILE = path.join(__dirname, 'system-config.json');
+let cachedConfig: any = null;
+let cachedConfigTime = 0;
+const CONFIG_CACHE_TTL = 15000; // 15 seconds cache
 
 function getSystemConfig() {
+  const now = Date.now();
+  if (cachedConfig && now - cachedConfigTime < CONFIG_CACHE_TTL) {
+    return cachedConfig;
+  }
+
   const envKey = process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY || "";
   const togetherKey = process.env.TOGETHER_API_KEY || "";
   const defaults = {
@@ -29,7 +38,7 @@ function getSystemConfig() {
     imageKitPublicKey: process.env.VITE_IMAGEKIT_PUBLIC_KEY || process.env.IMAGEKIT_PUBLIC_KEY || "",
     imageKitPrivateKey: process.env.IMAGEKIT_PRIVATE_KEY || "",
     imageKitUrlEndpoint: process.env.VITE_IMAGEKIT_URL_ENDPOINT || process.env.IMAGEKIT_URL_ENDPOINT || "",
-    defaultModel: "gemini-3-flash-preview",
+    defaultModel: "gemini-3.6-flash",
     appName: "SALU AI",
     welcomeMessage: "What can I help with?"
   };
@@ -56,16 +65,36 @@ function getSystemConfig() {
       if (!fileConfig.imageKitPrivateKey && defaults.imageKitPrivateKey) fileConfig.imageKitPrivateKey = defaults.imageKitPrivateKey;
       if (!fileConfig.imageKitUrlEndpoint && defaults.imageKitUrlEndpoint) fileConfig.imageKitUrlEndpoint = defaults.imageKitUrlEndpoint;
 
-      return { ...defaults, ...fileConfig };
+      cachedConfig = { ...defaults, ...fileConfig };
+      cachedConfigTime = now;
+      return cachedConfig;
     }
   } catch (e) {
     console.error("Error reading config:", e);
   }
+
+  cachedConfig = defaults;
+  cachedConfigTime = now;
   return defaults;
 }
 
 function saveSystemConfig(config: any) {
   fs.writeFileSync(CONFIG_FILE, JSON.stringify(config, null, 2));
+  cachedConfig = null; // Invalidate cache
+}
+
+function getActiveGeminiKeys() {
+  const config = getSystemConfig();
+  const keys = [
+    config.geminiApiKey,
+    config.geminiApiKey2,
+    config.geminiApiKey3,
+    config.geminiApiKey4,
+    config.geminiApiKey5,
+    process.env.GEMINI_API_KEY,
+    process.env.VITE_GEMINI_API_KEY
+  ].filter(k => k && typeof k === 'string' && k.trim() !== '' && !k.includes('AIzaSyA9TH') && !k.includes('AIzaSyCU6n'));
+  return Array.from(new Set(keys));
 }
 
 function getSafeImageKit(req?: express.Request) {
@@ -125,6 +154,210 @@ async function startServer() {
       appName: config.appName,
       welcomeMessage: config.welcomeMessage
     });
+  });
+
+  // Streaming chat endpoint (Server-Sent Events)
+  app.post("/api/chat/stream", async (req, res) => {
+    res.setHeader("Content-Type", "text/event-stream");
+    res.setHeader("Cache-Control", "no-cache, no-transform");
+    res.setHeader("Connection", "keep-alive");
+    res.setHeader("X-Accel-Buffering", "no");
+
+    const { contents, systemInstruction, model } = req.body;
+    const activeKeys = getActiveGeminiKeys();
+    const config = getSystemConfig();
+    const selectedModel = model || config.defaultModel || "gemini-3.6-flash";
+
+    if (activeKeys.length === 0 && !config.groqApiKey) {
+      res.write(`data: ${JSON.stringify({ error: "System Error: SALU AI Engine key is missing. Please configure it in the Admin Panel." })}\n\n`);
+      res.write("data: [DONE]\n\n");
+      return res.end();
+    }
+
+    let success = false;
+    let lastError: any = null;
+
+    for (let i = 0; i < activeKeys.length; i++) {
+      const key = activeKeys[i];
+      if (req.destroyed) break;
+
+      try {
+        const ai = new GoogleGenAI({
+          apiKey: key,
+          httpOptions: {
+            headers: {
+              'User-Agent': 'aistudio-build'
+            }
+          }
+        });
+
+        const responseStream = await ai.models.generateContentStream({
+          model: selectedModel,
+          contents,
+          config: {
+            systemInstruction
+          }
+        });
+
+        for await (const chunk of responseStream) {
+          if (req.destroyed) break;
+          if (chunk.text) {
+            res.write(`data: ${JSON.stringify({ text: chunk.text })}\n\n`);
+          }
+        }
+
+        success = true;
+        break;
+      } catch (e: any) {
+        lastError = e;
+        console.warn(`[Server Stream] Gemini Key ${i + 1} failed:`, e?.message);
+        if (i < activeKeys.length - 1) {
+          await new Promise(r => setTimeout(r, 500));
+        }
+      }
+    }
+
+    // Fallback to Groq if all Gemini keys fail
+    if (!success && config.groqApiKey && !req.destroyed) {
+      try {
+        console.info("[Server Stream] Gemini keys failed, falling back to Groq stream.");
+        const messages = [];
+        if (systemInstruction) {
+          messages.push({ role: 'system', content: systemInstruction });
+        }
+        if (Array.isArray(contents)) {
+          for (const c of contents) {
+            let textStr = "";
+            if (c.parts) {
+              for (const p of c.parts) {
+                if (p.text) textStr += p.text + "\n";
+              }
+            }
+            if (textStr.trim()) {
+              messages.push({ role: c.role === 'model' ? 'assistant' : 'user', content: textStr.trim() });
+            }
+          }
+        }
+
+        const groqRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${config.groqApiKey}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            model: 'llama-3.1-70b-versatile',
+            messages,
+            stream: true
+          })
+        });
+
+        if (groqRes.ok && groqRes.body) {
+          const reader = groqRes.body.getReader();
+          const decoder = new TextDecoder();
+          while (true) {
+            if (req.destroyed) break;
+            const { value, done } = await reader.read();
+            if (done) break;
+            const chunkStr = decoder.decode(value, { stream: true });
+            const lines = chunkStr.split('\n');
+            for (const line of lines) {
+              if (line.startsWith('data: ') && line.trim() !== 'data: [DONE]') {
+                try {
+                  const parsed = JSON.parse(line.slice(6));
+                  const delta = parsed.choices?.[0]?.delta?.content || "";
+                  if (delta) {
+                    res.write(`data: ${JSON.stringify({ text: delta })}\n\n`);
+                  }
+                } catch (e) {}
+              }
+            }
+          }
+          success = true;
+        }
+      } catch (e: any) {
+        console.warn("[Server Stream] Groq fallback failed:", e?.message);
+        lastError = e;
+      }
+    }
+
+    if (!success && !req.destroyed) {
+      const errorMsg = lastError?.message || "All AI engine attempts failed.";
+      res.write(`data: ${JSON.stringify({ error: `System Error: ${errorMsg}` })}\n\n`);
+    }
+
+    res.write("data: [DONE]\n\n");
+    res.end();
+  });
+
+  // Image Generation endpoint
+  app.post("/api/chat/image", async (req, res) => {
+    try {
+      const { prompt } = req.body;
+      const activeKeys = getActiveGeminiKeys();
+      if (activeKeys.length === 0) {
+        return res.status(400).json({ error: "SALU AI Engine key is missing for image generation" });
+      }
+
+      let lastError: any = null;
+      for (let i = 0; i < activeKeys.length; i++) {
+        try {
+          const ai = new GoogleGenAI({
+            apiKey: activeKeys[i],
+            httpOptions: { headers: { 'User-Agent': 'aistudio-build' } }
+          });
+          const response = await ai.models.generateContent({
+            model: 'gemini-3.1-flash-lite-image',
+            contents: { parts: [{ text: prompt }] },
+            config: { imageConfig: { aspectRatio: "1:1" } }
+          });
+
+          const candidates = (response as any).candidates;
+          if (candidates && candidates[0]?.content?.parts) {
+            for (const part of candidates[0].content.parts) {
+              if (part.inlineData) {
+                return res.json({ image: `data:image/png;base64,${part.inlineData.data}` });
+              }
+            }
+          }
+        } catch (err: any) {
+          lastError = err;
+        }
+      }
+      res.status(500).json({ error: lastError?.message || "Failed to generate image" });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  // Web Search endpoint
+  app.post("/api/chat/search", async (req, res) => {
+    try {
+      const { query } = req.body;
+      const activeKeys = getActiveGeminiKeys();
+      const config = getSystemConfig();
+      if (activeKeys.length === 0) {
+        return res.status(400).json({ error: "SALU AI Engine key is missing" });
+      }
+
+      const ai = new GoogleGenAI({
+        apiKey: activeKeys[0],
+        httpOptions: { headers: { 'User-Agent': 'aistudio-build' } }
+      });
+
+      const response = await ai.models.generateContent({
+        model: config.defaultModel || 'gemini-3.6-flash',
+        contents: query,
+        config: {
+          systemInstruction: "You are an expert web search researcher. Provide a highly organized, beautifully formatted Markdown response based on your search results. Use markdown H3 (###) for main sections, bullet points, and always provide clickable markdown links [Source Name](URL) for your references at the end.",
+          tools: [{ googleSearch: {} }]
+        }
+      });
+
+      res.json({ text: response.text || "" });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
   });
 
   // Proxy route for Together AI image generation

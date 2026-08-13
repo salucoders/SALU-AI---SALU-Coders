@@ -49,4 +49,5 @@ export interface ChatSession {
   createdAt: any;
   updatedAt?: any;
   isArchived?: boolean;
+  isPinned?: boolean;
 }

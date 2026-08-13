@@ -32,7 +32,7 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { UserPreferences, Persona } from "../types";
-import { cn } from "../lib/utils";
+import { cn, compressImage } from "../lib/utils";
 import { useUserProfile } from "../context/UserProfileContext";
 import { useNotification } from "../context/NotificationContext";
 import { useAuth } from "../context/AuthContext";
@@ -78,18 +78,23 @@ export function SettingsModal({
     if (!file) return;
 
     const reader = new FileReader();
-    reader.onloadend = () => {
+    reader.onloadend = async () => {
+      const rawResult = reader.result as string;
+      const compressedPic = await compressImage(rawResult, 128, 128, 0.7);
+
       setLocalPrefs((prev) => ({
         ...prev,
-        profilePicture: reader.result as string,
+        profilePicture: compressedPic,
       }));
-      // Optionally auto-save profile picture
-      updatePreferences({
-        ...localPrefs,
-        profilePicture: reader.result as string,
-      }).then(() => {
+
+      try {
+        await updatePreferences({
+          profilePicture: compressedPic,
+        });
         notify("Profile picture updated", "success");
-      });
+      } catch (err) {
+        console.error("Error updating profile picture:", err);
+      }
     };
     reader.readAsDataURL(file);
   };

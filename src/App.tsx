@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Sidebar } from './components/Sidebar';
 import { ChatInterface } from './components/ChatInterface';
 import { SettingsModal } from './components/SettingsModal';
@@ -58,6 +58,7 @@ export default function App() {
     deleteSession, 
     updateSessionTitle, 
     archiveSession,
+    pinSession,
     clearSessions,
     loading: sessionsLoading
   } = useSessions();
@@ -261,7 +262,12 @@ export default function App() {
     }
   }, [user, sessionsLoading, sessions.length, currentSessionId, createSession, setCurrentSessionId, preferences.preferredMode]);
 
+  const isSendingRef = useRef(false);
+  const abortControllerRef = useRef<AbortController | null>(null);
+
   const handleSendMessage = async (content: string, attachments?: string[]) => {
+    if (isSendingRef.current) return; // Prevent duplicate sends
+
     if (preferences.role === 'suspended') {
       notify('Your account is currently suspended. Please contact an administrator.', 'error', 5000);
       return;
@@ -279,9 +285,16 @@ export default function App() {
     const currentSession = sessions.find(s => s.id === currentSessionId);
     if (!currentSession) return;
 
+    isSendingRef.current = true;
     setIsLoading(true);
     setIsStreaming(true);
     setStreamedText("");
+
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    abortControllerRef.current = new AbortController();
+    const signal = abortControllerRef.current.signal;
     
     try {
       // Add user message to Firestore
@@ -297,24 +310,30 @@ export default function App() {
         attachments,
         (chunkText) => {
           setStreamedText(chunkText);
-        }
+        },
+        signal
       );
 
       // Reset stream before adding message to avoid double render of ImageResult
       setStreamedText("");
       setIsStreaming(false);
 
-      // Add finalized model response to Firestore
-      await addMessage(currentSession.id, 'model', aiResponse);
+      if (!signal.aborted) {
+        // Add finalized model response to Firestore
+        await addMessage(currentSession.id, 'model', aiResponse);
 
-      // Deduct Credit
-      await updatePreferences({
-        creditsUsedToday: creditsUsed + 1
-      });
+        // Deduct Credit asynchronously
+        updatePreferences({
+          creditsUsedToday: creditsUsed + 1
+        }).catch(console.error);
+      }
     } catch (error: any) {
-      console.error("Failed to send message:", error);
-      notify(`Failed to send message: ${error.message || String(error)}`, 'error', 5000);
+      if (error.name !== 'AbortError') {
+        console.error("Failed to send message:", error);
+        notify(`Failed to send message: ${error.message || String(error)}`, 'error', 5000);
+      }
     } finally {
+      isSendingRef.current = false;
       setIsLoading(false);
       setIsStreaming(false);
       setStreamedText("");
@@ -421,6 +440,14 @@ export default function App() {
             if (s) await archiveSession(id, !s.isArchived);
           } catch (e) {
             console.error("Failed to archive session:", e);
+          }
+        }}
+        onPinSession={async (id) => {
+          try {
+            const s = sessions.find(x => x.id === id);
+            if (s) await pinSession(id, !s.isPinned);
+          } catch (e) {
+            console.error("Failed to pin session:", e);
           }
         }}
         isOpen={isSidebarOpen}

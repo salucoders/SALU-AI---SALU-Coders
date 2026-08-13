@@ -19,6 +19,7 @@ interface SessionContextType {
   deleteSession: (id: string) => Promise<void>;
   updateSessionTitle: (id: string, title: string) => Promise<void>;
   archiveSession: (id: string, isArchived: boolean) => Promise<void>;
+  pinSession: (id: string, isPinned: boolean) => Promise<void>;
   clearSessions: () => Promise<void>;
   loading: boolean;
 }
@@ -166,15 +167,33 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
       const sessionRef = doc(db, 'sessions', sessionId);
       const sessionUpdate: any = { updatedAt: serverTimestamp() };
       
-      if (role === 'user' && messages.length === 0) {
-        sessionUpdate.title = (content || (finalAttachments.length > 0 ? "Attachment analysis" : "New Conversation")).slice(0, 40) + ((content && content.length > 40) ? '...' : '');
+      const targetSession = sessions.find(s => s.id === sessionId);
+      const currentTitle = targetSession?.title || '';
+      const isGenericTitle = !currentTitle || 
+        currentTitle === 'New Conversation' || 
+        currentTitle === 'New Student Chat' || 
+        currentTitle === 'New Chat' || 
+        currentTitle === 'Untitled' || 
+        currentTitle.toLowerCase().startsWith('new ');
+
+      if (role === 'user' && (isGenericTitle || messages.length === 0)) {
+        const cleanContent = content ? content.trim().replace(/^[\s#*>-]+/, '') : '';
+        const preliminaryTitle = cleanContent 
+          ? (cleanContent.slice(0, 35) + (cleanContent.length > 35 ? '...' : '')) 
+          : (finalAttachments.length > 0 ? "Attachment Analysis" : "New Conversation");
+
+        sessionUpdate.title = preliminaryTitle;
+
+        // Optimistically update local session title
+        setSessions(prev => prev.map(s => s.id === sessionId ? { ...s, title: preliminaryTitle, updatedAt: new Date().toISOString() } : s));
 
         // Kick off asynchronous AI title generation
-        if (content) {
+        if (cleanContent) {
           import('../services/gemini').then(({ generateChatTitle }) => {
-            generateChatTitle(content).then(aiTitle => {
+            generateChatTitle(cleanContent).then(aiTitle => {
               if (aiTitle) {
-                updateDoc(sessionRef, { title: aiTitle });
+                updateDoc(sessionRef, { title: aiTitle, updatedAt: serverTimestamp() }).catch(console.error);
+                setSessions(prev => prev.map(s => s.id === sessionId ? { ...s, title: aiTitle } : s));
               }
             }).catch(console.error);
           }).catch(console.error);
@@ -206,6 +225,7 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   const updateSessionTitle = async (id: string, title: string) => {
     if (!user) return;
+    setSessions(prev => prev.map(s => s.id === id ? { ...s, title, updatedAt: new Date().toISOString() } : s));
     try {
       await updateDoc(doc(db, 'sessions', id), { title, updatedAt: serverTimestamp() });
     } catch (error) {
@@ -222,6 +242,17 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
     } catch (error) {
       console.error("Error archiving session:", error);
       notify?.('Failed to archive chat', 'error', 3000);
+    }
+  };
+
+  const pinSession = async (id: string, isPinned: boolean) => {
+    if (!user) return;
+    try {
+      await updateDoc(doc(db, 'sessions', id), { isPinned, updatedAt: serverTimestamp() });
+      notify?.(isPinned ? 'Chat pinned' : 'Chat unpinned', 'info', 2000);
+    } catch (error) {
+      console.error("Error pinning session:", error);
+      notify?.('Failed to pin chat', 'error', 3000);
     }
   };
 
@@ -249,7 +280,7 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
     <SessionContext.Provider value={{ 
       sessions, currentSessionId, setCurrentSessionId, messages, 
       createSession, addMessage, deleteSession, updateSessionTitle, 
-      archiveSession, clearSessions, loading
+      archiveSession, pinSession, clearSessions, loading
     }}>
       {children}
     </SessionContext.Provider>

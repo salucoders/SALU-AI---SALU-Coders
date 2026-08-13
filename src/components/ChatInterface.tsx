@@ -379,7 +379,24 @@ const ImageResult = ({ prompt }: { prompt: string }) => {
   const [seed, setSeed] = useState(() => Math.floor(Math.random() * 1000000));
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [engine, setEngine] = useState<'together' | 'gemini' | null>(null);
+  const [step, setStep] = useState(0);
   const generationStarted = React.useRef(false);
+  
+  const steps = [
+    { label: 'Analyzing Prompt', icon: Search },
+    { label: 'Expanding Vision', icon: Wand2 },
+    { label: 'Conceiving Canvas', icon: Layout },
+    { label: 'Refining Masterpiece', icon: Sparkles }
+  ];
+
+  useEffect(() => {
+    if (loading) {
+      const interval = setInterval(() => {
+        setStep(s => (s + 1) % steps.length);
+      }, 2000);
+      return () => clearInterval(interval);
+    }
+  }, [loading]);
 
   const generateImage = useCallback(async (retryCount = 0) => {
     if (generationStarted.current && retryCount === 0) return;
@@ -402,19 +419,30 @@ const ImageResult = ({ prompt }: { prompt: string }) => {
     try {
       // 1. Try SALU AI Engine (Primary)
       try {
-        const url = await generateImageWithSALU(prompt);
+        const imageUrl = await generateImageWithSALU(prompt);
+        
+        // Update quota
         await updatePreferences({ imagesUsedToday: (preferences.imagesUsedToday || 0) + 1 });
+
+        // Auto-save to ImageKit
         try {
-          const ikResult = await uploadToImageKit(url, `salu-art-${Date.now()}.png`, user ? [user.uid] : undefined, user ? `/salu-ai-generated/${user.uid}` : undefined);
+          const ikResult = await uploadToImageKit(imageUrl, `salu-art-${Date.now()}.png`, user ? [user.uid] : undefined, user ? `/salu-ai-generated/${user.uid}` : undefined);
           setImageUrl(ikResult.url);
         } catch (ikErr) {
-          setImageUrl(url);
+          console.warn("Saving SALU image to Vault failed:", ikErr);
+          setImageUrl(imageUrl);
         }
+
         setEngine('gemini');
         setLoading(false);
         return;
       } catch (e: any) {
         console.warn("SALU generation failed, trying Together AI fallback...", e);
+        
+        let saluError = e.message || "";
+        if (saluError.includes("403") || saluError.includes("PERMISSION_DENIED")) {
+          saluError = "SALU AI Engine (Gemini) denied permission. This often happens if the API key is restricted, the model is not enabled for your region, or it's a free-tier limitation.";
+        }
 
         // 2. Try Together AI (Secondary)
         const togetherResponse = await fetch('/api/generate-together-image', {
@@ -426,29 +454,25 @@ const ImageResult = ({ prompt }: { prompt: string }) => {
         if (togetherResponse.ok) {
           const data = await togetherResponse.json();
           if (data.image) {
+            // Update quota on success
             await updatePreferences({ imagesUsedToday: (preferences.imagesUsedToday || 0) + 1 });
             setImageUrl(data.image);
             setEngine('together');
             setLoading(false);
             return;
           }
-        } else {
-            const errorData = await togetherResponse.json().catch(() => ({}));
-            console.error("Together AI also failed:", errorData);
-            
-            // If Together AI failed because of missing API key, show a combined helpful message
-            if (errorData.error && errorData.error.includes("key is not configured")) {
-                 throw new Error(`${e.message}\n\nAdditionally, the fallback Together AI engine is missing its API key. Please configure it in the Admin Panel to keep generating images.`);
-            }
         }
-        throw new Error(e.message || "All generation engines failed.");
+        
+        throw new Error(e.message || "Primary and secondary generation engines failed.");
       }
     } catch (err: any) {
       if (retryCount < 1) {
+        console.warn("Generation failed, retrying once...", err);
         setTimeout(() => generateImage(retryCount + 1), 2000);
         return;
       }
-      setError(err.message || "Failed to generate image.");
+      console.error("Image generation failed after retries:", err);
+      setError(err.message || "Failed to generate image. All engines are currently unreachable.");
       setLoading(false);
     }
   }, [prompt, seed, preferences.subscription, preferences.imagesUsedToday, user, updatePreferences]);
@@ -456,6 +480,20 @@ const ImageResult = ({ prompt }: { prompt: string }) => {
   useEffect(() => {
     generateImage();
   }, [generateImage]);
+
+  const handleRetry = () => {
+    generationStarted.current = false;
+    setSeed(Math.floor(Math.random() * 1000000));
+  };
+
+  const handleCopyPrompt = () => {
+    if (!prompt) return;
+    navigator.clipboard.writeText(prompt);
+    // Dispatched custom event for notification to reach context
+    window.dispatchEvent(new CustomEvent('salu_notification', {
+      detail: { message: 'Prompt copied to clipboard!', type: 'success' }
+    }));
+  };
 
   const handleDownload = async () => {
     if (!imageUrl) return;
@@ -474,55 +512,190 @@ const ImageResult = ({ prompt }: { prompt: string }) => {
     }
   };
 
-  if (error) {
-    return (
-      <div className="flex items-start gap-2 p-3 bg-red-50 text-red-600 rounded-xl my-2 text-xs border border-red-100 max-w-[280px]">
-        <AlertCircle className="w-4 h-4 shrink-0" />
-        <div className="flex flex-col gap-1.5">
-           <span className="font-bold">Generation failed</span>
-           <span className="opacity-90 leading-relaxed text-[11px]">{error}</span>
-           <button onClick={() => { generationStarted.current = false; setSeed(Date.now()); }} className="text-left font-bold underline underline-offset-2 opacity-80 hover:opacity-100 transition-opacity w-max">
-             Try again
-           </button>
-        </div>
-      </div>
-    );
-  }
-
-  if (loading || !imageUrl) {
-    return (
-      <div className="w-[280px] md:w-[320px] aspect-square bg-slate-100/50 dark:bg-slate-800/30 rounded-2xl animate-pulse flex items-center justify-center my-2 shadow-sm border border-slate-200/50 dark:border-slate-700/50">
-         <Loader2 className="w-5 h-5 text-slate-400 animate-spin" />
-      </div>
-    );
-  }
+  const StepIcon = steps[step].icon;
 
   return (
-    <div className="relative group w-[280px] md:w-[320px] my-2 transition-all duration-300">
-      <div className="relative overflow-hidden rounded-2xl shadow-sm border border-slate-200/60 dark:border-slate-700/60 flex items-center justify-center bg-transparent">
-        <img
-          src={imageUrl}
-          alt={prompt}
-          className="w-full aspect-square object-cover bg-transparent"
-          referrerPolicy="no-referrer"
-        />
+    <div className="flex flex-col gap-6 w-full max-w-2xl py-2">
+      <div className="relative group overflow-hidden rounded-[2.5rem] border border-slate-200 shadow-2xl bg-white aspect-square">
+        {/* Immersive Loading UI */}
+        <AnimatePresence>
+          {loading && !error && (
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-white"
+            >
+              {/* Artistic Background Animation */}
+              <div className="absolute inset-0 overflow-hidden pointer-events-none opacity-20">
+                <motion.div 
+                  animate={{ 
+                    scale: [1, 1.2, 1],
+                    rotate: [0, 90, 180, 270, 360],
+                  }}
+                  transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
+                  className="absolute -top-1/2 -left-1/2 w-[200%] h-[200%] bg-[radial-gradient(circle_at_50%_50%,#f43f5e,transparent_50%),radial-gradient(circle_at_80%_20%,#8b5cf6,transparent_40%),radial-gradient(circle_at_20%_80%,#0ea5e9,transparent_40%)] blur-[80px]"
+                />
+              </div>
+
+              <div className="relative flex flex-col items-center">
+                {/* Visual Core */}
+                <div className="w-24 h-24 mb-8">
+                  <div className="absolute inset-0 bg-brand-500/10 rounded-full blur-2xl animate-pulse" />
+                  <motion.div 
+                    animate={{ rotate: 360 }}
+                    transition={{ duration: 8, repeat: Infinity, ease: "linear" }}
+                    className="w-full h-full rounded-full border-2 border-dashed border-slate-200 p-2"
+                  >
+                    <div className="w-full h-full rounded-full border-t-2 border-brand-500 animate-[spin_2s_linear_infinite]" />
+                  </motion.div>
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <motion.div
+                      key={step}
+                      initial={{ scale: 0, opacity: 0 }}
+                      animate={{ scale: 1, opacity: 1 }}
+                      className="text-brand-600"
+                    >
+                      <StepIcon className="w-8 h-8" />
+                    </motion.div>
+                  </div>
+                </div>
+
+                {/* Status Text */}
+                <div className="text-center space-y-1">
+                  <motion.h4 
+                    key={step}
+                    initial={{ y: 5, opacity: 0 }}
+                    animate={{ y: 0, opacity: 1 }}
+                    className="text-sm font-black text-slate-900 uppercase tracking-widest"
+                  >
+                    {steps[step].label}
+                  </motion.h4>
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                    drawing picture...
+                  </p>
+                </div>
+              </div>
+
+              {/* Progress Bar */}
+              <div className="absolute bottom-12 left-12 right-12 h-1 bg-slate-100 rounded-full overflow-hidden">
+                <motion.div 
+                  initial={{ width: "0%" }}
+                  animate={{ width: `${((step + 1) / steps.length) * 100}%` }}
+                  className="h-full bg-brand-500 rounded-full"
+                />
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
         
+        {imageUrl && (
+          <motion.img 
+            initial={{ scale: 1.1, filter: 'blur(20px)' }}
+            animate={{ 
+              scale: loading ? 1.1 : 1, 
+              filter: loading ? 'blur(20px)' : 'blur(0px)' 
+            }}
+            src={imageUrl} 
+            alt={prompt}
+            key={imageUrl}
+            onLoad={() => {
+              // Extra timeout to ensure smooth transition
+              setTimeout(() => setLoading(false), 500);
+            }}
+            onError={() => {
+              setLoading(false);
+              setError("Failed to load the generated image.");
+            }}
+            className={cn(
+              "w-full h-full object-cover transition-all duration-1000",
+              loading ? "opacity-0" : "opacity-100"
+            )}
+            referrerPolicy="no-referrer"
+          />
+        )}
+
         {/* Overlay Actions */}
-        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors duration-300 flex items-start justify-end p-2 opacity-0 group-hover:opacity-100">
-          <button
-            onClick={handleDownload}
-            className="p-2 bg-white/90 hover:bg-white text-slate-700 rounded-lg backdrop-blur-md transition-all shadow-sm hover:scale-105 active:scale-95"
-            title="Download Image"
-          >
-            <Download className="w-4 h-4" strokeWidth={2} />
-          </button>
-        </div>
+        {!loading && !error && imageUrl && (
+          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-all duration-500 backdrop-blur-[2px] flex items-center justify-center gap-4 z-20">
+            <motion.button 
+              initial={{ y: 20, opacity: 0 }}
+              whileInView={{ y: 0, opacity: 1 }}
+              onClick={handleDownload}
+              className="p-4 bg-white text-slate-900 rounded-3xl hover:scale-110 active:scale-95 transition-all shadow-2xl font-black flex items-center gap-3 text-xs uppercase tracking-widest"
+              title="Save Art"
+            >
+              <Download className="w-5 h-5" /> Save
+            </motion.button>
+            <motion.button 
+              initial={{ y: 20, opacity: 0 }}
+              whileInView={{ y: 0, opacity: 1 }}
+              transition={{ delay: 0.1 }}
+              onClick={handleCopyPrompt}
+              className="p-4 bg-white text-slate-900 rounded-3xl hover:scale-110 active:scale-95 transition-all shadow-2xl font-black flex items-center gap-3 text-xs uppercase tracking-widest"
+              title="Copy Prompt"
+            >
+              <Copy className="w-5 h-5" /> Copy
+            </motion.button>
+            <motion.a 
+              initial={{ y: 20, opacity: 0 }}
+              whileInView={{ y: 0, opacity: 1 }}
+              transition={{ delay: 0.2 }}
+              href={imageUrl} 
+              target="_blank" 
+              rel="noreferrer"
+              className="p-4 bg-white/20 backdrop-blur-xl text-white border border-white/30 rounded-3xl hover:scale-110 active:scale-95 transition-all shadow-2xl font-black flex items-center gap-3 text-xs uppercase tracking-widest"
+            >
+              <Maximize2 className="w-5 h-5" /> Full
+            </motion.a>
+          </div>
+        )}
+
+        {/* Error State */}
+        {error && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center bg-rose-50 p-12 text-center z-30">
+            <div className="w-16 h-16 bg-rose-100 rounded-full flex items-center justify-center mb-6">
+              <AlertCircle className="w-8 h-8 text-rose-500" />
+            </div>
+            <h4 className="text-rose-950 font-black uppercase tracking-widest text-sm">Vision Interrupted</h4>
+            <p className="text-rose-600 text-xs mt-3 mb-8 leading-relaxed font-medium">{error}</p>
+            <button 
+              onClick={handleRetry}
+              className="px-8 py-4 bg-rose-500 text-white rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-rose-600 transition-all flex items-center gap-2 shadow-lg shadow-rose-200 active:scale-95"
+            >
+              <RotateCcw className="w-4 h-4" /> Restart Generation
+            </button>
+          </div>
+        )}
       </div>
 
-      <p className="text-[10px] text-slate-400 mt-1.5 px-1 flex items-center gap-1">
-        <Sparkles className="w-3 h-3" />
-        Generated by {engine === 'gemini' ? 'SALU' : 'Together AI'}
-      </p>
+      {/* Footer Label */}
+      <div className="px-6 py-4 bg-white border border-slate-200 rounded-[2rem] shadow-xl flex items-center gap-4 group/label hover:border-brand-200 transition-colors">
+        <div className="p-2.5 rounded-2xl bg-brand-50 flex items-center justify-center group-hover/label:bg-brand-500 group-hover/label:text-white transition-all">
+          <ImageIcon className="w-5 h-5 text-brand-500 group-hover/label:text-white" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Generation Prompt</p>
+          <p className="text-xs text-slate-700 italic font-medium line-clamp-1">"{prompt}"</p>
+        </div>
+        <button 
+          onClick={handleCopyPrompt}
+          className="p-2 hover:bg-slate-100 rounded-xl transition-colors text-slate-400 hover:text-brand-500"
+          title="Copy Prompt"
+        >
+          <Copy className="w-4 h-4" />
+        </button>
+        {!loading && imageUrl && (
+          <div className="flex flex-col items-end shrink-0">
+            <span className={cn(
+              "text-[8px] font-black uppercase tracking-widest px-2 py-1 rounded-md border",
+              engine === 'gemini' ? "bg-indigo-50 text-indigo-600 border-indigo-100" : "bg-emerald-50 text-emerald-600 border-emerald-100"
+            )}>
+              {engine === 'gemini' ? 'SALU Version' : 'Together FLUX'}
+            </span>
+          </div>
+        )}
+      </div>
     </div>
   );
 };
@@ -1227,22 +1400,19 @@ export const ChatInterface = React.memo(({ messages, onSendMessage, isLoading, m
         )}
       </AnimatePresence>
 
-      <div className="px-4 pb-4 md:px-8 md:pb-8 relative z-20 bg-gradient-to-t from-white via-white/90 to-transparent dark:from-slate-950 dark:via-slate-950/90 pt-16 transition-colors duration-300">
-        <div className="max-w-3xl mx-auto relative group/input z-10 w-full mb-2 md:mb-4">
-          <div className="relative rounded-[2rem] p-[2px] overflow-hidden z-10 shadow-[0_8px_30px_rgb(0,0,0,0.08)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.2)] hover:shadow-[0_8px_40px_rgb(var(--brand-color-rgb),0.15)] transition-all duration-500 bg-white/50 dark:bg-slate-900/50 backdrop-blur-xl">
-            {/* Always Running Multicolor Crisp Border */}
-            <div 
-              className="absolute inset-[-200%] animate-[spin_3s_linear_infinite] opacity-100 pointer-events-none"
-              style={{
-                background: `conic-gradient(from 0deg at 50% 50%, #ff0f7b, #f89b29, #eab308, #10b981, #0ea5e9, #8b5cf6, #ff0f7b)`
-              }}
-            />
-
-            <motion.form 
-              id="chat-input-area"
-              onSubmit={handleSubmit} 
-              className="relative bg-[#f4f4f4] dark:bg-[#2f2f2f] rounded-[calc(2rem-2px)] py-1.5 px-2 transition-colors duration-500 flex flex-col w-full z-10"
-            >
+      <div className="px-3 pb-3 md:px-8 md:pb-8 relative z-20 bg-gradient-to-t from-white via-white to-transparent dark:from-slate-950 dark:via-slate-950 pt-10 transition-colors duration-300">
+        <div className="max-w-3xl mx-auto">
+          <motion.form 
+            id="chat-input-area"
+            onSubmit={handleSubmit} 
+            animate={{
+               boxShadow: isTyping ? "0 12px 32px rgba(0,0,0,0.06)" : "0 4px 16px rgba(0,0,0,0.03)"
+            }}
+            className={cn(
+               "relative bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border border-slate-200/80 dark:border-slate-800 rounded-[2rem] p-2 transition-all duration-500 ease-out shadow-sm flex flex-col w-full",
+               isTyping ? "border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900" : ""
+            )}
+          >
             <AnimatePresence>
               {fileError && (
                 <motion.div
@@ -1331,12 +1501,12 @@ export const ChatInterface = React.memo(({ messages, onSendMessage, isLoading, m
                       if (e.key === 'Enter' && !e.shiftKey && !isMobile()) {
                       e.preventDefault();
                       handleSubmit(e);
-                      textareaRef.current!.style.height = '24px';
+                      textareaRef.current!.style.height = '48px';
                       }
                   }}
-                  placeholder={isListening ? "" : "Message SALU AI..."}
+                  placeholder={isListening ? "" : "Ask SALU AI anything..."}
                   className={cn(
-                      "w-full bg-transparent border-none focus:ring-0 resize-none px-3 text-slate-800 dark:text-slate-100 placeholder-slate-500 dark:placeholder-slate-400 text-[16px] leading-[24px] min-h-[24px] max-h-[200px] outline-none rounded-none py-2 mt-1",
+                      "w-full bg-transparent border-none focus:ring-0 resize-none px-1 text-slate-800 placeholder-slate-400 text-[15px] md:text-[16px] leading-[24px] min-h-[48px] max-h-[200px] outline-none rounded-none py-1",
                       isListening && "blur-[1px] opacity-40"
                   )}
                   rows={1}
@@ -1356,8 +1526,8 @@ export const ChatInterface = React.memo(({ messages, onSendMessage, isLoading, m
                 </AnimatePresence>
             </div>
 
-            <div className="flex items-center justify-between px-2 pb-0.5 mt-2">
-              <div className="flex items-center gap-1 overflow-x-auto no-scrollbar">
+            <div className="flex items-center justify-between px-2 pb-2 mt-2">
+              <div className="flex items-center gap-0.5 md:gap-1 overflow-x-auto no-scrollbar">
                 <input
                   type="file"
                   ref={fileInputRef}
@@ -1376,8 +1546,8 @@ export const ChatInterface = React.memo(({ messages, onSendMessage, isLoading, m
                     e.preventDefault();
                     fileInputRef.current?.click();
                   }}
-                  className="w-9 h-9 text-slate-500 hover:text-slate-800 hover:bg-slate-200/50 dark:text-slate-400 dark:hover:text-slate-200 dark:hover:bg-slate-700/50 rounded-full transition-all flex items-center justify-center shrink-0"
-                  title="Add file"
+                  className="p-2 text-slate-500 hover:text-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 dark:hover:text-slate-300 rounded-full transition-colors flex items-center justify-center shrink-0"
+                  title="Add attachment"
                 >
                   <Paperclip className="w-5 h-5" />
                 </motion.button>
@@ -1388,8 +1558,8 @@ export const ChatInterface = React.memo(({ messages, onSendMessage, isLoading, m
                   type="button"
                   onClick={isListening ? stopListening : startListening}
                   className={cn(
-                    "w-9 h-9 rounded-full transition-all flex items-center justify-center shrink-0",
-                    isListening ? "bg-red-500/20 text-red-500" : "text-slate-500 hover:text-slate-800 hover:bg-slate-200/50 dark:text-slate-400 dark:hover:text-slate-200 dark:hover:bg-slate-700/50"
+                    "p-2 rounded-full transition-colors flex items-center justify-center shrink-0",
+                    isListening ? "bg-red-50 dark:bg-red-900/20 text-red-500" : "text-slate-500 hover:text-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 dark:hover:text-slate-300"
                   )}
                   title={isListening ? "Stop listening" : "Voice input"}
                 >
@@ -1401,7 +1571,7 @@ export const ChatInterface = React.memo(({ messages, onSendMessage, isLoading, m
                   whileTap={{ scale: 0.95 }}
                   type="button"
                   onClick={(e) => { e.preventDefault(); setIsCameraOpen(true); }}
-                  className="w-9 h-9 text-slate-500 hover:text-slate-800 hover:bg-slate-200/50 dark:text-slate-400 dark:hover:text-slate-200 dark:hover:bg-slate-700/50 rounded-full transition-all flex items-center justify-center shrink-0"
+                  className="p-2 text-slate-500 hover:text-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 dark:hover:text-slate-300 rounded-full transition-colors flex items-center justify-center shrink-0"
                   title="Take Photo"
                 >
                   <Camera className="w-5 h-5" />
@@ -1412,8 +1582,8 @@ export const ChatInterface = React.memo(({ messages, onSendMessage, isLoading, m
                   whileTap={{ scale: 0.95 }}
                   type="button"
                   onClick={(e) => { e.preventDefault(); setIsToolboxOpen(true); }}
-                  className="w-9 h-9 text-slate-500 hover:text-slate-800 hover:bg-slate-200/50 dark:text-slate-400 dark:hover:text-slate-200 dark:hover:bg-slate-700/50 rounded-full transition-all flex items-center justify-center shrink-0"
-                  title="Tools"
+                  className="p-2 text-slate-500 hover:text-purple-600 hover:bg-purple-50 dark:hover:bg-purple-900/20 dark:hover:text-purple-400 rounded-full transition-colors flex items-center justify-center shrink-0"
+                  title="AI Tools"
                 >
                   <Sparkles className="w-5 h-5" />
                 </motion.button>
@@ -1426,31 +1596,31 @@ export const ChatInterface = React.memo(({ messages, onSendMessage, isLoading, m
                   type="submit"
                   disabled={(!input.trim() && attachments.length === 0) || isLoading}
                   className={cn(
-                    "w-9 h-9 rounded-full flex items-center justify-center transition-all relative overflow-hidden",
+                    "w-9 h-9 rounded-full flex items-center justify-center transition-all duration-300 relative overflow-hidden",
                     isLoading 
-                      ? "bg-slate-300 dark:bg-slate-600 text-slate-500 dark:text-slate-400 cursor-wait"
+                      ? "bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500 cursor-wait"
                       : (input.trim() || attachments.length > 0)
-                        ? "bg-black dark:bg-white text-white dark:text-black shadow-sm"
-                        : "bg-slate-200 dark:bg-slate-700 text-slate-400 dark:text-slate-500"
+                        ? "bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 shadow-md hover:bg-slate-800 dark:hover:bg-white"
+                        : "bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500"
                   )}
                 >
                     {isLoading ? (
-                      <Loader2 className="w-5 h-5 animate-spin" />
+                      <Loader2 className="w-[18px] h-[18px] animate-spin" />
                     ) : (
-                      <ArrowUp className="w-5 h-5 stroke-[2.5px]" />
+                      <ArrowUp className="w-[18px] h-[18px] stroke-[2.5px]" />
                     )}
                 </motion.button>
               </div>
             </div>
             </motion.form>
-          </div>
 
-          <p className="text-[11px] text-center text-slate-500 mt-2 hidden md:block opacity-80">
-            SALU AI can make mistakes. Check important info.
-          </p>
+            <p className="text-xs text-center text-slate-500 mt-4">
+              SALU AI can make mistakes. Check important info.
+            </p>
+          </div>
         </div>
       </div>
-    </div>
-  );
-});
+    );
+  }
+);
 
