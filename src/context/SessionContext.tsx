@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useMemo, useCallback } from 'react';
 import { 
   collection, query, where, onSnapshot, addDoc, updateDoc, deleteDoc, doc, 
   serverTimestamp, orderBy, getDocs, writeBatch, setDoc
@@ -94,15 +94,16 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
     return () => unsubscribe();
   }, [currentSessionId, user]);
 
-  const createSession = async (mode: Mode): Promise<string> => {
+  const createSession = async (mode: Mode, initialTitle?: string): Promise<string> => {
     if (!user) throw new Error("User not authenticated");
 
     try {
       const sessionId = uuidv4();
+      const defaultTitle = initialTitle || 'Untitled Chat';
       const newSession: ChatSession = {
         id: sessionId,
         userId: user.uid,
-        title: 'New Conversation',
+        title: defaultTitle,
         mode,
         isArchived: false,
         createdAt: new Date().toISOString(),
@@ -115,6 +116,7 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
         updatedAt: serverTimestamp()
       });
 
+      setSessions(prev => [newSession, ...prev.filter(s => s.id !== sessionId)]);
       setCurrentSessionId(sessionId);
       return sessionId;
     } catch (error) {
@@ -135,11 +137,9 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
       const estimatedSize = JSON.stringify({ content, attachments: finalAttachments }).length;
 
       // Firestore document limit is 1MB (~1,048,576 bytes)
-      // If the message is too large, we save a version without large attachments to history
-      // but the AI still gets the full context in the current session
       if (estimatedSize > 900000) {
         finalAttachments = finalAttachments.map(att => {
-          if (att.length > 50000) { // If individual attachment is somewhat large
+          if (att.length > 50000) {
             const mime = att.split(';')[0].split(':')[1] || 'file';
             return `[${mime.toUpperCase()} too large for history storage - sent to AI for this turn]`;
           }
@@ -167,6 +167,10 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
       const sessionRef = doc(db, 'sessions', sessionId);
       const sessionUpdate: any = { updatedAt: serverTimestamp() };
       
+      if (role === 'user' && content) {
+        sessionUpdate.lastMessage = content.slice(0, 300);
+      }
+
       const targetSession = sessions.find(s => s.id === sessionId);
       const currentTitle = targetSession?.title || '';
       const isGenericTitle = !currentTitle || 
@@ -174,30 +178,33 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
         currentTitle === 'New Student Chat' || 
         currentTitle === 'New Chat' || 
         currentTitle === 'Untitled' || 
+        currentTitle === 'Untitled Chat' ||
         currentTitle.toLowerCase().startsWith('new ');
 
       if (role === 'user' && (isGenericTitle || messages.length === 0)) {
         const cleanContent = content ? content.trim().replace(/^[\s#*>-]+/, '') : '';
         const preliminaryTitle = cleanContent 
-          ? (cleanContent.slice(0, 35) + (cleanContent.length > 35 ? '...' : '')) 
-          : (finalAttachments.length > 0 ? "Attachment Analysis" : "New Conversation");
+          ? (cleanContent.slice(0, 30) + (cleanContent.length > 30 ? '...' : '')) 
+          : (finalAttachments.length > 0 ? "Attachment Analysis" : "Untitled Chat");
 
         sessionUpdate.title = preliminaryTitle;
 
-        // Optimistically update local session title
-        setSessions(prev => prev.map(s => s.id === sessionId ? { ...s, title: preliminaryTitle, updatedAt: new Date().toISOString() } : s));
+        // Optimistically update local session title & lastMessage
+        setSessions(prev => prev.map(s => s.id === sessionId ? { ...s, title: preliminaryTitle, lastMessage: content.slice(0, 300), updatedAt: new Date().toISOString() } : s));
 
         // Kick off asynchronous AI title generation
         if (cleanContent) {
           import('../services/gemini').then(({ generateChatTitle }) => {
             generateChatTitle(cleanContent).then(aiTitle => {
-              if (aiTitle) {
+              if (aiTitle && aiTitle !== 'New Conversation') {
                 updateDoc(sessionRef, { title: aiTitle, updatedAt: serverTimestamp() }).catch(console.error);
                 setSessions(prev => prev.map(s => s.id === sessionId ? { ...s, title: aiTitle } : s));
               }
             }).catch(console.error);
           }).catch(console.error);
         }
+      } else {
+        setSessions(prev => prev.map(s => s.id === sessionId ? { ...s, lastMessage: content.slice(0, 300), updatedAt: new Date().toISOString() } : s));
       }
       
       batch.update(sessionRef, sessionUpdate);
@@ -276,12 +283,26 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
   };
 
+  const value = useMemo(() => ({
+    sessions,
+    currentSessionId,
+    setCurrentSessionId,
+    messages, 
+    createSession,
+    addMessage,
+    deleteSession,
+    updateSessionTitle, 
+    archiveSession,
+    pinSession,
+    clearSessions,
+    loading
+  }), [
+    sessions, currentSessionId, messages, createSession, addMessage,
+    deleteSession, updateSessionTitle, archiveSession, pinSession, clearSessions, loading
+  ]);
+
   return (
-    <SessionContext.Provider value={{ 
-      sessions, currentSessionId, setCurrentSessionId, messages, 
-      createSession, addMessage, deleteSession, updateSessionTitle, 
-      archiveSession, pinSession, clearSessions, loading
-    }}>
+    <SessionContext.Provider value={value}>
       {children}
     </SessionContext.Provider>
   );

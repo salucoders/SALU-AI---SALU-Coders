@@ -23,7 +23,7 @@ const withBackoff = async <T>(fn: () => Promise<T>, retries = 5, delay = 2000): 
 
 export async function generateChatTitle(firstMessage: string): Promise<string> {
   const cleanSnippet = (firstMessage || "").trim().replace(/^[\s#*>-]+/, '');
-  const fallback = cleanSnippet ? (cleanSnippet.slice(0, 35) + (cleanSnippet.length > 35 ? "..." : "")) : "New Conversation";
+  const fallback = cleanSnippet ? (cleanSnippet.slice(0, 30) + (cleanSnippet.length > 30 ? "..." : "")) : "Untitled Chat";
 
   try {
     const config = await getSystemConfig();
@@ -37,7 +37,7 @@ export async function generateChatTitle(firstMessage: string): Promise<string> {
     
     const response = await withBackoff(() => ai.models.generateContent({
       model: 'gemini-3.6-flash',
-      contents: `Based on the following first message of a conversation, generate a short, concise, and descriptive title for the chat (maximum 4 words). Do not include quotes, markdown, or punctuation. Message: "${firstMessage.slice(0, 500)}"`,
+      contents: `Based on the following first message of a conversation, generate a short, concise, and meaningful title summarizing the main topic (2 to 4 words). Do not use generic words like "New Conversation", "New Chat", "Untitled", or "Chat". Do not include quotes, markdown, or punctuation. Message: "${firstMessage.slice(0, 500)}"`,
       config: {
         temperature: 0.5,
         maxOutputTokens: 20

@@ -94,18 +94,19 @@ export function SettingsModal({
         notify("Profile picture updated", "success");
       } catch (err) {
         console.error("Error updating profile picture:", err);
+        notify("Failed to update profile picture", "error");
       }
     };
     reader.readAsDataURL(file);
   };
 
-  const handleSave = async () => {
+  const handleSave = async (targetView: ViewMode = "main") => {
     if (!localPrefs.name || localPrefs.name.trim() === "") {
       notify("Name cannot be empty", "error");
       return;
     }
     
-    if (!localPrefs.email || !/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(localPrefs.email)) {
+    if (localPrefs.email && !/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(localPrefs.email)) {
       notify("Please provide a valid email address", "error");
       return;
     }
@@ -116,11 +117,21 @@ export function SettingsModal({
       notify("Settings saved successfully", "success", 2000);
       setTimeout(() => {
         setIsSaved(false);
-        setView("main");
-      }, 500);
+        setView(targetView);
+      }, 400);
     } catch (error) {
       console.error("Failed to save settings:", error);
       notify("Failed to save settings", "error", 3000);
+    }
+  };
+
+  const handleBack = () => {
+    if (view !== "main") {
+      // Auto-save changes made in subviews when going back
+      updatePreferences(localPrefs).catch(console.error);
+      setView("main");
+    } else {
+      onClose();
     }
   };
 
@@ -246,7 +257,7 @@ export function SettingsModal({
             {/* Header */}
             <div className="p-4 flex items-center justify-between sticky top-0 z-20 bg-[#FAFAFA]">
               <button
-                onClick={() => (view === "main" ? onClose() : setView("main"))}
+                onClick={handleBack}
                 className="p-2 hover:bg-slate-200/50 rounded-full transition-colors text-slate-800"
               >
                 <ChevronLeft className="w-6 h-6" strokeWidth={2} />
@@ -270,7 +281,7 @@ export function SettingsModal({
                   </button>
                 ) : (
                   <button
-                    onClick={handleSave}
+                    onClick={() => handleSave("main")}
                     className="p-2 hover:bg-slate-200/50 rounded-full transition-colors text-emerald-500"
                   >
                     {isSaved ? (
@@ -335,7 +346,7 @@ export function SettingsModal({
                         </p>
                         <button
                           onClick={() => setView("edit_profile")}
-                          className="bg-[#10b981] hover:bg-[#059669] text-white px-5 py-1.5 rounded-lg text-sm font-medium transition-colors"
+                          className="bg-[#10b981] hover:bg-[#059669] text-white px-5 py-1.5 rounded-lg text-sm font-medium transition-colors shadow-sm"
                         >
                           Edit Profile
                         </button>
@@ -509,6 +520,13 @@ export function SettingsModal({
                           />
                         </div>
                       </div>
+
+                      <button
+                        onClick={() => handleSave("main")}
+                        className="w-full bg-[#10b981] hover:bg-[#059669] text-white py-3.5 rounded-xl font-semibold text-sm transition-colors flex items-center justify-center gap-2 mt-6 shadow-sm"
+                      >
+                        <Save className="w-4 h-4" /> Save Profile
+                      </button>
                     </div>
                   </motion.div>
                 )}
@@ -525,12 +543,12 @@ export function SettingsModal({
                       <button
                         key={lang}
                         onClick={() => {
-                          setLocalPrefs((prev) => ({
-                            ...prev,
-                            language: lang as any,
-                          }));
+                          const updated = { ...localPrefs, language: lang as any };
+                          setLocalPrefs(updated);
+                          updatePreferences({ language: lang as any }).catch(console.error);
+                          notify(`Language updated to ${lang}`, "success");
                         }}
-                        className="w-full p-4 bg-white rounded-xl border border-slate-200 flex items-center justify-between"
+                        className="w-full p-4 bg-white rounded-xl border border-slate-200 flex items-center justify-between hover:border-emerald-300 transition-all"
                       >
                         <span className="text-[15px] font-medium text-slate-800">
                           {lang}
@@ -571,6 +589,13 @@ export function SettingsModal({
                     <p className="text-xs text-slate-500 mt-2">
                        Set your location to help the AI provide perfect context-aware responses according to your city or area.
                     </p>
+
+                    <button
+                      onClick={() => handleSave("main")}
+                      className="w-full bg-[#10b981] hover:bg-[#059669] text-white py-3.5 rounded-xl font-semibold text-sm transition-colors flex items-center justify-center gap-2 mt-6 shadow-sm"
+                    >
+                      <Save className="w-4 h-4" /> Save Location
+                    </button>
                   </motion.div>
                 )}
 
@@ -745,6 +770,13 @@ export function SettingsModal({
                         </button>
                       </div>
                     </div>
+
+                    <button
+                      onClick={() => handleSave("main")}
+                      className="w-full bg-[#10b981] hover:bg-[#059669] text-white py-3.5 rounded-xl font-semibold text-sm transition-colors flex items-center justify-center gap-2 mt-6 shadow-sm"
+                    >
+                      <Save className="w-4 h-4" /> Save AI Personality
+                    </button>
                   </motion.div>
                 )}
 
@@ -822,6 +854,13 @@ export function SettingsModal({
                         className="w-full px-4 py-3.5 bg-transparent border border-slate-300 rounded-xl focus:ring-1 focus:ring-[#10b981] focus:border-[#10b981] transition-all outline-none text-slate-800 text-[15px] resize-none h-24"
                       />
                     </div>
+
+                    <button
+                      onClick={() => handleSave("main")}
+                      className="w-full bg-[#10b981] hover:bg-[#059669] text-white py-3.5 rounded-xl font-semibold text-sm transition-colors flex items-center justify-center gap-2 mt-6 shadow-sm"
+                    >
+                      <Save className="w-4 h-4" /> Save Academic Info
+                    </button>
                   </motion.div>
                 )}
 

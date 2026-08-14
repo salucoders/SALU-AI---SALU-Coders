@@ -1,7 +1,8 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useMemo, useCallback } from 'react';
 import { doc, onSnapshot, updateDoc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { updateProfile } from 'firebase/auth';
 import { UserPreferences } from '../types';
-import { db } from '../lib/firebase';
+import { auth, db } from '../lib/firebase';
 import { useAuth } from './AuthContext';
 import { compressImage } from '../lib/utils';
 
@@ -82,13 +83,17 @@ export const UserProfileProvider: React.FC<{ children: React.ReactNode }> = ({ c
       return;
     }
 
-    // Optimistically set the user's name from Firebase Auth instantly
-    setPreferences(prev => ({ 
-      ...prev, 
-      name: user.displayName || user.email?.split('@')[0] || prev.name, 
-      email: user.email || prev.email,
-      profilePicture: user.photoURL || prev.profilePicture
-    }));
+    // Optimistically set the user's name from Firebase Auth instantly if local name is default
+    setPreferences(prev => {
+      const hasCustomName = prev.name && prev.name !== 'Guest User' && prev.name !== 'User';
+      const hasCustomPic = prev.profilePicture && prev.profilePicture.length > 0;
+      return {
+        ...prev, 
+        name: hasCustomName ? prev.name : (user.displayName || user.email?.split('@')[0] || 'User'), 
+        email: user.email || prev.email,
+        profilePicture: hasCustomPic ? prev.profilePicture : (user.photoURL || '')
+      };
+    });
 
     setLoading(true);
     const userDocRef = doc(db, 'users', user.uid);
@@ -119,6 +124,29 @@ export const UserProfileProvider: React.FC<{ children: React.ReactNode }> = ({ c
           ...rawData,
           profilePicture: profilePic,
           uid: docSnap.id
+        } as UserPreferences);
+      } else {
+        // User profile document doesn't exist yet in Firestore - bootstrap it now!
+        const initialDoc: Record<string, any> = {
+          ...defaultPreferences,
+          name: user.displayName || user.email?.split('@')[0] || 'User',
+          email: user.email || '',
+          profilePicture: user.photoURL || '',
+          uid: user.uid,
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        };
+        try {
+          await setDoc(userDocRef, initialDoc, { merge: true });
+        } catch (initErr) {
+          console.warn("Could not bootstrap initial user profile:", initErr);
+        }
+        setPreferences({
+          ...defaultPreferences,
+          name: user.displayName || user.email?.split('@')[0] || 'User',
+          email: user.email || '',
+          profilePicture: user.photoURL || '',
+          uid: user.uid
         } as UserPreferences);
       }
       setLoading(false);
@@ -152,7 +180,7 @@ export const UserProfileProvider: React.FC<{ children: React.ReactNode }> = ({ c
     }
   }, [preferences.accentColor]);
 
-  const updatePreferences = async (newPrefs: Partial<UserPreferences>) => {
+  const updatePreferences = useCallback(async (newPrefs: Partial<UserPreferences>) => {
     if (!user) return;
     
     try {
@@ -175,6 +203,17 @@ export const UserProfileProvider: React.FC<{ children: React.ReactNode }> = ({ c
         ...prev,
         ...updatedPrefs,
       }));
+
+      // Also sync display name to Firebase Auth user profile
+      if (auth.currentUser && updatedPrefs.name) {
+        try {
+          await updateProfile(auth.currentUser, {
+            displayName: updatedPrefs.name
+          });
+        } catch (authErr) {
+          console.warn("Could not sync name to Auth user profile:", authErr);
+        }
+      }
 
       try {
         await setDoc(
@@ -210,10 +249,18 @@ export const UserProfileProvider: React.FC<{ children: React.ReactNode }> = ({ c
       console.error("Error updating user preferences:", error);
       throw error;
     }
-  };
+  }, [user, preferences]);
+
+  const value = useMemo(() => ({
+    preferences,
+    updatePreferences,
+    loading,
+    isAdmin,
+    isPaid
+  }), [preferences, updatePreferences, loading, isAdmin, isPaid]);
 
   return (
-    <UserProfileContext.Provider value={{ preferences, updatePreferences, loading, isAdmin, isPaid }}>
+    <UserProfileContext.Provider value={value}>
       {children}
     </UserProfileContext.Provider>
   );

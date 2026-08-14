@@ -5,7 +5,7 @@ import {
   BookOpen, Globe, AudioLines, Pause, Play, RotateCcw, Bug, Code2, TestTube, Cpu, Video, Volume2, 
   Mail, ListChecks, Clock, ClipboardList, Info, Building2, Megaphone, FileText, Lightbulb, 
   Calendar, MessageSquare, PlayCircle, Share2, Camera, FileJson, StickyNote, FileSpreadsheet, Presentation,
-  Download, Maximize2, Layout, Wand2
+  Download, Maximize2, Layout, Wand2, ThumbsUp, ThumbsDown
 } from 'lucide-react';
 import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -22,6 +22,7 @@ import { GoogleGenAI, Modality } from "@google/genai";
 import { useNotification } from '../context/NotificationContext';
 import { useUserProfile } from '../context/UserProfileContext';
 import { useAuth } from '../context/AuthContext';
+import { useSessions } from '../context/SessionContext';
 import { generateImageWithSALU } from '../services/gemini';
 import { uploadToImageKit } from '../lib/imagekit';
 import { Toolbox } from './Toolbox';
@@ -128,10 +129,70 @@ const CopyButton = ({ content }: { content: string }) => {
   return (
     <button
       onClick={handleCopy}
-      className="p-1.5 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-400 hover:text-brand-500 hover:border-brand-500 transition-all shadow-sm opacity-60 hover:opacity-100"
+      className="p-1.5 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-400 hover:text-brand-500 hover:border-brand-500 transition-all shadow-sm opacity-60 hover:opacity-100 cursor-pointer"
       title="Copy to clipboard"
     >
       {copied ? <Check className="w-3.5 h-3.5 text-green-500" /> : <Copy className="w-3.5 h-3.5" />}
+    </button>
+  );
+};
+
+const ReactionButtons = () => {
+  const [reaction, setReaction] = useState<'good' | 'bad' | null>(null);
+  const { notify } = useNotification();
+
+  const handleReact = (type: 'good' | 'bad') => {
+    if (reaction === type) {
+      setReaction(null);
+    } else {
+      setReaction(type);
+      if (type === 'good') {
+        notify('Response rated good! 👍', 'success', 2000);
+      } else {
+        notify('Feedback submitted 👎', 'info', 2000);
+      }
+    }
+  };
+
+  return (
+    <div className="flex items-center gap-1">
+      <button
+        onClick={() => handleReact('good')}
+        className={cn(
+          "p-1.5 rounded-lg border transition-all shadow-2xs opacity-70 hover:opacity-100 cursor-pointer",
+          reaction === 'good'
+            ? "bg-emerald-50 dark:bg-emerald-950/60 border-emerald-300 dark:border-emerald-800 text-emerald-600 dark:text-emerald-400 opacity-100"
+            : "bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-400 hover:text-emerald-600 hover:border-emerald-400"
+        )}
+        title="Good response"
+      >
+        <ThumbsUp className={cn("w-3.5 h-3.5", reaction === 'good' && "fill-current")} />
+      </button>
+      <button
+        onClick={() => handleReact('bad')}
+        className={cn(
+          "p-1.5 rounded-lg border transition-all shadow-2xs opacity-70 hover:opacity-100 cursor-pointer",
+          reaction === 'bad'
+            ? "bg-rose-50 dark:bg-rose-950/60 border-rose-300 dark:border-rose-800 text-rose-600 dark:text-rose-400 opacity-100"
+            : "bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-400 hover:text-rose-600 hover:border-rose-400"
+        )}
+        title="Bad response"
+      >
+        <ThumbsDown className={cn("w-3.5 h-3.5", reaction === 'bad' && "fill-current")} />
+      </button>
+    </div>
+  );
+};
+
+const RetryButton = ({ onRetry, isLoading }: { onRetry: () => void; isLoading?: boolean }) => {
+  return (
+    <button
+      onClick={onRetry}
+      disabled={isLoading}
+      className="p-1.5 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-400 hover:text-brand-500 hover:border-brand-500 transition-all shadow-2xs opacity-70 hover:opacity-100 disabled:opacity-30 cursor-pointer"
+      title="Retry / Regenerate response"
+    >
+      <RotateCcw className={cn("w-3.5 h-3.5", isLoading && "animate-spin")} />
     </button>
   );
 };
@@ -778,6 +839,7 @@ export const ChatInterface = React.memo(({ messages, onSendMessage, isLoading, m
   const { notify } = useNotification();
   const { preferences } = useUserProfile();
   const { user } = useAuth();
+  const { sessions, setCurrentSessionId } = useSessions();
   const [input, setInput] = useState('');
   const [isListening, setIsListening] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
@@ -794,6 +856,159 @@ export const ChatInterface = React.memo(({ messages, onSendMessage, isLoading, m
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const recognitionRef = useRef<any>(null);
+
+  const recentActivities = React.useMemo(() => {
+    if (!sessions || sessions.length === 0) return [];
+
+    const getTimestamp = (val: any) => {
+      if (!val) return 0;
+      if (typeof val === 'string') return new Date(val).getTime();
+      if (val.seconds) return val.seconds * 1000;
+      if (val instanceof Date) return val.getTime();
+      return 0;
+    };
+
+    const formatRelativeTime = (timeMs: number) => {
+      if (!timeMs) return '';
+      const diff = Date.now() - timeMs;
+      const mins = Math.floor(diff / 60000);
+      if (mins < 1) return 'Just now';
+      if (mins < 60) return `${mins}m ago`;
+      const hours = Math.floor(mins / 60);
+      if (hours < 24) return `${hours}h ago`;
+      const days = Math.floor(hours / 24);
+      if (days < 7) return `${days}d ago`;
+      return new Date(timeMs).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+    };
+
+    return sessions
+      .filter(s => !s.isArchived && s.title && s.title !== 'Untitled Chat' && s.title !== 'New Chat')
+      .map(session => {
+        const titleLower = (session.title || '').toLowerCase();
+        const lastMsgLower = (session.lastMessage || '').toLowerCase();
+        const timeMs = getTimestamp(session.updatedAt) || getTimestamp(session.createdAt);
+
+        let category = 'AI Chat';
+        let icon = <MessageSquare className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />;
+        let badgeColor = 'bg-blue-50 dark:bg-blue-950/40 border border-blue-200/50 dark:border-blue-800/50';
+
+        const sessionModeStr = (session.mode as string) || '';
+
+        if (sessionModeStr === 'quiz' || titleLower.includes('quiz') || titleLower.includes('mcq')) {
+          category = 'Quiz & MCQs';
+          icon = <GraduationCap className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />;
+          badgeColor = 'bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200/50 dark:border-emerald-800/50';
+        } else if (sessionModeStr === 'analysis' || titleLower.includes('pdf') || titleLower.includes('file') || titleLower.includes('doc') || lastMsgLower.includes('attachment analysis') || lastMsgLower.includes('.pdf')) {
+          category = 'File / PDF Analysis';
+          icon = <FileText className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />;
+          badgeColor = 'bg-amber-50 dark:bg-amber-950/40 border border-amber-200/50 dark:border-amber-800/50';
+        } else if (sessionModeStr === 'research' || titleLower.includes('research') || titleLower.includes('search')) {
+          category = 'Research & Search';
+          icon = <Search className="w-3.5 h-3.5 text-cyan-600 dark:text-cyan-400" />;
+          badgeColor = 'bg-cyan-50 dark:bg-cyan-950/40 border border-cyan-200/50 dark:border-cyan-800/50';
+        } else if (sessionModeStr === 'live' || titleLower.includes('study') || titleLower.includes('pomodoro')) {
+          category = 'Study Session';
+          icon = <Clock className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />;
+          badgeColor = 'bg-purple-50 dark:bg-purple-950/40 border border-purple-200/50 dark:border-purple-800/50';
+        }
+
+        return {
+          id: session.id,
+          sessionId: session.id,
+          title: session.title || 'Untitled Chat',
+          category,
+          snippet: session.lastMessage ? (session.lastMessage.length > 40 ? session.lastMessage.slice(0, 40) + '...' : session.lastMessage) : '',
+          timeMs,
+          formattedTime: formatRelativeTime(timeMs),
+          icon,
+          badgeColor
+        };
+      })
+      .sort((a, b) => b.timeMs - a.timeMs);
+  }, [sessions]);
+
+  // Dynamic Greeting Generator based on user profile, time of day, day of week, and active mode
+  const dynamicGreetingData = React.useMemo(() => {
+    const rawName = (preferences?.name && preferences.name !== 'Guest User')
+      ? preferences.name 
+      : (user?.displayName || (user?.email ? user.email.split('@')[0] : ''));
+    
+    const firstName = rawName.trim().split(' ')[0] || '';
+    const formattedName = firstName ? (firstName.charAt(0).toUpperCase() + firstName.slice(1)) : '';
+
+    const now = new Date();
+    const hour = now.getHours();
+    const dayOfWeek = now.getDay();
+    const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const dayName = dayNames[dayOfWeek];
+
+    let timeGreeting = 'Good morning';
+    let timeEmoji = '🌅';
+    if (hour >= 5 && hour < 12) {
+      timeGreeting = 'Good morning';
+      timeEmoji = '🌅';
+    } else if (hour >= 12 && hour < 17) {
+      timeGreeting = 'Good afternoon';
+      timeEmoji = '☀️';
+    } else if (hour >= 17 && hour < 22) {
+      timeGreeting = 'Good evening';
+      timeEmoji = '🌆';
+    } else {
+      timeGreeting = 'Late night study';
+      timeEmoji = '🌙';
+    }
+
+    let specialDayText = '';
+    if (dayOfWeek === 5) {
+      specialDayText = 'Happy Friday! 🎉';
+    } else if (dayOfWeek === 6 || dayOfWeek === 0) {
+      specialDayText = `Happy ${dayName}! ☕`;
+    } else {
+      specialDayText = `Happy ${dayName}! ✨`;
+    }
+
+    const deptText = preferences?.department ? `${preferences.department} • ` : '';
+
+    let headline = '';
+    let subtitle = '';
+    let badge = '';
+
+    switch (mode) {
+      case 'student':
+        headline = formattedName ? `${timeGreeting}, ${formattedName}! ${timeEmoji}` : `${timeGreeting}! ${timeEmoji}`;
+        subtitle = "What topic, assignment, or lecture material are we mastering today?";
+        badge = `${deptText}${specialDayText} • Student Mode`;
+        break;
+      case 'developer':
+        headline = formattedName ? `What are we coding, ${formattedName}? 💻` : `Ready to code & debug? 💻`;
+        subtitle = "Architect systems, debug errors, review scripts, or design database models.";
+        badge = `${specialDayText} • Developer Mode`;
+        break;
+      case 'creator':
+        headline = formattedName ? `Unleash your spark, ${formattedName}! ✨` : `Unleash your creativity! ✨`;
+        subtitle = "Draft articles, write persuasive essays, script videos, or generate AI artwork.";
+        badge = `${specialDayText} • Creator Mode`;
+        break;
+      case 'assistant':
+        headline = formattedName ? `At your service, ${formattedName} 💼` : `How may I assist you today? 💼`;
+        subtitle = "Structure schedules, draft emails, organize task lists, or summarize documents.";
+        badge = `${specialDayText} • Executive Assistant`;
+        break;
+      case 'live':
+        headline = formattedName ? `Ready to speak, ${formattedName}? 🎙️` : `Ready for live voice AI? 🎙️`;
+        subtitle = "Start a real-time spoken dialogue to practice language, study, or brainstorm.";
+        badge = `${specialDayText} • Live Voice Mode`;
+        break;
+      case 'salu':
+      default:
+        headline = formattedName ? `Welcome back, ${formattedName}! 🏛️` : `Welcome to SALU AI! 🏛️`;
+        subtitle = "Your intelligent campus assistant at Shah Abdul Latif University.";
+        badge = `${deptText}${specialDayText} • SALU Core AI`;
+        break;
+    }
+
+    return { headline, subtitle, badge };
+  }, [preferences, user, mode]);
 
   const getFileName = (data: string) => {
     if (!data || typeof data !== 'string') return 'File';
@@ -1228,33 +1443,122 @@ export const ChatInterface = React.memo(({ messages, onSendMessage, isLoading, m
       
       <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 md:p-8 space-y-8 md:space-y-12 scroll-smooth relative custom-scrollbar">
         {messages.length === 0 && (
-          <div className="min-h-full flex flex-col items-center justify-center max-w-3xl mx-auto py-12 relative z-10">
+          <div className="min-h-full flex flex-col items-center justify-center max-w-2xl mx-auto py-6 sm:py-10 relative z-10 px-4 w-full">
             <motion.div
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
-              transition={{ duration: 0.8, ease: "easeOut", delay: 0.1 }}
-              className="mb-8 p-3 lg:p-4 bg-white dark:bg-slate-900 rounded-3xl shadow-sm border border-slate-100 dark:border-slate-800 ring-4 ring-slate-50 dark:ring-slate-900/50 flex items-center justify-center"
+              transition={{ duration: 0.5, ease: "easeOut" }}
+              className="mb-3 p-3 bg-white dark:bg-slate-900 rounded-2xl shadow-2xs border border-slate-200/80 dark:border-slate-800 flex items-center justify-center"
             >
               <img 
                 src={LOGO_URL} 
                 alt="SALU AI Logo" 
-                className="w-10 h-10 md:w-12 md:h-12 object-contain mx-auto"
+                className="w-10 h-10 sm:w-12 sm:h-12 object-contain mx-auto"
                 referrerPolicy="no-referrer"
               />
             </motion.div>
-            <motion.h1 
-              initial={{ opacity: 0, y: 10 }}
+
+            {/* Dynamic Context Badge */}
+            <motion.div
+              initial={{ opacity: 0, y: 6 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, ease: "easeOut" }}
-              className="text-[2rem] md:text-[2.5rem] font-semibold tracking-tight mb-8 text-center text-slate-800 dark:text-slate-100 leading-tight"
+              transition={{ duration: 0.4, delay: 0.05 }}
+              className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-brand-50/80 dark:bg-brand-950/50 border border-brand-200/60 dark:border-brand-800/60 text-[11px] font-semibold text-brand-700 dark:text-brand-300 mb-2.5 shadow-2xs"
             >
-              How can I help you this {(() => {
-                const hour = new Date().getHours();
-                if (hour < 12) return 'morning';
-                if (hour < 17) return 'afternoon';
-                return 'evening';
-              })()}?
+              <Sparkles className="w-3 h-3 text-brand-500 animate-pulse shrink-0" />
+              <span>{dynamicGreetingData.badge}</span>
+            </motion.div>
+
+            {/* Dynamic Headline */}
+            <motion.h1 
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, ease: "easeOut" }}
+              className="text-2xl sm:text-3xl font-bold tracking-tight mb-2 text-center text-slate-800 dark:text-slate-100 leading-tight font-serif"
+            >
+              {dynamicGreetingData.headline}
             </motion.h1>
+
+            {/* Dynamic Subtitle */}
+            <motion.p
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: 0.1, ease: "easeOut" }}
+              className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 text-center max-w-md mb-6 leading-relaxed"
+            >
+              {dynamicGreetingData.subtitle}
+            </motion.p>
+
+            {/* Mode Quick Action Chips */}
+            <div className="w-full flex flex-wrap justify-center gap-2 mb-6">
+              {MODE_QUICK_ACTIONS[mode]?.map((action, idx) => (
+                <motion.button
+                  key={idx}
+                  whileHover={{ scale: 1.02, y: -1 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={() => onSendMessage(action.prompt, [])}
+                  className="flex items-center gap-2 px-3.5 py-2 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border border-slate-200/80 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 rounded-xl text-xs font-medium text-slate-700 dark:text-slate-300 shadow-2xs transition-all cursor-pointer"
+                >
+                  <span className="text-brand-600 dark:text-brand-400">{action.icon}</span>
+                  <span>{action.label}</span>
+                </motion.button>
+              ))}
+            </div>
+
+            {/* Real-time Recent Activities Section - only shown when real recent activities exist */}
+            {recentActivities.length > 0 && (
+              <motion.div
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.4, delay: 0.15 }}
+                className="w-full bg-white/75 dark:bg-slate-900/75 backdrop-blur-xl border border-slate-200/80 dark:border-slate-800/80 rounded-2xl p-3.5 sm:p-4 shadow-2xs"
+              >
+                <div className="flex items-center justify-between mb-3 px-1">
+                  <div className="flex items-center gap-2">
+                    <Clock className="w-3.5 h-3.5 text-slate-400 dark:text-slate-500" />
+                    <h2 className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                      Recent Activities
+                    </h2>
+                  </div>
+                  <span className="text-[10px] text-slate-400 dark:text-slate-500 font-medium">
+                    {recentActivities.length} recent
+                  </span>
+                </div>
+
+                <div className="divide-y divide-slate-100 dark:divide-slate-800/60">
+                  {recentActivities.slice(0, 5).map((activity) => (
+                    <button
+                      key={activity.id}
+                      onClick={() => activity.sessionId && setCurrentSessionId(activity.sessionId)}
+                      className="w-full flex items-center justify-between py-2.5 px-2 hover:bg-slate-100/80 dark:hover:bg-slate-800/60 rounded-xl transition-all text-left group cursor-pointer"
+                    >
+                      <div className="flex items-center gap-3 min-w-0 flex-1 pr-2">
+                        <div className={cn(
+                          "w-8 h-8 rounded-xl flex items-center justify-center shrink-0 shadow-2xs transition-transform group-hover:scale-105",
+                          activity.badgeColor
+                        )}>
+                          {activity.icon}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2">
+                            <p className="text-xs font-semibold text-slate-800 dark:text-slate-200 truncate group-hover:text-brand-600 dark:group-hover:text-brand-400 transition-colors">
+                              {activity.title}
+                            </p>
+                          </div>
+                          <p className="text-[11px] text-slate-400 dark:text-slate-500 truncate mt-0.5">
+                            {activity.category} {activity.snippet ? `• ${activity.snippet}` : ''}
+                          </p>
+                        </div>
+                      </div>
+
+                      <span className="text-[10px] font-medium text-slate-400 dark:text-slate-500 shrink-0 ml-2">
+                        {activity.formattedTime}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </motion.div>
+            )}
           </div>
         )}
 
@@ -1339,10 +1643,23 @@ export const ChatInterface = React.memo(({ messages, onSendMessage, isLoading, m
                   </div>
                 )}
                 <MessageContent content={message.content} role={message.role} preferences={preferences} />
-                {message.role === 'model' && (
-                  <div className="flex items-center gap-1.5 mt-2 opacity-0 group-hover/bubble:opacity-100 transition-all duration-300">
+                {(message.role === 'model' || message.role === 'assistant') && (
+                  <div className="flex items-center gap-1.5 mt-2.5 pt-1 opacity-90 sm:opacity-0 group-hover/message:opacity-100 group-hover/bubble:opacity-100 transition-all duration-200 flex-wrap">
                     <SpeakButton content={message.content} voicePreference={preferences.voice || 'female'} />
                     <CopyButton content={message.content} />
+                    <ReactionButtons />
+                    <RetryButton 
+                      isLoading={isLoading} 
+                      onRetry={() => {
+                        for (let i = index - 1; i >= 0; i--) {
+                          if (messages[i].role === 'user') {
+                            onSendMessage(messages[i].content, messages[i].attachments);
+                            notify('Regenerating response...', 'info', 2000);
+                            break;
+                          }
+                        }
+                      }} 
+                    />
                   </div>
                 )}
               </div>
@@ -1400,16 +1717,16 @@ export const ChatInterface = React.memo(({ messages, onSendMessage, isLoading, m
         )}
       </AnimatePresence>
 
-      <div className="px-3 pb-3 md:px-8 md:pb-8 relative z-20 bg-gradient-to-t from-white via-white to-transparent dark:from-slate-950 dark:via-slate-950 pt-10 transition-colors duration-300">
-        <div className="max-w-3xl mx-auto">
+      <div className="px-2.5 pb-2 sm:px-4 sm:pb-3 md:px-6 md:pb-4 relative z-20 bg-gradient-to-t from-white via-white/95 to-transparent dark:from-slate-950 dark:via-slate-950/95 pt-3 transition-colors duration-300 pb-[calc(0.5rem+env(safe-area-inset-bottom))]">
+        <div className="max-w-2xl mx-auto w-full">
           <motion.form 
             id="chat-input-area"
             onSubmit={handleSubmit} 
             animate={{
-               boxShadow: isTyping ? "0 12px 32px rgba(0,0,0,0.06)" : "0 4px 16px rgba(0,0,0,0.03)"
+               boxShadow: isTyping ? "0 10px 28px rgba(0,0,0,0.06)" : "0 2px 10px rgba(0,0,0,0.02)"
             }}
             className={cn(
-               "relative bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border border-slate-200/80 dark:border-slate-800 rounded-[2rem] p-2 transition-all duration-500 ease-out shadow-sm flex flex-col w-full",
+               "relative bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl border border-slate-200/80 dark:border-slate-800 rounded-2xl sm:rounded-3xl p-1.5 sm:p-2 transition-all duration-300 ease-out shadow-xs flex flex-col w-full",
                isTyping ? "border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900" : ""
             )}
           >
@@ -1614,7 +1931,7 @@ export const ChatInterface = React.memo(({ messages, onSendMessage, isLoading, m
             </div>
             </motion.form>
 
-            <p className="text-xs text-center text-slate-500 mt-4">
+            <p className="text-[11px] text-center text-slate-400 dark:text-slate-500 mt-2">
               SALU AI can make mistakes. Check important info.
             </p>
           </div>

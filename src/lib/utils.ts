@@ -58,3 +58,35 @@ export function compressImage(
   });
 }
 
+export async function uploadImageToImageKit(
+  fileData: string,
+  userId: string,
+  fileName = `profile-${Date.now()}.png`,
+  folder = `/salu-ai-profiles/${userId}`
+): Promise<string | null> {
+  try {
+    const response = await fetch('/api/imagekit/upload', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        file: fileData,
+        fileName,
+        tags: ['profile-picture', userId],
+        folder,
+      }),
+    });
+
+    if (response.ok) {
+      const data = await response.json();
+      if (data && data.url) {
+        return data.url;
+      }
+    }
+  } catch (err) {
+    console.warn('ImageKit upload request failed:', err);
+  }
+  return null;
+}
+

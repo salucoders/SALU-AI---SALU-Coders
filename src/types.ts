@@ -46,6 +46,7 @@ export interface ChatSession {
   mode: Mode;
   persona?: Persona; // Optional, can override global preference
   messages?: Message[];
+  lastMessage?: string;
   createdAt: any;
   updatedAt?: any;
   isArchived?: boolean;

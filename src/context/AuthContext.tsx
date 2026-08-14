@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useState, useMemo, useCallback } from 'react';
 import { User, onAuthStateChanged, signInWithPopup, GoogleAuthProvider, signOut } from 'firebase/auth';
 import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { auth, db } from '../lib/firebase';
@@ -27,8 +27,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (currentUser) {
         try {
-          // Wrap DB operations in a timeout to prevent hanging the auth flow
-          // and catch connection errors gracefully
           const configPromise = getDoc(doc(db, 'system', 'config')).catch(() => null);
           const userDocPromise = getDoc(doc(db, 'users', currentUser.uid)).catch(() => null);
           
@@ -38,7 +36,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           const isAdmin = currentUser.email === 'salucoders@gmail.com';
 
           if (userDoc && !userDoc.exists()) {
-            // Check if registration is allowed
             if (!config.publicRegistration && !isAdmin) {
               await signOut(auth);
               notify?.('Registration is currently disabled by administrator', 'error', 5000);
@@ -46,7 +43,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               return;
             }
 
-            // Attempt to create profile, but don't crash if offline
             try {
               await setDoc(doc(db, 'users', currentUser.uid), {
                 uid: currentUser.uid,
@@ -78,7 +74,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => unsubscribe();
   }, [notify]);
 
-  const loginWithGoogle = async () => {
+  const loginWithGoogle = useCallback(async () => {
     if (isAuthenticating || user) return;
     
     setIsAuthenticating(true);
@@ -109,19 +105,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setIsAuthenticating(false);
     }
-  };
+  }, [isAuthenticating, user, notify]);
 
-  const logout = async () => {
+  const logout = useCallback(async () => {
     try {
       await signOut(auth);
     } catch (error) {
       console.error("Logout Error:", error);
       throw error;
     }
-  };
+  }, []);
+
+  const value = useMemo(() => ({
+    user,
+    loading,
+    isAuthenticating,
+    loginWithGoogle,
+    logout
+  }), [user, loading, isAuthenticating, loginWithGoogle, logout]);
 
   return (
-    <AuthContext.Provider value={{ user, loading, isAuthenticating, loginWithGoogle, logout }}>
+    <AuthContext.Provider value={value}>
       {children}
     </AuthContext.Provider>
   );

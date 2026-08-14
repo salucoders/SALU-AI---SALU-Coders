@@ -1,8 +1,6 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, Suspense, lazy } from 'react';
 import { Sidebar } from './components/Sidebar';
 import { ChatInterface } from './components/ChatInterface';
-import { SettingsModal } from './components/SettingsModal';
-import { ImageKitGallery } from './components/ImageKitGallery';
 import { LoginPage } from './components/LoginPage';
 import { Mode, Message, ChatSession, Persona } from './types';
 import { sendMessage, sendMessageStream, generateImageWithSALU } from './services/gemini';
@@ -18,11 +16,16 @@ import { onSnapshot, doc, updateDoc, serverTimestamp } from 'firebase/firestore'
 import  { db, OperationType, handleFirestoreError } from './lib/firebase';
 
 import { Onboarding } from './components/Onboarding';
-import { LiveChatInterface } from './components/LiveChatInterface';
-import { AdminPanel } from './components/AdminPanel';
 import { Toolbox } from './components/Toolbox';
-import { UpgradeModal } from './components/UpgradeModal';
 import { InstallPWA } from './components/InstallPWA';
+
+// Lazy loaded heavy modals and views
+const SettingsModal = lazy(() => import('./components/SettingsModal').then(m => ({ default: m.SettingsModal })));
+const ImageKitGallery = lazy(() => import('./components/ImageKitGallery').then(m => ({ default: m.ImageKitGallery })));
+const LiveChatInterface = lazy(() => import('./components/LiveChatInterface').then(m => ({ default: m.LiveChatInterface })));
+const AdminPanel = lazy(() => import('./components/AdminPanel').then(m => ({ default: m.AdminPanel })));
+const UpgradeModal = lazy(() => import('./components/UpgradeModal').then(m => ({ default: m.UpgradeModal })));
+
 
 export default function App() {
   const { preferences, loading: profileLoading, isAdmin, isPaid, updatePreferences } = useUserProfile();
@@ -249,18 +252,21 @@ export default function App() {
     }
   }, [user, profileLoading]);
 
+  const initialSessionSetRef = useRef(false);
+
   // Auto-manage session
   useEffect(() => {
-    if (user && !sessionsLoading) {
-      if (sessions.length === 0 && !currentSessionId) {
-        createSession(preferences.preferredMode || 'student').catch(e => console.error("Auto-create session failed:", e));
-      } else if (sessions.length > 0 && !currentSessionId) {
-        // Automatically select the most recent active session
+    if (user && !sessionsLoading && !initialSessionSetRef.current) {
+      if (sessions.length > 0 && !currentSessionId) {
+        // Automatically select the most recent active session on initial load
         const latestSession = sessions.find(s => !s.isArchived) || sessions[0];
         setCurrentSessionId(latestSession.id);
+        initialSessionSetRef.current = true;
+      } else if (sessions.length === 0) {
+        initialSessionSetRef.current = true;
       }
     }
-  }, [user, sessionsLoading, sessions.length, currentSessionId, createSession, setCurrentSessionId, preferences.preferredMode]);
+  }, [user, sessionsLoading, sessions, currentSessionId, setCurrentSessionId]);
 
   const isSendingRef = useRef(false);
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -282,13 +288,33 @@ export default function App() {
       return;
     }
 
-    const currentSession = sessions.find(s => s.id === currentSessionId);
-    if (!currentSession) return;
-
     isSendingRef.current = true;
     setIsLoading(true);
     setIsStreaming(true);
     setStreamedText("");
+
+    let targetSessionId = currentSessionId;
+    let targetMode = preferences.preferredMode || 'student';
+
+    // If there is no active session yet, create one in Firestore now that user is sending a message!
+    if (!targetSessionId || !sessions.some(s => s.id === targetSessionId)) {
+      try {
+        targetSessionId = await createSession(targetMode);
+      } catch (err) {
+        console.error("Failed to create session on message send:", err);
+        isSendingRef.current = false;
+        setIsLoading(false);
+        setIsStreaming(false);
+        return;
+      }
+    }
+
+    const currentSession = sessions.find(s => s.id === targetSessionId) || {
+      id: targetSessionId,
+      mode: targetMode,
+      title: 'Untitled Chat',
+      persona: preferences.persona || 'professional'
+    };
 
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
@@ -341,14 +367,17 @@ export default function App() {
   };
 
   const handleModeChange = async (mode: Mode) => {
-    if (!currentSessionId) return;
     try {
-      const sessionRef = sessions.find(s => s.id === currentSessionId);
-      if (sessionRef) {
-        await updateDoc(doc(db, 'sessions', currentSessionId), { mode, updatedAt: serverTimestamp() });
-        await updatePreferences({ preferredMode: mode });
-        notify(`Switched to ${mode.charAt(0).toUpperCase() + mode.slice(1)} Mode`, 'change', 2000);
+      await updatePreferences({ preferredMode: mode });
+      if (currentSessionId) {
+        const sessionRef = sessions.find(s => s.id === currentSessionId);
+        if (sessionRef) {
+          await updateDoc(doc(db, 'sessions', currentSessionId), { mode, updatedAt: serverTimestamp() });
+        }
       }
+      const modeObj = MODES.find(m => m.id === mode);
+      const modeName = modeObj ? modeObj.label : mode.charAt(0).toUpperCase() + mode.slice(1);
+      notify(`Switched to SALU AI ${modeName} Mode`, 'change', 2000);
     } catch (e) {
       console.error("Failed to change mode:", e);
     }
@@ -393,6 +422,14 @@ export default function App() {
   }
 
   const currentSession = sessions.find(s => s.id === currentSessionId);
+  const activeSession = currentSession || {
+    id: currentSessionId || '',
+    userId: user.uid,
+    mode: preferences.preferredMode || 'student',
+    title: 'New Chat',
+    isArchived: false,
+    createdAt: new Date().toISOString()
+  };
 
   return (
     <div className={cn(
@@ -402,15 +439,11 @@ export default function App() {
       <Sidebar 
         sessions={sessions}
         currentSessionId={currentSessionId}
-        currentMode={currentSession?.mode || 'student'}
+        currentMode={activeSession.mode}
         liveAiEnabled={systemConfig.liveAiMode}
         onModeChange={handleModeChange}
-        onNewChat={async () => {
-          try {
-            await createSession(preferences.preferredMode || 'student');
-          } catch (e) {
-            console.error("Failed to create session:", e);
-          }
+        onNewChat={() => {
+          setCurrentSessionId(null);
         }}
         onSelectSession={setCurrentSessionId}
         onClearChats={async () => {
@@ -470,44 +503,50 @@ export default function App() {
         )}
       </AnimatePresence>
 
-      <AnimatePresence>
-        {isVaultOpen && (
-          <ImageKitGallery 
-            isOpen={isVaultOpen} 
-            onClose={() => setIsVaultOpen(false)} 
-            onOpenUpgrade={() => setIsUpgradeOpen(true)}
+      <Suspense fallback={null}>
+        <AnimatePresence>
+          {isVaultOpen && (
+            <ImageKitGallery 
+              isOpen={isVaultOpen} 
+              onClose={() => setIsVaultOpen(false)} 
+              onOpenUpgrade={() => setIsUpgradeOpen(true)}
+            />
+          )}
+        </AnimatePresence>
+
+        <AnimatePresence>
+          {showOnboarding && (
+            <Onboarding 
+              onComplete={() => {
+                setShowOnboarding(false);
+                localStorage.setItem('salu_ai_onboarding_seen', 'true');
+              }} 
+              onUpgradeRequest={() => {
+                setShowOnboarding(false);
+                localStorage.setItem('salu_ai_onboarding_seen', 'true');
+                setIsUpgradeOpen(true);
+              }}
+            />
+          )}
+        </AnimatePresence>
+        
+        {isUpgradeOpen && (
+          <UpgradeModal 
+            isOpen={isUpgradeOpen}
+            onClose={() => setIsUpgradeOpen(false)}
+            isPaid={isPaid}
+            jazzCashNumber={systemConfig.jazzCashNumber}
+            qrUrl={systemConfig.paymentQrUrl}
           />
         )}
-      </AnimatePresence>
 
-      <AnimatePresence>
-        {showOnboarding && (
-          <Onboarding 
-            onComplete={() => {
-              setShowOnboarding(false);
-              localStorage.setItem('salu_ai_onboarding_seen', 'true');
-            }} 
-            onUpgradeRequest={() => {
-              setShowOnboarding(false);
-              localStorage.setItem('salu_ai_onboarding_seen', 'true');
-              setIsUpgradeOpen(true);
-            }}
+        {isSettingsOpen && (
+          <SettingsModal 
+            isOpen={isSettingsOpen}
+            onClose={() => setIsSettingsOpen(false)}
           />
         )}
-      </AnimatePresence>
-      
-      <UpgradeModal 
-        isOpen={isUpgradeOpen}
-        onClose={() => setIsUpgradeOpen(false)}
-        isPaid={isPaid}
-        jazzCashNumber={systemConfig.jazzCashNumber}
-        qrUrl={systemConfig.paymentQrUrl}
-      />
-
-      <SettingsModal 
-        isOpen={isSettingsOpen}
-        onClose={() => setIsSettingsOpen(false)}
-      />
+      </Suspense>
 
       <InstallPWA />
       
@@ -544,7 +583,7 @@ export default function App() {
                   className="w-full flex items-center justify-center gap-2 py-1.5 transition-all text-slate-800 hover:text-slate-900 group"
                 >
                   {(() => {
-                    const currentModeId = currentSession?.mode || preferences.preferredMode || 'student';
+                    const currentModeId = activeSession.mode;
                     const activeMode = MODES.find(m => m.id === currentModeId) || MODES[0];
                     return (
                       <>
@@ -578,19 +617,13 @@ export default function App() {
                         <div className="max-h-[400px] overflow-y-auto custom-scrollbar px-2 space-y-1">
                           {MODES.filter(m => m.id !== 'live' || systemConfig.liveAiMode).map((mode) => {
                             const Icon = mode.icon;
-                            const currentModeId = currentSession?.mode || preferences.preferredMode || 'student';
+                            const currentModeId = activeSession.mode;
                             const isActive = currentModeId === mode.id;
-                            const isLocked = !isPaid && ['live', 'assistant'].includes(mode.id);
                             
                             return (
                               <button
                                 key={mode.id}
                                 onClick={async () => {
-                                  if (isLocked) {
-                                    setIsUpgradeOpen(true);
-                                    setIsModeOpen(false);
-                                    return;
-                                  }
                                   await handleModeChange(mode.id);
                                   setIsModeOpen(false);
                                 }}
@@ -610,7 +643,6 @@ export default function App() {
                                 <div className="flex-1 min-w-0">
                                   <div className="font-bold flex items-center gap-2 font-serif">
                                     {mode.label}
-                                    {isLocked && <Lock className="w-3 h-3 opacity-50" />}
                                   </div>
                                   <p className={cn("text-[10px] truncate", isActive ? "text-slate-400" : "text-slate-500")}>
                                     {mode.description}
@@ -654,67 +686,80 @@ export default function App() {
           
           <div className="flex-1 flex flex-col h-full overflow-hidden pt-20">
             <div className="flex-1 overflow-hidden">
-              {!currentSession ? (
-                <div className="h-full flex flex-col items-center justify-center bg-white" />
-              ) : currentSession.mode === 'live' ? (
-                <LiveChatInterface 
-                  onClose={async () => {
-                    try {
-                      await handleModeChange('student');
-                    } catch (e) {
-                      console.error("Failed to close live chat:", e);
-                    }
-                  }} 
-                  onSendMessage={handleSendMessage}
-                  onGenerateImage={async (prompt) => {
-                    if (!currentSessionId) return;
+              <Suspense fallback={
+                <div className="flex items-center justify-center h-full">
+                  <Loader2 className="w-8 h-8 text-emerald-500 animate-spin" />
+                </div>
+              }>
+                {activeSession.mode === 'live' ? (
+                  <LiveChatInterface 
+                    onClose={async () => {
+                      try {
+                        await handleModeChange('student');
+                      } catch (e) {
+                        console.error("Failed to close live chat:", e);
+                      }
+                    }} 
+                    onSendMessage={handleSendMessage}
+                    onGenerateImage={async (prompt) => {
+                      let targetId = currentSessionId;
+                      if (!targetId) {
+                        try {
+                          targetId = await createSession('live');
+                        } catch (err) {
+                          return;
+                        }
+                      }
 
-                    // Quota check
-                    const maxImages = preferences.subscription === 'paid' ? 5 : 3;
-                    if ((preferences.imagesUsedToday || 0) >= maxImages) {
-                        notify(`You have reached your daily image generation limit (${maxImages} images/day). Upgrade for higher limits.`, 'error', 5000);
-                        return;
-                    }
-                    
-                    setIsLoading(true);
-                    try {
-                      notify('Live AI is painting your vision...', 'change', 3000);
-                      const imageUrl = await generateImageWithSALU(prompt);
+                      // Quota check
+                      const maxImages = preferences.subscription === 'paid' ? 5 : 3;
+                      if ((preferences.imagesUsedToday || 0) >= maxImages) {
+                          notify(`You have reached your daily image generation limit (${maxImages} images/day). Upgrade for higher limits.`, 'error', 5000);
+                          return;
+                      }
                       
-                      // Update quota
-                      await updatePreferences({ imagesUsedToday: (preferences.imagesUsedToday || 0) + 1 });
+                      setIsLoading(true);
+                      try {
+                        notify('Live AI is painting your vision...', 'change', 3000);
+                        const imageUrl = await generateImageWithSALU(prompt);
+                        
+                        // Update quota
+                        await updatePreferences({ imagesUsedToday: (preferences.imagesUsedToday || 0) + 1 });
 
-                      await addMessage(currentSessionId, 'model', `[IMAGE_GEN: ${prompt}]`, []);
-                      // Also add the actual image result
-                      await addMessage(currentSessionId, 'model', `Here is your creation based on: ${prompt}`, [imageUrl]);
-                      notify('Image generated and saved to chat!', 'success', 4000);
-                    } catch (e: any) {
-                      notify(`Image generation failed: ${e.message}`, 'error', 5000);
-                    } finally {
-                      setIsLoading(false);
-                    }
-                  }}
-                />
-              ) : (
-                <ChatInterface 
-                  messages={messages}
-                  onSendMessage={handleSendMessage}
-                  isLoading={isLoading}
-                  mode={currentSession.mode}
-                  isStreaming={isStreaming}
-                  streamedText={streamedText}
-                />
-              )}
+                        await addMessage(targetId, 'model', `[IMAGE_GEN: ${prompt}]`, []);
+                        // Also add the actual image result
+                        await addMessage(targetId, 'model', `Here is your creation based on: ${prompt}`, [imageUrl]);
+                        notify('Image generated and saved to chat!', 'success', 4000);
+                      } catch (e: any) {
+                        notify(`Image generation failed: ${e.message}`, 'error', 5000);
+                      } finally {
+                        setIsLoading(false);
+                      }
+                    }}
+                  />
+                ) : (
+                  <ChatInterface 
+                    messages={messages}
+                    onSendMessage={handleSendMessage}
+                    isLoading={isLoading}
+                    mode={activeSession.mode}
+                    isStreaming={isStreaming}
+                    streamedText={streamedText}
+                  />
+                )}
+              </Suspense>
             </div>
           </div>
         </div>
       </main>
 
-      <AnimatePresence>
-        {isAdminPanelOpen && (
-          <AdminPanel onClose={() => setIsAdminPanelOpen(false)} />
-        )}
-      </AnimatePresence>
+      <Suspense fallback={null}>
+        <AnimatePresence>
+          {isAdminPanelOpen && (
+            <AdminPanel onClose={() => setIsAdminPanelOpen(false)} />
+          )}
+        </AnimatePresence>
+      </Suspense>
     </div>
   );
 }
