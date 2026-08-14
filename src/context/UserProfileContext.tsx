@@ -96,9 +96,16 @@ export const UserProfileProvider: React.FC<{ children: React.ReactNode }> = ({ c
     });
 
     setLoading(true);
+
+    // Safeguard: Never hang loading state indefinitely if Firestore connection is slow
+    const safetyTimeout = setTimeout(() => {
+      setLoading(false);
+    }, 3000);
+
     const userDocRef = doc(db, 'users', user.uid);
     
     const unsubscribe = onSnapshot(userDocRef, async (docSnap) => {
+      clearTimeout(safetyTimeout);
       if (docSnap.exists()) {
         const rawData = docSnap.data();
         let profilePic = rawData.profilePicture || '';
@@ -159,7 +166,10 @@ export const UserProfileProvider: React.FC<{ children: React.ReactNode }> = ({ c
       setLoading(false);
     });
 
-    return () => unsubscribe();
+    return () => {
+      clearTimeout(safetyTimeout);
+      unsubscribe();
+    };
   }, [user]);
 
   useEffect(() => {

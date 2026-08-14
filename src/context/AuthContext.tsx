@@ -21,7 +21,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isAuthenticating, setIsAuthenticating] = useState(false);
 
   useEffect(() => {
+    // Safety fallback: Never keep auth loading forever if network/indexedDB hangs
+    const safetyTimeout = setTimeout(() => {
+      setLoading(false);
+    }, 3000);
+
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+      clearTimeout(safetyTimeout);
       setUser(currentUser);
       setLoading(false);
 
@@ -71,7 +77,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     });
 
-    return () => unsubscribe();
+    return () => {
+      clearTimeout(safetyTimeout);
+      unsubscribe();
+    };
   }, [notify]);
 
   const loginWithGoogle = useCallback(async () => {

@@ -18,6 +18,7 @@ import  { db, OperationType, handleFirestoreError } from './lib/firebase';
 import { Onboarding } from './components/Onboarding';
 import { Toolbox } from './components/Toolbox';
 import { InstallPWA } from './components/InstallPWA';
+import { LoadingScreen } from './components/LoadingScreen';
 
 // Lazy loaded heavy modals and views
 const SettingsModal = lazy(() => import('./components/SettingsModal').then(m => ({ default: m.SettingsModal })));
@@ -391,14 +392,16 @@ export default function App() {
     };
   }, [currentSessionId, sessions]);
 
-  if (authLoading || profileLoading) {
-    return (
-      <div className="h-screen w-full bg-[#F5F4F0]" />
-    );
+  if (authLoading) {
+    return <LoadingScreen />;
   }
 
   if (!user) {
     return <LoginPage />;
+  }
+
+  if (profileLoading) {
+    return <LoadingScreen />;
   }
 
   if (systemConfig.maintenanceMode && !isAdmin) {
